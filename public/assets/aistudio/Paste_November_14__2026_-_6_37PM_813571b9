@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Karya - منصة كراء السيارات</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Supabase JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <!-- Babel for JSX in browser -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: system-ui, -apple-system, sans-serif; background-color: #f8fafc; }
+        .hidden-view { display: none !important; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // ==========================================
+        // 1. إعدادات Supabase (المفاتيح التي أرسلتها)
+        // ==========================================
+        const SUPABASE_URL = 'https://nklmlcbojylonybrglbq.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5rbG1sY2Jvanlsb255YnJnbGJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ1MTAxMDksImV4cCI6MjExMDA4NjEwOX0.N830adtyD8KkrhRS_RouJvgKriWTVTLcH_eFcPJyzXI';
+        
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // ==========================================
+        // 2. المكونات المساعدة (Helpers)
+        // ==========================================
+        const formatMAD = (n) => new Intl.NumberFormat('fr-MA', { style: 'currency', currency: 'MAD' }).format(n);
+
+        const CITIES = ['Casablanca', 'Marrakech', 'Agadir', 'Rabat', 'Tangier'];
+
+        // ==========================================
+        // 3. واجهة العميل (Customer View)
+        // ==========================================
+        function CustomerApp({ onGoToAgency }) {
+            const [city, setCity] = useState('Casablanca');
+            const [cars, setCars] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [selectedCar, setSelectedCar] = useState(null);
+            const [bookingSuccess, setBookingSuccess] = useState(null);
+
+            useEffect(() => {
+                fetchCars();
+            }, [city]);
+
+            const fetchCars = async () => {
+                setLoading(true);
+                const { data, error } = await supabase
+                    .from('agency_cars')
+                    .select(`*, car_catalog (*), agencies (name, rating_avg, rating_count)`)
+                    .eq('city', city)
+                    .eq('status', 'available');
+                
+                if (!error) setCars(data || []);
+                setLoading(false);
+            };
+
+            const handleBook = async (formData) => {
+                const total = selectedCar.daily_price * formData.days;
+                const { data, error } = await supabase.rpc('create_booking', {
+                    p_agency_car_id: selectedCar.id,
+                    p_customer_name: formData.name,
+                    p_customer_cin: formData.cin,
+                    p_customer_phone: formData.phone,
+                    p_customer_email: formData.email || null,
+                    p_days: formData.days,
+                    p_delivery_at: new Date(formData.date).toISOString()
+                });
+
+                if (error) {
+                    alert("خطأ: " + error.message);
+                } else {
+                    setBookingSuccess(data[0]);
+                    setSelectedCar(null);
+                }
+            };
+
+            if (bookingSuccess) {
+                return (
+                    <div className="min-h-screen bg-gray-50 p-4 pt-12" dir="rtl">
+                        <div className="max-w-md mx-auto bg-white rounded-2xl shadow-lg p-6 text-center">
+                            <i className="fas fa-check-circle text-5xl text-emerald-500 mb-4"></i>
+                            <h2 className="text-2xl font-bold text-gray-900 mb-2">تم الحجز بنجاح!</h2>
+                            <p className="text-gray-600 mb-4">يرجى تحويل المبلغ للوكالة عبر RIB:</p>
+                            <div className="bg-gray-100 p-3 rounded text-sm font-mono mb-4 break-all" dir="ltr">
+                                {bookingSuccess.booking_id}
+                            </div>
+                            <button onClick={() => setBookingSuccess(null)} className="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold">العودة للرئيسية</button>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen pb-20">
+                    <header className="bg-white shadow-sm sticky top-0 z-10 p-4">
+                        <div className="max-w-5xl mx-auto flex justify-between items-center">
+                            <div className="flex items-center gap-2">
+                                <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white font-bold text-xl">K</div>
+                                <h1 className="font-bold text-xl text-gray-900">Karya</h1>
+                            </div>
+                            <button onClick={onGoToAgency} className="text-sm font-medium text-emerald-600 border border-emerald-600 px-4 py-2 rounded-lg hover:bg-emerald-50">
+                                بوابة الوكالات
+                            </button>
+                        </div>
+                    </header>
+
+                    <main className="max-w-5xl mx-auto p-4">
+                        <div className="bg-emerald-50 rounded-2xl p-6 mb-8 mt-4">
+                            <h2 className="text-2xl font-bold text-gray-900 mb-2">اكتشف سيارتك المفضلة</h2>
+                            <select 
+                                value={city} 
+                                onChange={(e) => setCity(e.target.value)}
+                                className="w-full md:w-64 p-3 rounded-xl border-none shadow-sm focus:ring-2 focus:ring-emerald-500"
+                            >
+                                {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                        </div>
+
+                        {loading ? (
+                            <div className="text-center py-20 text-emerald-600"><i className="fas fa-spinner fa-spin text-4xl"></i></div>
+                        ) : cars.length === 0 ? (
+                            <div className="text-center py-20 text-gray-500">لا توجد سيارات متاحة في هذه المدينة حالياً.</div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {cars.map(car => (
+                                    <div key={car.id} className="bg-white rounded-2xl shadow-sm hover:shadow-md transition overflow-hidden flex flex-col">
+                                        <img src={car.car_catalog.image_url} alt="car" className="w-full h-48 object-cover bg-gray-200" />
+                                        <div className="p-4 flex-1 flex flex-col">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <h3 className="font-bold text-lg">{car.car_catalog.brand} {car.car_catalog.model}</h3>
+                                                <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2 py-1 rounded">{formatMAD(car.daily_price)}/يوم</span>
+                                            </div>
+                                            <p className="text-sm text-gray-500 mb-4"><i className="fas fa-store ml-1"></i> {car.agencies.name}</p>
+                                            <button 
+                                                onClick={() => setSelectedCar(car)}
+                                                className="mt-auto w-full bg-emerald-600 text-white py-2 rounded-lg font-semibold hover:bg-emerald-700"
+                                            >
+                                                احجز الآن
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </main>
+
+                    {/* Booking Modal */}
+                    {selectedCar && (
+                        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                            <div className="bg-white rounded-2xl w-full max-w-md p-6 relative">
+                                <button onClick={() => setSelectedCar(null)} className="absolute top-4 left-4 text-gray-400 hover:text-gray-900"><i className="fas fa-times"></i></button>
+                                <h3 className="font-bold text-xl mb-4">تأكيد الحجز</h3>
+                                <BookingForm car={selectedCar} onSubmit={handleBook} />
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        function BookingForm({ car, onSubmit }) {
+            const [form, setForm] = useState({ name: '', cin: '', phone: '', email: '', days: 1, date: '' });
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                onSubmit(form);
+            };
+            return (
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <input required placeholder="الاسم الكامل" className="w-full p-3 border rounded-xl" onChange={e => setForm({...form, name: e.target.value})} />
+                    <input required placeholder="رقم البطاقة الوطنية" className="w-full p-3 border rounded-xl" onChange={e => setForm({...form, cin: e.target.value})} />
+                    <input required type="tel" placeholder="رقم الهاتف" className="w-full p-3 border rounded-xl" onChange={e => setForm({...form, phone: e.target.value})} />
+                    <input required type="number" min="1" placeholder="عدد الأيام" className="w-full p-3 border rounded-xl" onChange={e => setForm({...form, days: parseInt(e.target.value)})} />
+                    <input required type="datetime-local" className="w-full p-3 border rounded-xl" onChange={e => setForm({...form, date: e.target.value})} />
+                    <div className="bg-emerald-50 p-4 rounded-xl font-bold text-lg flex justify-between">
+                        <span>المجموع:</span>
+                        <span>{formatMAD(car.daily_price * form.days)}</span>
+                    </div>
+                    <button type="submit" className="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold hover:bg-emerald-700">تأكيد</button>
+                </form>
+            );
+        }
+
+        // ==========================================
+        // 4. واجهة الوكالة (Agency View)
+        // ==========================================
+        function AgencyApp({ onGoToCustomer }) {
+            const [session, setSession] = useState(null);
+            const [agency, setAgency] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [view, setView] = useState('dashboard'); // dashboard, cars, bookings
+            const [cars, setCars] = useState([]);
+            const [bookings, setBookings] = useState([]);
+
+            useEffect(() => {
+                supabase.auth.getSession().then(({ data: { session } }) => {
+                    setSession(session);
+                    if (session) fetchAgency(session.user.id);
+                    else setLoading(false);
+                });
+
+                const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+                    setSession(session);
+                    if (session) fetchAgency(session.user.id);
+                    else { setAgency(null); setLoading(false); }
+                });
+
+                return () => authListener.subscription.unsubscribe();
+            }, []);
+
+            const fetchAgency = async (userId) => {
+                const { data } = await supabase.from('agencies').select('*').eq('owner_id', userId).maybeSingle();
+                setAgency(data);
+                if (data) {
+                    fetchCars(data.id);
+                    fetchBookings(data.id);
+                }
+                setLoading(false);
+            };
+
+            const fetchCars = async (agencyId) => {
+                const { data } = await supabase.from('agency_cars').select('*, car_catalog(*)').eq('agency_id', agencyId);
+                setCars(data || []);
+            };
+
+            const fetchBookings = async (agencyId) => {
+                const { data } = await supabase.from('bookings').select('*, agency_cars(car_catalog(brand, model))').eq('agency_id', agencyId).order('created_at', {ascending: false});
+                setBookings(data || []);
+            };
+
+            if (loading) return <div className="min-h-screen flex items-center justify-center"><i className="fas fa-spinner fa-spin text-4xl text-emerald-600"></i></div>;
+
+            // Login / Register
+            if (!session) {
+                return <AgencyLogin onLogin={() => {}} onGoToCustomer={onGoToCustomer} />;
+            }
+
+            // Onboarding (No agency profile yet)
+            if (!agency) {
+                return <AgencyOnboarding user={session.user} onComplete={() => fetchAgency(session.user.id)} onGoToCustomer={onGoToCustomer} />;
+            }
+
+            // Dashboard
+            return (
+                <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row" dir="rtl">
+                    {/* Sidebar */}
+                    <aside className="w-full md:w-64 bg-white border-l border-gray-200 p-4 flex flex-col">
+                        <div className="flex items-center gap-3 mb-8 px-2">
+                            <div className="w-10 h-10 bg-emerald-600 rounded-lg flex items-center justify-center text-white font-bold">A</div>
+                            <div>
+                                <p className="text-xs text-gray-500">بوابة الوكالات</p>
+                                <p className="font-bold text-gray-900 truncate max-w-[120px]">{agency.name}</p>
+                            </div>
+                        </div>
+                        
+                        <nav className="space-y-2 flex-1">
+                            <button onClick={() => setView('dashboard')} className={`w-full text-right px-4 py-3 rounded-xl font-medium ${view === 'dashboard' ? 'bg-emerald-50 text-emerald-700' : 'text-gray-600 hover:bg-gray-50'}`}><i className="fas fa-home ml-2"></i> الرئيسية</button>
+                            <button onClick={() => setView('cars')} className={`w-full text-right px-4 py-3 rounded-xl font-medium ${view === 'cars' ? 'bg-emerald-50 text-emerald-700' : 'text-gray-600 hover:bg-gray-50'}`}><i className="fas fa-car ml-2"></i> سياراتي</button>
+                            <button onClick={() => setView('bookings')} className={`w-full text-right px-4 py-3 rounded-xl font-medium ${view === 'bookings' ? 'bg-emerald-50 text-emerald-700' : 'text-gray-600 hover:bg-gray-50'}`}><i className="fas fa-calendar ml-2"></i> الحجوزات</button>
+                        </nav>
+
+                        <button onClick={onGoToCustomer} className="w-full text-right px-4 py-3 text-sm text-gray-500 hover:text-emerald-600 mt-4"><i className="fas fa-arrow-right ml-2"></i> العودة للموقع</button>
+                        <button onClick={() => supabase.auth.signOut()} className="w-full text-right px-4 py-3 text-sm text-red-600 hover:bg-red-50 rounded-xl mt-2"><i className="fas fa-sign-out-alt ml-2"></i> تسجيل الخروج</button>
+                    </aside>
+
+                    {/* Main Content */}
+                    <main className="flex-1 p-4 md:p-8">
+                        {view === 'dashboard' && <AgencyDashboard agency={agency} cars={cars} bookings={bookings} />}
+                        {view === 'cars' && <AgencyCars cars={cars} agency={agency} refresh={() => fetchCars(agency.id)} />}
+                        {view === 'bookings' && <AgencyBookings bookings={bookings} refresh={() => fetchBookings(agency.id)} />}
+                    </main>
+                </div>
+            );
+        }
+
+        function AgencyLogin({ onGoToCustomer }) {
+            const [isLogin, setIsLogin] = useState(true);
+            const [email, setEmail] = useState('');
+            const [password, setPassword] = useState('');
+            const [error, setError] = useState(null);
+            const [loading, setLoading] = useState(false);
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setLoading(true); setError(null);
+                const { error } = isLogin 
+                    ? await supabase.auth.signInWithPassword({ email, password })
+                    : await supabase.auth.signUp({ email, password });
+                
+                if (error) setError(error.message);
+                setLoading(false);
+            };
+
+            return (
+                <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4" dir="rtl">
+                    <div className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
+                        <div className="text-center mb-8">
+                            <h2 className="text-2xl font-bold text-gray-900">{isLogin ? 'دخول الوكالات' : 'تسجيل وكالة جديدة'}</h2>
+                        </div>
+                        {error && <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm">{error}</div>}
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <input type="email" required placeholder="البريد الإلكتروني" className="w-full p-3 border rounded-xl" value={email} onChange={e => setEmail(e.target.value)} dir="ltr" />
+                            <input type="password" required placeholder="كلمة المرور" className="w-full p-3 border rounded-xl" value={password} onChange={e => setPassword(e.target.value)} dir="ltr" />
+                            <button type="submit" disabled={loading} className="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold hover:bg-emerald-700">
+                                {loading ? 'جاري...' : (isLogin ? 'دخول' : 'إنشاء حساب')}
+                            </button>
+                        </form>
+                        <div className="mt-6 text-center text-sm">
+                            <button onClick={() => setIsLogin(!isLogin)} className="text-emerald-600 font-medium">
+                                {isLogin ? 'ليس لديك حساب؟ سجل الآن' : 'لديك حساب؟ سجل الدخول'}
+                            </button>
+                        </div>
+                        <div className="mt-4 text-center">
+                            <button onClick={onGoToCustomer} className="text-gray-500 text-sm hover:text-gray-900">العودة للعملاء</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function AgencyOnboarding({ user, onComplete, onGoToCustomer }) {
+            const [form, setForm] = useState({ name: '', phone: '', city: 'Casablanca', bank_rib: '', bank_name: '' });
+            const [loading, setLoading] = useState(false);
+            const [error, setError] = useState(null);
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setLoading(true); setError(null);
+                const { error } = await supabase.from('agencies').insert({
+                    owner_id: user.id,
+                    ...form,
+                    verification_status: 'verified' // For testing, set to verified directly
+                });
+                if (error) setError(error.message);
+                else onComplete();
+                setLoading(false);
+            };
+
+            return (
+                <div className="min-h-screen bg-gray-50 p-4 py-12" dir="rtl">
+                    <div className="max-w-lg mx-auto bg-white p-8 rounded-2xl shadow-lg">
+                        <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">أكمل ملف وكالتك</h2>
+                        {error && <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm">{error}</div>}
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <input required placeholder="اسم الوكالة" className="w-full p-3 border rounded-xl" onChange={e => setForm({...form, name: e.target.value})} />
+                            <input required placeholder="رقم الهاتف" className="w-full p-3 border rounded-xl" onChange={e => setForm({...form, phone: e.target.value})} />
+                            <select className="w-full p-3 border rounded-xl" onChange={e => setForm({...form, city: e.target.value})}>
+                                {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                            <input required placeholder="اسم البنك" className="w-full p-3 border rounded-xl" onChange={e => setForm({...form, bank_name: e.target.value})} />
+                            <input required placeholder="RIB الحساب البنكي" className="w-full p-3 border rounded-xl font-mono text-sm" dir="ltr" onChange={e => setForm({...form, bank_rib: e.target.value})} />
+                            <button type="submit" disabled={loading} className="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold hover:bg-emerald-700">حفظ ومتابعة</button>
+                        </form>
+                        <button onClick={onGoToCustomer} className="w-full text-center mt-4 text-gray-500 text-sm">إلغاء والعودة</button>
+                    </div>
+                </div>
+            );
+        }
+
+        function AgencyDashboard({ agency, cars, bookings }) {
+            const pending = bookings.filter(b => b.status === 'pending_payment' || b.status === 'payment_uploaded').length;
+            return (
+                <div>
+                    <h1 className="text-2xl font-bold mb-6">مرحباً، {agency.name}</h1>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                            <p className="text-gray-500 text-sm mb-1">إجمالي السيارات</p>
+                            <p className="text-3xl font-bold text-gray-900">{cars.length}</p>
+                        </div>
+                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                            <p className="text-gray-500 text-sm mb-1">حجوزات معلقة</p>
+                            <p className="text-3xl font-bold text-amber-600">{pending}</p>
+                        </div>
+                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                            <p className="text-gray-500 text-sm mb-1">إجمالي الحجوزات</p>
+                            <p className="text-3xl font-bold text-emerald-600">{bookings.length}</p>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function AgencyCars({ cars, agency, refresh }) {
+            const [showAdd, setShowAdd] = useState(false);
+            const [catalog, setCatalog] = useState([]);
+
+            useEffect(() => {
+                if (showAdd) {
+                    supabase.from('car_catalog').select('*').then(({data}) => setCatalog(data || []));
+                }
+            }, [showAdd]);
+
+            const addCar = async (catalogId, price) => {
+                await supabase.from('agency_cars').insert({
+                    agency_id: agency.id,
+                    catalog_id: catalogId,
+                    daily_price: price,
+                    city: agency.city,
+                    status: 'available'
+                });
+                setShowAdd(false);
+                refresh();
+            };
+
+            const toggleStatus = async (id, current) => {
+                await supabase.from('agency_cars').update({ status: current === 'available' ? 'unavailable' : 'available' }).eq('id', id);
+                refresh();
+            };
+
+            return (
+                <div>
+                    <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-2xl font-bold">سياراتي</h2>
+                        <button onClick={() => setShowAdd(!showAdd)} className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-emerald-700"><i className="fas fa-plus ml-1"></i> إضافة سيارة</button>
+                    </div>
+
+                    {showAdd && (
+                        <div className="bg-white p-6 rounded-2xl shadow-sm mb-6 border border-emerald-100">
+                            <h3 className="font-bold mb-4">اختر سيارة من الكتالوج</h3>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                {catalog.map(c => (
+                                    <div key={c.id} className="border rounded-xl overflow-hidden cursor-pointer hover:border-emerald-500" onClick={() => {
+                                        const price = prompt("أدخل السعر اليومي بالدرهم:", "350");
+                                        if (price) addCar(c.id, parseInt(price));
+                                    }}>
+                                        <img src={c.image_url} className="w-full h-24 object-cover" />
+                                        <div className="p-2 text-center text-sm font-bold">{c.brand} {c.model}</div>
+                                    </div>
+                                ))}
+                            </div>
+                            <button onClick={() => setShowAdd(false)} className="mt-4 text-gray-500 text-sm">إلغاء</button>
+                        </div>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {cars.map(car => (
+                            <div key={car.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                                <div className="relative">
+                                    <img src={car.car_catalog.image_url} className="w-full h-40 object-cover" />
+                                    <span className={`absolute top-2 right-2 text-xs font-bold px-2 py-1 rounded ${car.status === 'available' ? 'bg-emerald-500 text-white' : 'bg-gray-800 text-white'}`}>
+                                        {car.status === 'available' ? 'متاحة' : 'مخفية'}
+                                    </span>
+                                </div>
+                                <div className="p-4">
+                                    <h3 className="font-bold">{car.car_catalog.brand} {car.car_catalog.model}</h3>
+                                    <p className="text-emerald-600 font-bold mb-4">{formatMAD(car.daily_price)}/يوم</p>
+                                    <button onClick={() => toggleStatus(car.id, car.status)} className="w-full bg-gray-50 hover:bg-gray-100 py-2 rounded-lg text-sm font-medium">
+                                        {car.status === 'available' ? 'إخفاء' : 'إظهار'}
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
+        function AgencyBookings({ bookings, refresh }) {
+            const updateStatus = async (id, status) => {
+                await supabase.from('bookings').update({ status }).eq('id', id);
+                refresh();
+            };
+
+            return (
+                <div>
+                    <h2 className="text-2xl font-bold mb-6">الحجوزات</h2>
+                    {bookings.length === 0 ? <p className="text-gray-500">لا توجد حجوزات بعد.</p> : (
+                        <div className="space-y-4">
+                            {bookings.map(b => (
+                                <div key={b.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between md:items-center gap-4">
+                                    <div>
+                                        <p className="font-bold">{b.agency_cars.car_catalog.brand} {b.agency_cars.car_catalog.model}</p>
+                                        <p className="text-sm text-gray-500">العميل: {b.customer_name} | {b.customer_phone}</p>
+                                        <p className="text-sm font-bold text-emerald-600 mt-1">{formatMAD(b.total_amount)} ({b.days} أيام)</p>
+                                    </div>
+                                    <div className="flex gap-2 items-center">
+                                        <span className="text-xs font-bold px-3 py-1 bg-gray-100 rounded-full">{b.status}</span>
+                                        {b.status === 'pending_payment' && <button onClick={() => updateStatus(b.id, 'confirmed')} className="bg-emerald-600 text-white px-3 py-1 rounded text-sm">تأكيد الدفع</button>}
+                                        {b.status === 'confirmed' && <button onClick={() => updateStatus(b.id, 'completed')} className="bg-blue-600 text-white px-3 py-1 rounded text-sm">إكمال الحجز</button>}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // ==========================================
+        // 5. التطبيق الرئيسي (Main Router)
+        // ==========================================
+        function App() {
+            const [route, setRoute] = useState('customer'); // customer | agency
+            return (
+                <>
+                    {route === 'customer' && <CustomerApp onGoToAgency={() => setRoute('agency')} />}
+                    {route === 'agency' && <AgencyApp onGoToCustomer={() => setRoute('customer')} />}
+                </>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

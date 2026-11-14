@@ -1,0 +1,6 @@
+{
+  "name": "Karya — كراء السيارات بالمغرب",
+  "description": "منصة ذكية للوساطة في كراء السيارات بالمغرب مع تحديد الموقع بالـ GPS والدفع بالتحويل البنكي الآمن.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
