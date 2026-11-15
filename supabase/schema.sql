@@ -646,7 +646,10 @@ SET search_path = public
 AS $$
 DECLARE
     v_car RECORD;
-    v_bank RECORD;
+    v_bank_id UUID := NULL;
+    v_bank_code TEXT := NULL;
+    v_bank_holder TEXT := NULL;
+    v_bank_rib TEXT := NULL;
     v_total NUMERIC(10,2);
     v_commission NUMERIC(10,2);
     v_payout NUMERIC(10,2);
@@ -676,7 +679,10 @@ BEGIN
     END IF;
 
     IF p_platform_bank_id IS NOT NULL THEN
-        SELECT * INTO v_bank FROM public.platform_banks WHERE id = p_platform_bank_id AND is_active = true;
+        SELECT id, code, account_holder_name, rib
+        INTO v_bank_id, v_bank_code, v_bank_holder, v_bank_rib
+        FROM public.platform_banks
+        WHERE id = p_platform_bank_id AND is_active = true;
     END IF;
 
     v_total := ROUND(v_car.daily_price * p_days, 2);
@@ -727,8 +733,8 @@ BEGIN
         0.1000,
         v_commission,
         v_payout,
-        v_bank.id,
-        v_bank.code,
+        v_bank_id,
+        v_bank_code,
         'pending_payment'
     )
     RETURNING id INTO v_booking_id;
@@ -739,9 +745,9 @@ BEGIN
         v_total,
         v_commission,
         v_payout,
-        v_bank.code,
-        v_bank.account_holder_name,
-        v_bank.rib;
+        v_bank_code,
+        v_bank_holder,
+        v_bank_rib;
 END;
 $$;
 

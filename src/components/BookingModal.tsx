@@ -232,6 +232,21 @@ export const BookingModal: React.FC<BookingModalProps> = ({
 
     try {
       if (!car.is_demo) {
+        let defaultBankId: string | null = null;
+        try {
+          const { data: bankRows } = await supabase
+            .from('platform_banks')
+            .select('id')
+            .eq('is_active', true)
+            .order('sort_order', { ascending: true })
+            .limit(1);
+          if (bankRows && bankRows[0]?.id) {
+            defaultBankId = String(bankRows[0].id);
+          }
+        } catch {
+          // Proceed with null if platform_banks lookup fails
+        }
+
         let rpcResult = await supabase.rpc('create_booking', {
           p_agency_car_id: car.id,
           p_customer_name: customerName.trim(),
@@ -239,6 +254,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
           p_customer_phone: customerPhone.trim(),
           p_days: days,
           p_delivery_at: deliveryDateObj.toISOString(),
+          p_platform_bank_id: defaultBankId,
           p_delivery_notes: packedNotes,
           p_customer_license_number: customerLicenseNumber.trim().toUpperCase(),
           p_customer_license_issue_date: customerLicenseIssueDate,
@@ -257,6 +273,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
             p_customer_phone: customerPhone.trim(),
             p_days: days,
             p_delivery_at: deliveryDateObj.toISOString(),
+            p_platform_bank_id: defaultBankId,
             p_delivery_notes: packedNotes,
           });
         }
