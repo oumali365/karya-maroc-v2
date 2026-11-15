@@ -1,14 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { CheckCircle2, Copy, Check, Shield, Wallet, Building2, Loader2 } from 'lucide-react';
+import { CheckCircle2, Copy, Check, Shield, Wallet, Building2, Loader2, LogOut } from 'lucide-react';
 import { supabase, formatDH, getCityLabelAr } from '../lib/supabase';
-import { verifyAdminAccess } from '../lib/adminAuth';
+import { logoutAdminAccess, verifyAdminAccess } from '../lib/adminAuth';
 import type { AgencyBookingRecord, AgencyProfile, PayoutRecord } from '../types/karya';
 
 interface AdminConsoleProps {
   onUnauthorized: () => void;
+  onLogout?: () => void;
 }
 
-export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized }) => {
+export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLogout }) => {
   const [tab, setTab] = useState<'receipts' | 'payouts' | 'agencies'>('receipts');
   const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
@@ -24,7 +25,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized }) =>
     setErrorMsg(null);
 
     try {
-      const { isAdmin } = await verifyAdminAccess();
+      const { isAdmin, mode } = await verifyAdminAccess();
       if (!isAdmin) {
         setAuthorized(false);
         onUnauthorized();
@@ -42,9 +43,9 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized }) =>
         supabase.from('agencies').select('*').order('created_at', { ascending: false }),
       ]);
 
-      if (bRes.error) throw new Error(bRes.error.message);
-      if (pRes.error) throw new Error(pRes.error.message);
-      if (aRes.error) throw new Error(aRes.error.message);
+      if (bRes.error && mode === 'supabase') throw new Error(bRes.error.message);
+      if (pRes.error && mode === 'supabase') throw new Error(pRes.error.message);
+      if (aRes.error && mode === 'supabase') throw new Error(aRes.error.message);
 
       setBookings(
         (bRes.data || []).map((r: Record<string, any>) => ({
@@ -107,21 +108,41 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized }) =>
     .filter((b) => ['payment_verified', 'car_delivered', 'completed'].includes(b.status))
     .reduce((sum, b) => sum + Number(b.commission_amount || 0), 0);
 
+  const handleLogout = async () => {
+    await logoutAdminAccess();
+    if (onLogout) {
+      onLogout();
+    } else {
+      onUnauthorized();
+    }
+  };
+
   return (
     <section className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-6" dir="rtl">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">لوحة إدارة الوساطة والعربون</h1>
           <p className="text-sm text-slate-500 mt-0.5">
-            مراجعة وصولات العربون (10%) وتأكيد الحجوزات، ومعالجة طلبات الاسترجاع للعميل خلال 24 إلى 48 ساعة
+            مراجعة وصولات العربون (10%) وتأكيد الحجوزات، ومعالجة طلبات الاسترجاع الفوري للعميل خلال ساعات من التحقق
           </p>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-left">
-          <div className="text-xs text-slate-500">عائدات المنصة المؤكدة (عربون 10%)</div>
-          <div className="font-mono-tabular font-extrabold text-lg text-[#1B5E20]">
-            {formatDH(totalCommission)}
+        <div className="flex items-center gap-3 self-start sm:self-auto">
+          <div className="bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-left">
+            <div className="text-xs text-slate-500">عائدات المنصة المؤكدة (عربون 10%)</div>
+            <div className="font-mono-tabular font-extrabold text-lg text-[#1B5E20]">
+              {formatDH(totalCommission)}
+            </div>
           </div>
+
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="rounded-xl border border-slate-200 bg-white hover:bg-red-50 hover:border-red-200 text-slate-600 hover:text-red-700 px-3.5 py-2.5 text-xs font-bold transition-colors flex items-center gap-1.5"
+          >
+            <LogOut className="w-4 h-4" />
+            <span>قفل الإدارة</span>
+          </button>
         </div>
       </div>
 
@@ -264,7 +285,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized }) =>
                         ) : (
                           <Copy className="w-3 h-3" />
                         )}
-                        <span>{copiedId === p.id ? 'نُسخ' : 'نسخ RIB'}</span>
+                        <span>{copiedId === p.id ? 'نُسخ' : 'نسخ الحساب / الهاتف'}</span>
                       </button>
                     </div>
                   </div>

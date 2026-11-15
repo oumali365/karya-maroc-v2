@@ -6,7 +6,7 @@ import {
   findNearestMoroccanCity,
   getCityLabelAr,
 } from '../lib/supabase';
-import { HERO_IMAGE_URL, STARTER_CARS } from '../data/starterData';
+import { DEFAULT_CAR_IMAGE_URL, HERO_IMAGE_URL, STARTER_CARS } from '../data/starterData';
 import { BookingModal } from './BookingModal';
 import type { CarOffer, CreatedBooking } from '../types/karya';
 
@@ -93,13 +93,13 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
           primary_image_url: String(
             row.primary_image_url ||
               row.car_catalog?.image_url ||
-              '/src/assets/images/car_renault_clio_1794682738372.jpg',
+              DEFAULT_CAR_IMAGE_URL,
           ),
           gallery_images: [
             String(
               row.primary_image_url ||
                 row.car_catalog?.image_url ||
-                '/src/assets/images/car_renault_clio_1794682738372.jpg',
+                DEFAULT_CAR_IMAGE_URL,
             ),
           ],
           daily_price: Number(row.daily_price),

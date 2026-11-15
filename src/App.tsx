@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Loader2, Lock } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import { verifyAdminAccess } from './lib/adminAuth';
 import { CustomerPortal } from './components/CustomerPortal';
 import { MyBookingsView } from './components/MyBookingsView';
 import { AgencyPortal } from './components/AgencyPortal';
 import { AdminConsole } from './components/AdminConsole';
+import { AdminPinModal } from './components/AdminPinModal';
 import { FloatingWhatsAppButton } from './components/FloatingWhatsAppButton';
 import type { BookingStatus, CreatedBooking } from './types/karya';
 
@@ -59,6 +60,8 @@ export function App() {
   const [recentBookings, setRecentBookings] = useState<CreatedBooking[]>(() => loadStoredBookings());
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminChecked, setAdminChecked] = useState(false);
+  const [showAdminPinModal, setShowAdminPinModal] = useState(false);
+  const copyrightClickTimestamps = useRef<number[]>([]);
 
   const navigate = (nextRoute: AppRoute, replace = false) => {
     const targetPath = routeToPath(nextRoute);
@@ -104,6 +107,40 @@ export function App() {
       navigate('discover', true);
     }
   }, [route, adminChecked, isAdmin]);
+
+  const handleOpenAdminEntry = () => {
+    if (isAdmin) {
+      navigate('admin');
+      return;
+    }
+    setShowAdminPinModal(true);
+  };
+
+  const handleCopyrightClick = () => {
+    const now = Date.now();
+    const recent = copyrightClickTimestamps.current.filter((ts) => now - ts < 700);
+    recent.push(now);
+    copyrightClickTimestamps.current = recent;
+
+    if (recent.length >= 3) {
+      copyrightClickTimestamps.current = [];
+      handleOpenAdminEntry();
+    }
+  };
+
+  const handleAdminUnlockSuccess = async () => {
+    setShowAdminPinModal(false);
+    setIsAdmin(true);
+    setAdminChecked(true);
+    await refreshAdminStatus();
+    navigate('admin');
+  };
+
+  const handleAdminLogout = () => {
+    setIsAdmin(false);
+    setAdminChecked(true);
+    navigate('discover', true);
+  };
 
   const handleBookingCreated = (booking: CreatedBooking) => {
     setRecentBookings((prev) => {
@@ -252,14 +289,22 @@ export function App() {
         )}
 
         {route === 'admin' && adminChecked && isAdmin && (
-          <AdminConsole onUnauthorized={() => navigate('discover', true)} />
+          <AdminConsole
+            onUnauthorized={() => navigate('discover', true)}
+            onLogout={handleAdminLogout}
+          />
         )}
       </div>
 
       {/* Quiet Footer */}
       <footer className="bg-white border-t border-slate-100 py-7 mt-auto">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
-          <div>Karya — منصة كراء السيارات في المغرب</div>
+          <div
+            onClick={handleCopyrightClick}
+            className="select-none cursor-default"
+          >
+            © Karya — منصة كراء السيارات في المغرب
+          </div>
           <div className="flex items-center gap-5">
             <button type="button" onClick={() => navigate('discover')} className="hover:text-slate-900">
               السيارات المتاحة
@@ -270,9 +315,27 @@ export function App() {
             <button type="button" onClick={() => navigate('agency')} className="hover:text-slate-900">
               انضم كوكالة
             </button>
+            {route === 'discover' && (
+              <button
+                type="button"
+                onClick={handleOpenAdminEntry}
+                aria-label="دخول الإدارة"
+                title=""
+                className="text-slate-300/60 hover:text-slate-400 transition-colors p-1 -me-1"
+              >
+                <Lock className="w-3 h-3" />
+              </button>
+            )}
           </div>
         </div>
       </footer>
+
+      {showAdminPinModal && (
+        <AdminPinModal
+          onClose={() => setShowAdminPinModal(false)}
+          onSuccess={handleAdminUnlockSuccess}
+        />
+      )}
 
       <FloatingWhatsAppButton />
     </div>

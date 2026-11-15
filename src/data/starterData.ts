@@ -1,19 +1,24 @@
 import type { CarOffer, PlatformBank } from '../types/karya';
+import heroMoroccoDrive from '../assets/images/hero_morocco_drive_1794682738472.jpg';
+import carDaciaDuster from '../assets/images/car_dacia_duster_1794682738207.jpg';
+import carRenaultClio from '../assets/images/car_renault_clio_1794682738372.jpg';
+import carPeugeot208 from '../assets/images/car_peugeot_208_1794682740248.jpg';
 
-export const HERO_IMAGE_URL = '/src/assets/images/hero_morocco_drive_1794682738472.jpg';
+export const HERO_IMAGE_URL = heroMoroccoDrive;
+export const DEFAULT_CAR_IMAGE_URL = carRenaultClio;
 
 export const STARTER_IMAGE_TEMPLATES = [
   {
     label: 'Dacia Duster',
-    url: '/src/assets/images/car_dacia_duster_1794682738207.jpg',
+    url: carDaciaDuster,
   },
   {
     label: 'Renault Clio 5',
-    url: '/src/assets/images/car_renault_clio_1794682738372.jpg',
+    url: carRenaultClio,
   },
   {
     label: 'Peugeot 208',
-    url: '/src/assets/images/car_peugeot_208_1794682740248.jpg',
+    url: carPeugeot208,
   },
 ];
 
@@ -93,8 +98,8 @@ export const STARTER_CARS: CarOffer[] = [
     fuel_type: 'diesel',
     transmission: 'manual',
     seats: 5,
-    primary_image_url: '/src/assets/images/car_dacia_duster_1794682738207.jpg',
-    gallery_images: ['/src/assets/images/car_dacia_duster_1794682738207.jpg'],
+    primary_image_url: carDaciaDuster,
+    gallery_images: [carDaciaDuster],
     daily_price: 380,
     deposit_amount: 3000,
     city: 'Casablanca',
@@ -114,8 +119,8 @@ export const STARTER_CARS: CarOffer[] = [
     fuel_type: 'diesel',
     transmission: 'automatic',
     seats: 5,
-    primary_image_url: '/src/assets/images/car_renault_clio_1794682738372.jpg',
-    gallery_images: ['/src/assets/images/car_renault_clio_1794682738372.jpg'],
+    primary_image_url: carRenaultClio,
+    gallery_images: [carRenaultClio],
     daily_price: 290,
     deposit_amount: 2000,
     city: 'Casablanca',
@@ -135,8 +140,8 @@ export const STARTER_CARS: CarOffer[] = [
     fuel_type: 'essence',
     transmission: 'automatic',
     seats: 5,
-    primary_image_url: '/src/assets/images/car_peugeot_208_1794682740248.jpg',
-    gallery_images: ['/src/assets/images/car_peugeot_208_1794682740248.jpg'],
+    primary_image_url: carPeugeot208,
+    gallery_images: [carPeugeot208],
     daily_price: 320,
     deposit_amount: 2500,
     city: 'Casablanca',
@@ -156,8 +161,8 @@ export const STARTER_CARS: CarOffer[] = [
     fuel_type: 'diesel',
     transmission: 'automatic',
     seats: 5,
-    primary_image_url: '/src/assets/images/car_dacia_duster_1794682738207.jpg',
-    gallery_images: ['/src/assets/images/car_dacia_duster_1794682738207.jpg'],
+    primary_image_url: carDaciaDuster,
+    gallery_images: [carDaciaDuster],
     daily_price: 410,
     deposit_amount: 3000,
     city: 'Marrakech',
@@ -177,8 +182,8 @@ export const STARTER_CARS: CarOffer[] = [
     fuel_type: 'diesel',
     transmission: 'manual',
     seats: 5,
-    primary_image_url: '/src/assets/images/car_renault_clio_1794682738372.jpg',
-    gallery_images: ['/src/assets/images/car_renault_clio_1794682738372.jpg'],
+    primary_image_url: carRenaultClio,
+    gallery_images: [carRenaultClio],
     daily_price: 270,
     deposit_amount: 2000,
     city: 'Agadir',
@@ -198,8 +203,8 @@ export const STARTER_CARS: CarOffer[] = [
     fuel_type: 'diesel',
     transmission: 'automatic',
     seats: 5,
-    primary_image_url: '/src/assets/images/car_peugeot_208_1794682740248.jpg',
-    gallery_images: ['/src/assets/images/car_peugeot_208_1794682740248.jpg'],
+    primary_image_url: carPeugeot208,
+    gallery_images: [carPeugeot208],
     daily_price: 340,
     deposit_amount: 2500,
     city: 'Rabat',

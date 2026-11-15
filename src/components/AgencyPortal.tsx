@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { supabase, MOROCCAN_CITIES, formatDH, getCityLabelAr } from '../lib/supabase';
 import { compressImageFile, formatFileSize } from '../lib/imageCompression';
-import { STARTER_IMAGE_TEMPLATES } from '../data/starterData';
+import { DEFAULT_CAR_IMAGE_URL, STARTER_IMAGE_TEMPLATES } from '../data/starterData';
 import type {
   AgencyBookingRecord,
   AgencyProfile,
@@ -97,7 +97,7 @@ export const AgencyPortal: React.FC<AgencyPortalProps> = ({ onGoToCustomer }) =>
         primary_image_url: String(
           row.primary_image_url ||
             row.car_catalog?.image_url ||
-            '/src/assets/images/car_renault_clio_1794682738372.jpg',
+            DEFAULT_CAR_IMAGE_URL,
         ),
         gallery_images: Array.isArray(row.gallery_images) ? row.gallery_images : [],
         daily_price: Number(row.daily_price),

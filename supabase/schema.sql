@@ -45,11 +45,38 @@ CREATE TABLE IF NOT EXISTS public.platform_admins (
     user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     email TEXT UNIQUE NOT NULL,
     full_name TEXT NOT NULL,
+    pin_hash TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 ALTER TABLE public.platform_admins
     ADD COLUMN IF NOT EXISTS email TEXT UNIQUE;
+
+ALTER TABLE public.platform_admins
+    ADD COLUMN IF NOT EXISTS pin_hash TEXT;
+
+-- دالة آمنة للتحقق من الرمز السري للإدارة عبر التجزئة المشفرة (bcrypt) دون كشف جدول platform_admins
+CREATE OR REPLACE FUNCTION public.verify_admin_pin(p_pin TEXT)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+DECLARE
+    v_clean_pin TEXT := NULLIF(TRIM(COALESCE(p_pin, '')), '');
+BEGIN
+    IF v_clean_pin IS NULL THEN
+        RETURN false;
+    END IF;
+
+    RETURN EXISTS (
+        SELECT 1
+        FROM public.platform_admins
+        WHERE pin_hash IS NOT NULL
+          AND pin_hash = crypt(v_clean_pin, pin_hash)
+    );
+END;
+$$;
 
 CREATE OR REPLACE FUNCTION public.is_admin()
 RETURNS BOOLEAN
@@ -930,6 +957,7 @@ GRANT EXECUTE ON FUNCTION public.create_booking(UUID, TEXT, TEXT, TEXT, INTEGER,
 GRANT EXECUTE ON FUNCTION public.submit_payment_receipt(UUID, TEXT, UUID, TEXT) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.request_full_refund(UUID, TEXT, TEXT, TEXT) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.get_customer_booking_by_phone(TEXT, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.verify_admin_pin(TEXT) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.admin_verify_payment(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.confirm_car_delivery(UUID) TO authenticated;
 

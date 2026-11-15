@@ -63,6 +63,52 @@ function getStatusBadge(status: BookingStatus): {
   }
 }
 
+function validateRefundDestination(raw: string): {
+  valid: boolean;
+  value: string;
+  error?: string;
+} {
+  const trimmed = raw.trim();
+  const compact = trimmed.replace(/[\s\-().]/g, '');
+
+  if (!compact) {
+    return {
+      valid: false,
+      value: trimmed,
+      error: 'يرجى إدخال رقم الحساب أو رقم الهاتف لاسترجاع العربون.',
+    };
+  }
+
+  // Exact Moroccan mobile number (06/07 + 8 digits, or +212/00212 + 6/7 + 8 digits)
+  const moroccanMobileRegex = /^(?:0[67]\d{8}|(?:\+212|00212)[67]\d{8})$/;
+  if (moroccanMobileRegex.test(compact)) {
+    return { valid: true, value: trimmed };
+  }
+
+  // If the user started typing a Moroccan mobile number (06, 07, +212, 00212) that isn't a longer RIB
+  if (/^(?:0[67]|\+?212|00212)/.test(compact) && compact.length < 16) {
+    return {
+      valid: false,
+      value: trimmed,
+      error:
+        'رقم الهاتف المغربي غير مكتمل. يجب أن يبدأ بـ 06 أو 07 ويتكون من 10 أرقام، أو أدخل رقم حسابك البنكي.',
+    };
+  }
+
+  // Flexible bank account / wallet / RIB (8 to 34 alphanumeric chars, at least 6 digits)
+  const flexibleAccountRegex = /^(?=(?:.*\d){6,})[A-Za-z0-9]{8,34}$/;
+  if (flexibleAccountRegex.test(compact)) {
+    return { valid: true, value: trimmed };
+  }
+
+  return {
+    valid: false,
+    value: trimmed,
+    error:
+      'يرجى إدخال رقم هاتف مغربي صحيح (يبدأ بـ 06 أو 07) أو رقم حساب بنكي صحيح (8 أرقام على الأقل).',
+  };
+}
+
 export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
   recentBookings,
   onUpdateBookingStatus,
@@ -212,8 +258,9 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
       return;
     }
 
-    if (refundRib.replace(/\s+/g, '').length < 16) {
-      setRefundError('يرجى إدخال رقم حساب بنكي (RIB) صحيح لاسترجاع العربون.');
+    const accountValidation = validateRefundDestination(refundRib);
+    if (!accountValidation.valid) {
+      setRefundError(accountValidation.error || 'يرجى إدخال رقم حساب أو رقم هاتف صحيح.');
       return;
     }
 
@@ -223,7 +270,7 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
         const { error } = await supabase.rpc('request_full_refund', {
           p_booking_id: matchedBooking.booking_id,
           p_booking_code: matchedBooking.booking_code,
-          p_customer_rib: refundRib.trim(),
+          p_customer_rib: accountValidation.value,
           p_reason: refundReason,
         });
         if (error) throw new Error(error.message);
@@ -242,7 +289,7 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
       );
 
       setRefundFeedback(
-        'تم تسجيل طلب الاسترجاع بنجاح. تسترجع مبلغ العربون كاملاً في حسابك البنكي (RIB) خلال 24 إلى 48 ساعة بعد التحقق من الطلب وإلغاء الحجز وفق الشروط.',
+        'تم تسجيل طلب الاسترجاع بنجاح. استرجع عربونك كاملاً عبر التحويل الفوري لرقم هاتفك أو حسابك البنكي (مثل Cash Plus أو التطبيقات البنكية) خلال ساعات من التحقق.',
       );
       setRefundRib('');
       setRefundTarget(null);
@@ -261,7 +308,7 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
         <div className="space-y-1.5">
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">حجوزاتي</h1>
           <p className="text-sm text-slate-600 max-w-2xl">
-            تسترجع مبلغ العربون كاملاً في حسابك البنكي (RIB) خلال 24 إلى 48 ساعة بعد التحقق من الطلب وإلغاء الحجز وفق الشروط.
+            استرجع عربونك كاملاً عبر التحويل الفوري لرقم هاتفك أو حسابك البنكي (مثل Cash Plus أو التطبيقات البنكية) خلال ساعات من التحقق.
           </p>
         </div>
 
@@ -458,7 +505,7 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
         </div>
       )}
 
-      {/* Refund Request Panel (linked cleanly to chosen booking_code + RIB) */}
+      {/* Refund Request Panel (linked cleanly to chosen booking_code + phone/account) */}
       {(refundTarget || manualRefundMode) && (
         <form
           id="refund-request-panel"
@@ -469,10 +516,10 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
             <div className="space-y-1">
               <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                 <ShieldCheck className="w-5 h-5 text-emerald-700" />
-                <span>طلب استرجاع العربون إلى حسابك البنكي (RIB)</span>
+                <span>طلب استرجاع العربون (تحويل فوري)</span>
               </h2>
               <p className="text-xs text-slate-500">
-                تسترجع مبلغ العربون كاملاً في حسابك البنكي (RIB) خلال 24 إلى 48 ساعة بعد التحقق من الطلب وإلغاء الحجز وفق الشروط.
+                استرجع عربونك كاملاً عبر التحويل الفوري لرقم هاتفك أو حسابك البنكي (مثل Cash Plus أو التطبيقات البنكية) خلال ساعات من التحقق.
               </p>
             </div>
             <button
@@ -507,18 +554,25 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                رقم حسابك البنكي (RIB) — 24 رقماً
+              <label
+                htmlFor="refund-destination-input"
+                className="block text-xs font-semibold text-slate-700 mb-1.5"
+              >
+                رقم الحساب أو رقم الهاتف (للتحويل الفوري عبر التطبيقات البنكية أو Cash Plus)
               </label>
               <input
+                id="refund-destination-input"
                 required
                 type="text"
-                dir="ltr"
-                placeholder="24 Digits RIB"
+                dir={refundRib ? 'ltr' : 'rtl'}
+                placeholder="رقم الحساب أو رقم الهاتف (للتحويل الفوري عبر التطبيقات البنكية أو Cash Plus)"
                 value={refundRib}
                 onChange={(e) => setRefundRib(e.target.value)}
-                className="w-full min-h-[44px] rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-mono focus:border-emerald-600 focus:outline-none"
+                className="w-full min-h-[44px] rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-mono focus:border-emerald-600 focus:outline-none placeholder:font-sans placeholder:text-xs"
               />
+              <p className="text-[11px] text-slate-500 mt-1.5">
+                مثال: رقم هاتف يبدأ بـ 06 أو 07 مربوط بـ Cash Plus أو تطبيقك البنكي، أو رقم حسابك البنكي البسيط.
+              </p>
             </div>
           </div>
 

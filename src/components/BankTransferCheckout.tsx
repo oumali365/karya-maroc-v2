@@ -471,7 +471,10 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
 
         <div className="flex items-center justify-center gap-1.5 text-xs text-slate-500 pt-1 text-center">
           <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0" />
-          <span>تحويل مؤمّن · يمكنك تتبع طلبك من صفحة حجوزاتي</span>
+          <span>
+            تحويل مؤمّن · استرجع عربونك كاملاً عبر التحويل الفوري لرقم هاتفك أو حسابك البنكي خلال
+            ساعات من التحقق
+          </span>
         </div>
       </div>
     </div>

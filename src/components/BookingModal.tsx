@@ -670,8 +670,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                 <div className="flex items-start gap-2 text-xs text-emerald-800 pt-2 border-t border-emerald-200/70">
                   <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
                   <span>
-                    في حال عدم تسليم السيارة، تسترجع مبلغ العربون كاملاً في حسابك البنكي (RIB) خلال
-                    24 إلى 48 ساعة بعد التحقق من الطلب وإلغاء الحجز وفق الشروط.
+                    في حال عدم تسليم السيارة، استرجع عربونك كاملاً عبر التحويل الفوري لرقم هاتفك أو
+                    حسابك البنكي (مثل Cash Plus أو التطبيقات البنكية) خلال ساعات من التحقق.
                   </span>
                 </div>
               </div>
