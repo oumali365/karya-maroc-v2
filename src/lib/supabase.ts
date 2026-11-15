@@ -1,9 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 import type { CityOption } from '../types/karya';
 
-const FALLBACK_SUPABASE_URL = 'https://nklmlcbojylonybrglbq.supabase.co';
+const FALLBACK_SUPABASE_URL = 'https://fvadhrdyxykromonpnoo.supabase.co';
 const FALLBACK_SUPABASE_ANON_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5rbG1sY2Jvanlsb255YnJnbGJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ1MTAxMDksImV4cCI6MjExMDA4NjEwOX0.N830adtyD8KkrhRS_RouJvgKriWTVTLcH_eFcPJyzXI';
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ2YWRocmR5eHlrcm9tb25wbm9vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ3MzE2NjgsImV4cCI6MjExMDMwNzY2OH0.Snu4HAl3pgxuHcaNMJCSzdKMbe4y6brSWo07hWDFozY';
 
 export const SUPABASE_URL =
   import.meta.env.VITE_SUPABASE_URL?.trim() || FALLBACK_SUPABASE_URL;
