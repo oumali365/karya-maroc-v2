@@ -218,7 +218,7 @@ export const AgencyPortal: React.FC<AgencyPortalProps> = ({ onGoToCustomer }) =>
       {/* Sidebar matching sent HTML layout & colors */}
       <aside className="w-full lg:w-64 shrink-0 bg-white rounded-2xl border border-slate-200/90 p-4 flex flex-col gap-4 self-start">
         <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
-          <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white font-bold flex items-center justify-center shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-[#2563EB] text-white font-bold flex items-center justify-center shrink-0">
             <Building2 className="w-5 h-5" />
           </div>
           <div className="min-w-0">
@@ -233,7 +233,7 @@ export const AgencyPortal: React.FC<AgencyPortalProps> = ({ onGoToCustomer }) =>
             onClick={() => setView('dashboard')}
             className={`w-full text-right px-3.5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2.5 transition-colors ${
               view === 'dashboard'
-                ? 'bg-emerald-50 text-emerald-800'
+                ? 'bg-blue-50 text-[#2563EB]'
                 : 'text-slate-600 hover:bg-slate-50'
             }`}
           >
@@ -246,7 +246,7 @@ export const AgencyPortal: React.FC<AgencyPortalProps> = ({ onGoToCustomer }) =>
             onClick={() => setView('cars')}
             className={`w-full text-right px-3.5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2.5 transition-colors ${
               view === 'cars'
-                ? 'bg-emerald-50 text-emerald-800'
+                ? 'bg-blue-50 text-[#2563EB]'
                 : 'text-slate-600 hover:bg-slate-50'
             }`}
           >
@@ -259,7 +259,7 @@ export const AgencyPortal: React.FC<AgencyPortalProps> = ({ onGoToCustomer }) =>
             onClick={() => setView('bookings')}
             className={`w-full text-right px-3.5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2.5 transition-colors ${
               view === 'bookings'
-                ? 'bg-emerald-50 text-emerald-800'
+                ? 'bg-blue-50 text-[#2563EB]'
                 : 'text-slate-600 hover:bg-slate-50'
             }`}
           >
@@ -272,7 +272,7 @@ export const AgencyPortal: React.FC<AgencyPortalProps> = ({ onGoToCustomer }) =>
             onClick={() => setView('profile')}
             className={`w-full text-right px-3.5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2.5 transition-colors ${
               view === 'profile'
-                ? 'bg-emerald-50 text-emerald-800'
+                ? 'bg-blue-50 text-[#2563EB]'
                 : 'text-slate-600 hover:bg-slate-50'
             }`}
           >
@@ -303,32 +303,43 @@ export const AgencyPortal: React.FC<AgencyPortalProps> = ({ onGoToCustomer }) =>
 
         {view === 'dashboard' && (
           <div className="space-y-6">
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900">مرحباً، {agency.name}</h1>
-              <p className="text-sm text-slate-500 mt-0.5">
-                {getCityLabelAr(agency.city)} · {agency.bank_name}
-              </p>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-xs text-slate-400 mb-0.5">بوابة الوكالات / الرئيسية</div>
+                <h1 className="text-2xl font-bold text-slate-900">مرحباً، {agency.name}</h1>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {getCityLabelAr(agency.city)} · {agency.bank_name}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setView('cars')}
+                className="rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-4 py-2 text-xs font-bold transition-colors flex items-center gap-1.5"
+              >
+                <Plus className="w-4 h-4" />
+                <span>إدارة الأسطول</span>
+              </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-              <div className="bg-white p-5 rounded-2xl shadow-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-white p-5 rounded-2xl border border-slate-200/80">
                 <p className="text-xs text-slate-500 font-medium">الحجوزات المؤكدة لليوم</p>
-                <p className="text-3xl font-bold text-slate-900 mt-1 font-mono-tabular">
+                <p className="text-2xl sm:text-3xl font-bold text-slate-900 mt-1 font-mono-tabular">
                   {todayConfirmedCount}
                 </p>
                 <p className="text-xs text-slate-400 mt-1 font-mono-tabular">
                   جاهز للتسليم: {verifiedBookings.length}
                 </p>
               </div>
-              <div className="bg-white p-5 rounded-2xl shadow-xs">
-                <p className="text-xs text-slate-500 font-medium">السيارات المتاحة في الأسطول</p>
-                <p className="text-3xl font-bold text-slate-900 mt-1 font-mono-tabular">
+              <div className="bg-white p-5 rounded-2xl border border-slate-200/80">
+                <p className="text-xs text-slate-500 font-medium">السيارات المتاحة</p>
+                <p className="text-2xl sm:text-3xl font-bold text-slate-900 mt-1 font-mono-tabular">
                   {availableCarsCount} / {cars.length}
                 </p>
               </div>
-              <div className="bg-white p-5 rounded-2xl shadow-xs">
-                <p className="text-xs text-slate-500 font-medium">العائدات المتوقعة (نسبة 90%)</p>
-                <p className="text-3xl font-bold text-slate-900 mt-1 font-mono-tabular">
+              <div className="bg-white p-5 rounded-2xl border border-slate-200/80">
+                <p className="text-xs text-slate-500 font-medium">العائدات المتوقعة (90%)</p>
+                <p className="text-2xl sm:text-3xl font-bold text-[#2563EB] mt-1 font-mono-tabular">
                   {formatDH(totalPayoutExpected)}
                 </p>
               </div>
@@ -450,7 +461,7 @@ const AgencyAuthView: React.FC<{ onGoToCustomer: () => void }> = ({ onGoToCustom
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-xl bg-[#1B5E20] hover:bg-[#144718] text-white py-3 font-bold text-sm transition-colors flex items-center justify-center gap-2"
+            className="w-full rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white py-3 font-bold text-sm transition-colors flex items-center justify-center gap-2"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             <span>{isLogin ? 'تسجيل الدخول' : 'إنشاء حساب وكالة'}</span>
@@ -612,7 +623,7 @@ const AgencyOnboardingView: React.FC<{
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-xl bg-[#1B5E20] hover:bg-[#144718] text-white py-3 font-bold text-sm"
+            className="w-full rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white py-3 font-bold text-sm"
           >
             {loading ? 'جاري الحفظ...' : 'حفظ ملف الشركة والمتابعة'}
           </button>
@@ -746,7 +757,7 @@ const AgencyFleetManager: React.FC<{
         <button
           type="button"
           onClick={() => setShowAddForm(!showAddForm)}
-          className="inline-flex items-center gap-2 rounded-xl bg-[#1B5E20] hover:bg-[#144718] text-white px-4 py-2.5 text-sm font-bold transition-colors"
+          className="inline-flex items-center gap-2 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-4 py-2.5 text-sm font-bold transition-colors"
         >
           <Plus className="w-4 h-4" />
           <span>إضافة سيارة لأسطولي</span>
@@ -756,7 +767,7 @@ const AgencyFleetManager: React.FC<{
       {showAddForm && (
         <form
           onSubmit={handleAddCar}
-          className="bg-white rounded-2xl border border-emerald-200 p-5 space-y-4 shadow-xs"
+          className="bg-white rounded-2xl border border-blue-200 p-5 space-y-4"
         >
           <h3 className="font-bold text-slate-900">إضافة سيارة جديدة بصورتها الحقيقية</h3>
 
@@ -804,7 +815,7 @@ const AgencyFleetManager: React.FC<{
                       setImageFile(null);
                       setImagePreview(tpl.url);
                     }}
-                    className="text-[11px] px-2 py-1 rounded-md border border-slate-200 text-slate-600 hover:border-emerald-500"
+                    className="text-[11px] px-2 py-1 rounded-md border border-slate-200 text-slate-600 hover:border-[#2563EB] hover:text-[#2563EB] transition-colors"
                   >
                     {tpl.label}
                   </button>
@@ -889,7 +900,7 @@ const AgencyFleetManager: React.FC<{
             <button
               type="submit"
               disabled={saving || compressing}
-              className="rounded-xl bg-[#1B5E20] hover:bg-[#144718] disabled:opacity-60 text-white px-5 py-2.5 text-sm font-bold flex items-center gap-2"
+              className="rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] disabled:opacity-60 text-white px-5 py-2.5 text-sm font-bold flex items-center gap-2"
             >
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
               <span>حفظ ونشر السيارة</span>
@@ -899,17 +910,27 @@ const AgencyFleetManager: React.FC<{
       )}
 
       {cars.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-200/90 p-10 text-center space-y-2">
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-10 text-center space-y-3">
           <CarFront className="w-9 h-9 text-slate-400 mx-auto" />
           <p className="font-bold text-slate-800">لم تقم بإضافة أي سيارة بعد</p>
-          <p className="text-xs text-slate-500">اضغط على "إضافة سيارة لأسطولي" لرفع صور سياراتك.</p>
+          <p className="text-xs text-slate-500">أضف سيارتك الأولى بصورتها الحقيقية لتظهر للعملاء.</p>
+          {!showAddForm && (
+            <button
+              type="button"
+              onClick={() => setShowAddForm(true)}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-4 py-2 text-xs font-bold transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>إضافة سيارة الآن</span>
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {cars.map((car) => (
             <div
               key={car.id}
-              className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden flex flex-col"
+              className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden flex flex-col"
             >
               <div className="aspect-[4/3] bg-slate-100 relative">
                 <img
@@ -933,7 +954,7 @@ const AgencyFleetManager: React.FC<{
                       {car.status === 'available' ? 'متاح' : 'غير متاح'}
                     </span>
                   </div>
-                  <div className="font-mono-tabular font-bold text-sm text-[#1B5E20] mt-1">
+                  <div className="font-mono-tabular font-bold text-sm text-[#2563EB] mt-1">
                     {formatDH(car.daily_price)} / يوم
                   </div>
                 </div>
@@ -992,7 +1013,7 @@ const AgencyBookingsManager: React.FC<{
       </div>
 
       {bookings.length === 0 ? (
-        <div className="bg-white rounded-2xl shadow-xs p-10 text-center text-sm text-slate-500">
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-10 text-center text-sm text-slate-500">
           لا توجد حجوزات مؤكدة في هذه القائمة حالياً.
         </div>
       ) : (
@@ -1000,7 +1021,7 @@ const AgencyBookingsManager: React.FC<{
           {bookings.map((b) => (
             <div
               key={b.id}
-              className="bg-white rounded-2xl shadow-xs p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4"
+              className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:border-slate-300/80 transition-colors"
             >
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
@@ -1044,7 +1065,7 @@ const AgencyBookingsManager: React.FC<{
                     type="button"
                     disabled={busyId === b.id}
                     onClick={() => handleDeliverCar(b.id)}
-                    className="min-h-[40px] rounded-xl bg-[#1B5E20] hover:bg-[#144718] disabled:opacity-60 text-white px-4 py-2 text-xs font-bold transition-colors flex items-center gap-1.5"
+                    className="min-h-[40px] rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] disabled:opacity-60 text-white px-4 py-2 text-xs font-bold transition-colors flex items-center gap-1.5"
                   >
                     {busyId === b.id && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                     <span>{busyId === b.id ? 'جاري التأكيد...' : 'تم تسليم السيارة للعميل'}</span>
@@ -1155,7 +1176,7 @@ const AgencyProfileSettings: React.FC<{
       <button
         type="submit"
         disabled={saving}
-        className="rounded-xl bg-[#1B5E20] hover:bg-[#144718] text-white px-5 py-2.5 text-sm font-bold"
+        className="rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-5 py-2.5 text-sm font-bold"
       >
         {saving ? 'جاري الحفظ...' : 'حفظ التغييرات'}
       </button>

@@ -108,6 +108,28 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
     .filter((b) => ['payment_verified', 'car_delivered', 'completed'].includes(b.status))
     .reduce((sum, b) => sum + Number(b.commission_amount || 0), 0);
 
+  const pendingReceiptsCount = bookings.filter((b) => b.status === 'payment_uploaded').length;
+  const pendingPayoutsCount = payouts.filter((p) => p.status === 'pending').length;
+
+  const getBookingStatusMeta = (status: string) => {
+    switch (status) {
+      case 'payment_uploaded':
+        return { label: 'بانتظار التحقق', cls: 'text-amber-700' };
+      case 'payment_verified':
+        return { label: 'مؤكد', cls: 'text-emerald-700' };
+      case 'car_delivered':
+      case 'completed':
+        return { label: 'تم التسليم', cls: 'text-slate-700' };
+      case 'refund_requested':
+        return { label: 'طلب استرجاع', cls: 'text-red-700' };
+      case 'refunded':
+      case 'cancelled':
+        return { label: 'مسترجع / ملغى', cls: 'text-red-700' };
+      default:
+        return { label: 'بانتظار الدفع', cls: 'text-slate-500' };
+    }
+  };
+
   const handleLogout = async () => {
     await logoutAdminAccess();
     if (onLogout) {
@@ -121,28 +143,42 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
     <section className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-6" dir="rtl">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">لوحة إدارة الوساطة والعربون</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            مراجعة وصولات العربون (10%) وتأكيد الحجوزات، ومعالجة طلبات الاسترجاع الفوري للعميل خلال ساعات من التحقق
+          <div className="text-xs text-slate-400 mb-0.5">الإدارة / مراجعة العمليات</div>
+          <h1 className="text-2xl font-bold text-slate-900">لوحة إدارة الوساطة</h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+            تأكيد وصولات التسبيق، متابعة الاسترجاع الفوري، وتوثيق الوكالات.
           </p>
         </div>
 
-        <div className="flex items-center gap-3 self-start sm:self-auto">
-          <div className="bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-left">
-            <div className="text-xs text-slate-500">عائدات المنصة المؤكدة (عربون 10%)</div>
-            <div className="font-mono-tabular font-extrabold text-lg text-[#1B5E20]">
-              {formatDH(totalCommission)}
-            </div>
-          </div>
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="self-start sm:self-auto rounded-xl border border-slate-200 bg-white hover:bg-red-50 hover:border-red-200 text-slate-600 hover:text-red-700 px-3.5 py-2 text-xs font-bold transition-colors flex items-center gap-1.5"
+        >
+          <LogOut className="w-4 h-4" />
+          <span>قفل الإدارة</span>
+        </button>
+      </div>
 
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="rounded-xl border border-slate-200 bg-white hover:bg-red-50 hover:border-red-200 text-slate-600 hover:text-red-700 px-3.5 py-2.5 text-xs font-bold transition-colors flex items-center gap-1.5"
-          >
-            <LogOut className="w-4 h-4" />
-            <span>قفل الإدارة</span>
-          </button>
+      {/* 3-Column KPI Strip */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-5">
+          <div className="text-xs text-slate-500">عائدات المنصة المؤكدة (10%)</div>
+          <div className="font-mono-tabular font-extrabold text-2xl text-[#2563EB] mt-1">
+            {formatDH(totalCommission)}
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-5">
+          <div className="text-xs text-slate-500">وصولات بانتظار المراجعة</div>
+          <div className="font-mono-tabular font-extrabold text-2xl text-slate-900 mt-1">
+            {pendingReceiptsCount}
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-5">
+          <div className="text-xs text-slate-500">طلبات استرجاع معلقة</div>
+          <div className="font-mono-tabular font-extrabold text-2xl text-slate-900 mt-1">
+            {pendingPayoutsCount}
+          </div>
         </div>
       </div>
 
@@ -153,120 +189,123 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
       )}
 
       {/* Segmented Tabs */}
-      <div className="flex items-center gap-1 p-1 bg-white border border-slate-200 rounded-xl self-start w-fit">
+      <div className="flex flex-wrap items-center gap-1 p-1 bg-white border border-slate-200/80 rounded-xl self-start w-fit">
         <button
           type="button"
           onClick={() => setTab('receipts')}
           className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 ${
-            tab === 'receipts' ? 'bg-[#1B5E20] text-white' : 'text-slate-600 hover:text-slate-900'
+            tab === 'receipts' ? 'bg-[#2563EB] text-white' : 'text-slate-600 hover:text-slate-900'
           }`}
         >
           <Shield className="w-3.5 h-3.5" />
-          <span>مراجعة وصولات العربون ({bookings.length})</span>
+          <span>الوصولات ({bookings.length})</span>
         </button>
 
         <button
           type="button"
           onClick={() => setTab('payouts')}
           className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 ${
-            tab === 'payouts' ? 'bg-[#1B5E20] text-white' : 'text-slate-600 hover:text-slate-900'
+            tab === 'payouts' ? 'bg-[#2563EB] text-white' : 'text-slate-600 hover:text-slate-900'
           }`}
         >
           <Wallet className="w-3.5 h-3.5" />
-          <span>طلبات استرجاع العربون ({payouts.length})</span>
+          <span>الاسترجاع ({payouts.length})</span>
         </button>
 
         <button
           type="button"
           onClick={() => setTab('agencies')}
           className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 ${
-            tab === 'agencies' ? 'bg-[#1B5E20] text-white' : 'text-slate-600 hover:text-slate-900'
+            tab === 'agencies' ? 'bg-[#2563EB] text-white' : 'text-slate-600 hover:text-slate-900'
           }`}
         >
           <Building2 className="w-3.5 h-3.5" />
-          <span>توثيق الشركات ({agencies.length})</span>
+          <span>الوكالات ({agencies.length})</span>
         </button>
       </div>
 
       {tab === 'receipts' && (
-        <div className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden">
           {bookings.length === 0 ? (
             <div className="p-10 text-center text-sm text-slate-500">
               لا توجد طلبات بانتظار المراجعة حالياً.
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
-              {bookings.map((b) => (
-                <div
-                  key={b.id}
-                  className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4"
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono-tabular font-bold text-slate-900">
-                        {b.booking_code}
-                      </span>
-                      <span className="text-slate-400">·</span>
-                      <span className="font-semibold text-slate-800">
-                        {b.car_brand} {b.car_model}
-                      </span>
-                      <span className="text-slate-400">·</span>
-                      <span className="text-xs text-slate-500">{b.agency_name}</span>
+              {bookings.map((b) => {
+                const statusMeta = getBookingStatusMeta(b.status);
+                return (
+                  <div
+                    key={b.id}
+                    className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-slate-50/60 transition-colors"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono-tabular font-bold text-slate-900">
+                          {b.booking_code}
+                        </span>
+                        <span className="text-slate-300">·</span>
+                        <span className="font-semibold text-slate-800">
+                          {b.car_brand} {b.car_model}
+                        </span>
+                        <span className="text-slate-300">·</span>
+                        <span className="text-xs text-slate-500">{b.agency_name}</span>
+                      </div>
+                      <div className="text-xs text-slate-600">
+                        البنك: <span className="font-bold">{b.selected_bank_code || 'غير محدد'}</span> ·
+                        الإجمالي:{' '}
+                        <span className="font-mono-tabular font-bold text-slate-900">
+                          {formatDH(Number(b.total_amount))}
+                        </span>{' '}
+                        · التسبيق (10%):{' '}
+                        <span className="font-mono-tabular font-bold text-[#2563EB]">
+                          {formatDH(Number(b.commission_amount))}
+                        </span>{' '}
+                        · للوكالة (90%):{' '}
+                        <span className="font-mono-tabular font-bold text-slate-800">
+                          {formatDH(Number(b.agency_payout_amount))}
+                        </span>
+                      </div>
                     </div>
-                    <div className="text-xs text-slate-600">
-                      البنك: <span className="font-bold">{b.selected_bank_code || 'غير محدد'}</span> ·
-                      الإجمالي:{' '}
-                      <span className="font-mono-tabular font-bold text-slate-900">
-                        {formatDH(Number(b.total_amount))}
-                      </span>{' '}
-                      · عمولة 10%:{' '}
-                      <span className="font-mono-tabular font-bold text-emerald-700">
-                        {formatDH(Number(b.commission_amount))}
-                      </span>{' '}
-                      · للوكالة 90%:{' '}
-                      <span className="font-mono-tabular font-bold text-[#1B5E20]">
-                        {formatDH(Number(b.agency_payout_amount))}
-                      </span>
-                    </div>
-                  </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-xs font-semibold text-slate-600 px-2.5 py-1 rounded-lg bg-slate-100">
-                      {b.status}
-                    </span>
-                    {b.status === 'payment_uploaded' && (
-                      <button
-                        type="button"
-                        onClick={() => handleVerifyPayment(b.id)}
-                        className="rounded-xl bg-[#1B5E20] hover:bg-[#144718] text-white px-4 py-2 text-xs font-bold"
-                      >
-                        تأكيد استلام العربون
-                      </button>
-                    )}
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className={`text-xs font-bold ${statusMeta.cls}`}>
+                        {statusMeta.label}
+                      </span>
+                      {b.status === 'payment_uploaded' && (
+                        <button
+                          type="button"
+                          onClick={() => handleVerifyPayment(b.id)}
+                          className="rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-4 py-2 text-xs font-bold transition-colors"
+                        >
+                          تأكيد الاستلام
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
       )}
 
       {tab === 'payouts' && (
-        <div className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden">
           {payouts.length === 0 ? (
             <div className="p-10 text-center text-sm text-slate-500">
-              لا توجد طلبات استرجاع عربون مسجلة حالياً.
+              لا توجد طلبات استرجاع تسبيق مسجلة حالياً.
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
               {payouts.map((p) => (
                 <div
                   key={p.id}
-                  className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4"
+                  className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-slate-50/60 transition-colors"
                 >
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900">استرجاع العربون للعميل</span>
+                      <span className="font-bold text-slate-900">استرجاع التسبيق للعميل</span>
                       <span className="text-slate-400">·</span>
                       <span className="text-sm text-slate-700">{p.recipient_name}</span>
                     </div>
@@ -278,7 +317,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
                       <button
                         type="button"
                         onClick={() => copyText(p.id, p.recipient_rib)}
-                        className="inline-flex items-center gap-1 text-emerald-700 font-semibold hover:underline"
+                        className="inline-flex items-center gap-1 text-[#2563EB] font-semibold hover:underline"
                       >
                         {copiedId === p.id ? (
                           <Check className="w-3 h-3" />
@@ -291,14 +330,14 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <span className="font-mono-tabular font-bold text-base text-[#1B5E20]">
+                    <span className="font-mono-tabular font-bold text-base text-[#2563EB]">
                       {formatDH(Number(p.amount))}
                     </span>
                     {p.status === 'pending' ? (
                       <button
                         type="button"
                         onClick={() => handleMarkPayoutSent(p.id)}
-                        className="rounded-xl bg-[#1B5E20] text-white px-3.5 py-2 text-xs font-bold"
+                        className="rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-3.5 py-2 text-xs font-bold transition-colors"
                       >
                         تأكيد إرسال الاسترجاع
                       </button>
@@ -317,7 +356,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
       )}
 
       {tab === 'agencies' && (
-        <div className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden">
           {agencies.length === 0 ? (
             <div className="p-10 text-center text-sm text-slate-500">
               لا توجد شركات مسجلة للمراجعة حالياً.
@@ -327,11 +366,28 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
               {agencies.map((ag) => (
                 <div
                   key={ag.id}
-                  className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4"
+                  className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-slate-50/60 transition-colors"
                 >
                   <div className="space-y-1">
-                    <div className="font-bold text-slate-900">
-                      {ag.name} · {getCityLabelAr(ag.city)}
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-slate-900">
+                        {ag.name} · {getCityLabelAr(ag.city)}
+                      </span>
+                      <span
+                        className={`text-xs font-bold ${
+                          ag.verification_status === 'verified'
+                            ? 'text-emerald-700'
+                            : ag.verification_status === 'suspended'
+                              ? 'text-red-600'
+                              : 'text-amber-700'
+                        }`}
+                      >
+                        {ag.verification_status === 'verified'
+                          ? 'موثقة'
+                          : ag.verification_status === 'suspended'
+                            ? 'موقوفة'
+                            : 'قيد المراجعة'}
+                      </span>
                     </div>
                     <div className="text-xs text-slate-500">
                       الهاتف: <span dir="ltr">{ag.phone}</span> · البنك: {ag.bank_name} · RIB:{' '}
@@ -340,12 +396,12 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
                       </span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 shrink-0">
                     {ag.verification_status !== 'verified' ? (
                       <button
                         type="button"
                         onClick={() => handleVerifyAgency(ag.id, 'verified')}
-                        className="rounded-xl bg-emerald-600 text-white px-4 py-2 text-xs font-bold"
+                        className="rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-4 py-2 text-xs font-bold transition-colors"
                       >
                         توثيق الشركة
                       </button>
@@ -353,7 +409,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
                       <button
                         type="button"
                         onClick={() => handleVerifyAgency(ag.id, 'suspended')}
-                        className="rounded-xl border border-slate-200 text-slate-600 px-3 py-1.5 text-xs font-semibold"
+                        className="rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 px-3 py-1.5 text-xs font-semibold transition-colors"
                       >
                         إيقاف مؤقت
                       </button>

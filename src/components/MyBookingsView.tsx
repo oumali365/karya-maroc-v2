@@ -48,7 +48,7 @@ function getStatusBadge(status: BookingStatus): {
     case 'refunded':
     case 'cancelled':
       return {
-        label: 'ملغى / تم استرجاع العربون',
+        label: 'ملغى / تم استرجاع التسبيق',
         classes: 'bg-red-50 text-red-800 border-red-200',
         icon: <XCircle className="w-3.5 h-3.5 text-red-600 shrink-0" />,
       };
@@ -75,7 +75,7 @@ function validateRefundDestination(raw: string): {
     return {
       valid: false,
       value: trimmed,
-      error: 'يرجى إدخال رقم الحساب أو رقم الهاتف لاسترجاع العربون.',
+      error: 'يرجى إدخال رقم الحساب أو رقم الهاتف لاسترجاع التسبيق.',
     };
   }
 
@@ -289,7 +289,7 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
       );
 
       setRefundFeedback(
-        'تم تسجيل طلب الاسترجاع بنجاح. استرجع عربونك كاملاً عبر التحويل الفوري لرقم هاتفك أو حسابك البنكي (مثل Cash Plus أو التطبيقات البنكية) خلال ساعات من التحقق.',
+        'تم تسجيل طلب الاسترجاع بنجاح. استرجع تسبيقك كاملاً عبر التحويل الفوري لرقم هاتفك أو حسابك البنكي (مثل Cash Plus أو التطبيقات البنكية) خلال ساعات من التحقق.',
       );
       setRefundRib('');
       setRefundTarget(null);
@@ -302,13 +302,13 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
   };
 
   return (
-    <section className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-8" dir="rtl">
-      {/* Page Title & Policy */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-        <div className="space-y-1.5">
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">حجوزاتي</h1>
-          <p className="text-sm text-slate-600 max-w-2xl">
-            استرجع عربونك كاملاً عبر التحويل الفوري لرقم هاتفك أو حسابك البنكي (مثل Cash Plus أو التطبيقات البنكية) خلال ساعات من التحقق.
+    <section className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-10 space-y-6" dir="rtl">
+      {/* Page Title */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-extrabold text-slate-900">حجوزاتي</h1>
+          <p className="text-xs sm:text-sm text-slate-500">
+            تابع حالة طلباتك أو اطلب استرجاع التسبيق فورياً عند تعذر التسليم.
           </p>
         </div>
 
@@ -321,19 +321,17 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
           }}
           className="self-start sm:self-auto inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 px-4 py-2.5 text-xs font-bold transition-colors whitespace-nowrap"
         >
-          <RotateCcw className="w-3.5 h-3.5 text-slate-600" />
-          <span>طلب استرجاع برمز الحجز</span>
+          <RotateCcw className="w-3.5 h-3.5 text-[#2563EB]" />
+          <span>استرجاع برمز الحجز</span>
         </button>
       </div>
 
       {/* Secure Lookup Form */}
       <form
         onSubmit={handleLookupByPhone}
-        className="bg-white rounded-2xl p-5 sm:p-6 shadow-xs space-y-3"
+        className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 space-y-3"
       >
-        <div className="text-xs font-bold text-slate-800">
-          البحث عن حجز سابق برمز الحجز ورقم الهاتف
-        </div>
+        <div className="text-xs font-bold text-slate-700">تتبع حجز سابق</div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <input
             type="text"
@@ -341,20 +339,20 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
             placeholder="رمز الحجز (KRY-XXXXXX)"
             value={trackCode}
             onChange={(e) => setTrackCode(e.target.value)}
-            className="min-h-[44px] rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-2.5 text-sm font-mono uppercase focus:bg-white focus:border-emerald-600 focus:outline-none"
+            className="min-h-[44px] rounded-xl border border-slate-200 bg-[#F8FAFC] px-3.5 py-2 text-sm font-mono uppercase focus:bg-white focus:border-[#2563EB] focus:outline-none"
           />
           <input
             type="tel"
             dir="ltr"
-            placeholder="رقم الهاتف المرتبط بالحجز"
+            placeholder="رقم الهاتف"
             value={trackPhone}
             onChange={(e) => setTrackPhone(e.target.value)}
-            className="min-h-[44px] rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-2.5 text-sm font-mono focus:bg-white focus:border-emerald-600 focus:outline-none"
+            className="min-h-[44px] rounded-xl border border-slate-200 bg-[#F8FAFC] px-3.5 py-2 text-sm font-mono focus:bg-white focus:border-[#2563EB] focus:outline-none"
           />
           <button
             type="submit"
             disabled={lookupLoading}
-            className="min-h-[44px] rounded-xl bg-[#1B5E20] hover:bg-[#144718] text-white px-5 py-2.5 text-xs font-bold transition-colors flex items-center justify-center gap-2"
+            className="min-h-[44px] rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-5 py-2 text-xs font-bold transition-colors flex items-center justify-center gap-2"
           >
             {lookupLoading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -370,7 +368,7 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
       {refundFeedback && (
         <div
           role="status"
-          className="rounded-2xl bg-emerald-50 border border-emerald-200 px-5 py-4 text-sm text-emerald-900 flex items-center gap-2.5"
+          className="rounded-2xl bg-emerald-50 border border-emerald-200 px-5 py-3.5 text-xs sm:text-sm text-emerald-900 flex items-center gap-2.5"
         >
           <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-700" />
           <span>{refundFeedback}</span>
@@ -379,24 +377,24 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
 
       {/* Bookings List */}
       {allBookings.length === 0 ? (
-        <div className="bg-white rounded-2xl p-12 text-center space-y-4 shadow-xs">
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-10 text-center space-y-4">
           <CarFront className="w-10 h-10 text-slate-300 mx-auto" />
           <div className="space-y-1">
-            <h2 className="font-bold text-lg text-slate-900">لا توجد حجوزات معروضة حالياً</h2>
-            <p className="text-sm text-slate-500">
-              ابحث برمز الحجز ورقم هاتفك أعلاه، أو تصفح السيارات المتاحة لإجراء حجز جديد.
+            <h2 className="font-bold text-base sm:text-lg text-slate-900">لا توجد حجوزات حالياً</h2>
+            <p className="text-xs sm:text-sm text-slate-500">
+              ابحث برمز الحجز أعلاه أو تصفح السيارات المتاحة.
             </p>
           </div>
           <button
             type="button"
             onClick={onBrowseCars}
-            className="inline-flex items-center justify-center rounded-xl bg-[#1B5E20] hover:bg-[#144718] text-white px-6 py-3 text-sm font-bold transition-colors"
+            className="inline-flex items-center justify-center rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-5 py-2.5 text-xs sm:text-sm font-bold transition-colors"
           >
-            تصفح السيارات المتاحة
+            تصفح السيارات
           </button>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3.5">
           {allBookings.map((booking) => {
             const badge = getStatusBadge(booking.status);
             const canRequestRefund =
@@ -417,7 +415,7 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
             return (
               <article
                 key={booking.booking_code}
-                className="bg-white rounded-2xl p-5 sm:p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-5"
+                className="bg-white rounded-2xl border border-slate-200/80 p-5 flex flex-col md:flex-row md:items-center justify-between gap-4"
               >
                 <div className="flex items-start gap-4 min-w-0">
                   {booking.car_image ? (
@@ -433,24 +431,33 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
                     </div>
                   )}
 
-                  <div className="space-y-2 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2.5">
+                  <div className="space-y-1.5 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
                       <span
-                        className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold ${badge.classes}`}
+                        className={`inline-flex items-center gap-1 font-bold ${
+                          booking.status === 'payment_verified'
+                            ? 'text-emerald-700'
+                            : booking.status === 'refund_requested' ||
+                                booking.status === 'refunded' ||
+                                booking.status === 'cancelled'
+                              ? 'text-red-700'
+                              : 'text-amber-700'
+                        }`}
                       >
                         {badge.icon}
                         <span>{badge.label}</span>
                       </span>
-                      <span className="font-mono-tabular text-xs font-semibold text-slate-500">
+                      <span className="text-slate-300">·</span>
+                      <span className="font-mono-tabular font-semibold text-slate-500">
                         {booking.booking_code}
                       </span>
                     </div>
 
-                    <h3 className="text-lg font-bold text-slate-900 truncate">
+                    <h3 className="text-base sm:text-lg font-bold text-slate-900 truncate">
                       {booking.car_label}
                     </h3>
 
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
+                    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-slate-500">
                       <span>{booking.agency_name}</span>
                       <span aria-hidden="true">·</span>
                       <span>{getCityLabelAr(booking.city)}</span>
@@ -472,16 +479,16 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
                   </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row md:flex-col items-start sm:items-center md:items-end justify-between gap-3 pt-4 md:pt-0 border-t md:border-t-0 border-slate-100 shrink-0">
-                  <div className="text-right md:text-left space-y-0.5">
-                    <div className="text-xs text-slate-500">
-                      العربون المدفوع:{' '}
-                      <span className="font-mono-tabular font-bold text-slate-900">
+                <div className="flex flex-col sm:flex-row md:flex-col items-start sm:items-center md:items-end justify-between gap-3 pt-3 md:pt-0 border-t md:border-t-0 border-slate-100 shrink-0">
+                  <div className="text-right md:text-left space-y-0.5 text-xs text-slate-500">
+                    <div>
+                      التسبيق:{' '}
+                      <span className="font-mono-tabular font-bold text-[#2563EB]">
                         {formatDH(booking.commission_amount)}
                       </span>
                     </div>
-                    <div className="text-xs text-slate-500">
-                      المتبقي عند الاستلام:{' '}
+                    <div>
+                      عند الاستلام:{' '}
                       <span className="font-mono-tabular font-bold text-slate-900">
                         {formatDH(booking.agency_payout_amount)}
                       </span>
@@ -492,10 +499,10 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
                     <button
                       type="button"
                       onClick={() => openRefundForBooking(booking)}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50/70 hover:bg-red-100/80 text-red-800 px-3.5 py-2 text-xs font-bold transition-colors whitespace-nowrap"
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50/70 hover:bg-red-100/80 text-red-700 px-3.5 py-2 text-xs font-bold transition-colors whitespace-nowrap"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
-                      <span>طلب استرجاع العربون</span>
+                      <span>طلب استرجاع</span>
                     </button>
                   )}
                 </div>
@@ -505,21 +512,21 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
         </div>
       )}
 
-      {/* Refund Request Panel (linked cleanly to chosen booking_code + phone/account) */}
+      {/* Refund Request Panel */}
       {(refundTarget || manualRefundMode) && (
         <form
           id="refund-request-panel"
           onSubmit={handleSubmitRefund}
-          className="bg-white rounded-2xl p-6 sm:p-8 shadow-xs space-y-5"
+          className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 space-y-4"
         >
           <div className="flex items-start justify-between gap-4">
-            <div className="space-y-1">
-              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-emerald-700" />
-                <span>طلب استرجاع العربون (تحويل فوري)</span>
+            <div className="space-y-0.5">
+              <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-[#2563EB]" />
+                <span>طلب استرجاع التسبيق</span>
               </h2>
               <p className="text-xs text-slate-500">
-                استرجع عربونك كاملاً عبر التحويل الفوري لرقم هاتفك أو حسابك البنكي (مثل Cash Plus أو التطبيقات البنكية) خلال ساعات من التحقق.
+                تحويل فوري عبر رقم الهاتف (Cash Plus) أو الحساب البنكي.
               </p>
             </div>
             <button
@@ -537,7 +544,7 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                رمز الحجز المرتبط
+                رمز الحجز
               </label>
               <input
                 required
@@ -547,7 +554,7 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
                 placeholder="KRY-XXXXXX"
                 value={refundTarget ? refundTarget.booking_code : manualCode}
                 onChange={(e) => setManualCode(e.target.value)}
-                className={`w-full min-h-[44px] rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-mono uppercase focus:border-emerald-600 focus:outline-none ${
+                className={`w-full min-h-[44px] rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-mono uppercase focus:border-[#2563EB] focus:outline-none ${
                   refundTarget ? 'bg-slate-50 text-slate-700' : 'bg-white'
                 }`}
               />
@@ -558,36 +565,33 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
                 htmlFor="refund-destination-input"
                 className="block text-xs font-semibold text-slate-700 mb-1.5"
               >
-                رقم الحساب أو رقم الهاتف (للتحويل الفوري عبر التطبيقات البنكية أو Cash Plus)
+                رقم الهاتف (06/07) أو الحساب البنكي (RIB)
               </label>
               <input
                 id="refund-destination-input"
                 required
                 type="text"
                 dir={refundRib ? 'ltr' : 'rtl'}
-                placeholder="رقم الحساب أو رقم الهاتف (للتحويل الفوري عبر التطبيقات البنكية أو Cash Plus)"
+                placeholder="06XXXXXXXX أو رقم الحساب"
                 value={refundRib}
                 onChange={(e) => setRefundRib(e.target.value)}
-                className="w-full min-h-[44px] rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-mono focus:border-emerald-600 focus:outline-none placeholder:font-sans placeholder:text-xs"
+                className="w-full min-h-[44px] rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-mono focus:border-[#2563EB] focus:outline-none placeholder:font-sans placeholder:text-xs"
               />
-              <p className="text-[11px] text-slate-500 mt-1.5">
-                مثال: رقم هاتف يبدأ بـ 06 أو 07 مربوط بـ Cash Plus أو تطبيقك البنكي، أو رقم حسابك البنكي البسيط.
-              </p>
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1.5">سبب الطلب</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">السبب</label>
             <input
               type="text"
               value={refundReason}
               onChange={(e) => setRefundReason(e.target.value)}
-              className="w-full min-h-[44px] rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:border-emerald-600 focus:outline-none"
+              className="w-full min-h-[44px] rounded-xl border border-slate-200 px-3.5 py-2 text-sm focus:border-[#2563EB] focus:outline-none"
             />
           </div>
 
           {refundError && (
-            <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+            <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-2.5 text-xs sm:text-sm text-red-700">
               {refundError}
             </div>
           )}
@@ -595,10 +599,10 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
           <button
             type="submit"
             disabled={refundSubmitting}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#1B5E20] hover:bg-[#144718] disabled:opacity-65 text-white px-6 py-3 text-sm font-bold transition-colors"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] disabled:opacity-65 text-white px-5 py-2.5 text-sm font-bold transition-colors"
           >
             {refundSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-            <span>تأكيد إرسال طلب الاسترجاع</span>
+            <span>إرسال طلب الاسترجاع</span>
           </button>
         </form>
       )}

@@ -10,18 +10,29 @@ import {
   MapPin,
   CreditCard,
   AlertCircle,
+  Star,
+  Fuel,
+  Gauge,
+  Users,
+  ArrowLeft,
+  ArrowRight,
+  Minus,
+  Plus,
+  Navigation,
 } from 'lucide-react';
 import {
   supabase,
   formatDH,
   getCityLabelAr,
-  MOROCCAN_PICKUP_LOCATIONS,
+  findNearestMoroccanCity,
 } from '../lib/supabase';
 import { BankTransferCheckout } from './BankTransferCheckout';
 import type { CarOffer, CreatedBooking } from '../types/karya';
 
 interface BookingModalProps {
   car: CarOffer;
+  initialPickupDate?: string;
+  initialDays?: number;
   onClose: () => void;
   onBookingCompleted: (booking: CreatedBooking) => void;
 }
@@ -45,16 +56,8 @@ function getDefaultPickupDateString(): string {
   return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
 }
 
-function getDefaultPickupLocation(city: string): string {
-  const match = MOROCCAN_PICKUP_LOCATIONS.find(
-    (loc) => loc.cityFr.toLowerCase() === city.toLowerCase(),
-  );
-  return match ? match.label : MOROCCAN_PICKUP_LOCATIONS[0].label;
-}
-
 function getLicenseSeniorityInfo(issueDateStr: string): {
   valid: boolean;
-  years: number;
   message: string;
   isRecent: boolean;
 } | null {
@@ -67,8 +70,7 @@ function getLicenseSeniorityInfo(issueDateStr: string): {
   if (parsed > today) {
     return {
       valid: false,
-      years: 0,
-      message: 'تاريخ إصدار الرخصة لا يمكن أن يكون في المستقبل.',
+      message: 'تاريخ إصدار الرخصة غير صالح.',
       isRecent: true,
     };
   }
@@ -79,44 +81,50 @@ function getLicenseSeniorityInfo(issueDateStr: string): {
   if (diffYears < 1) {
     return {
       valid: true,
-      years: 0,
-      message: 'رخصة حديثة (أقل من سنة) — قد تطلب بعض الوكالات ضماناً إضافياً عند التسليم.',
+      message: 'رخصة أقل من سنة — قد يُطلب ضمان إضافي عند التسليم.',
       isRecent: true,
     };
   }
 
   return {
     valid: true,
-    years: wholeYears,
     message:
       wholeYears === 1
-        ? 'أقدمية الرخصة: سنة واحدة (مؤهل للكراء).'
-        : `أقدمية الرخصة: ${wholeYears} سنوات (مؤهل للكراء).`,
+        ? 'أقدمية الرخصة: سنة واحدة (مؤهل).'
+        : `أقدمية الرخصة: ${wholeYears} سنوات (مؤهل).`,
     isRecent: false,
   };
 }
 
 export const BookingModal: React.FC<BookingModalProps> = ({
   car,
+  initialPickupDate,
+  initialDays,
   onClose,
   onBookingCompleted,
 }) => {
   const todayStr = useMemo(() => getTodayDateString(), []);
 
-  const [step, setStep] = useState<'details' | 'payment' | 'done'>('details');
+  const [step, setStep] = useState<'overview' | 'details' | 'payment' | 'done'>('overview');
   const [customerName, setCustomerName] = useState('');
   const [customerCin, setCustomerCin] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerLicenseNumber, setCustomerLicenseNumber] = useState('');
   const [customerLicenseIssueDate, setCustomerLicenseIssueDate] = useState('');
 
-  const [selectedPickupOption, setSelectedPickupOption] = useState<string>(() =>
-    getDefaultPickupLocation(car.city),
-  );
-  const [customPickupLocation, setCustomPickupLocation] = useState('');
+  const [pickupLocation, setPickupLocation] = useState('');
+  const [detectingLocation, setDetectingLocation] = useState(false);
+  const [locationCoords, setLocationCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [locationNote, setLocationNote] = useState<string | null>(null);
 
-  const [days, setDays] = useState(2);
-  const [pickupDate, setPickupDate] = useState(getDefaultPickupDateString);
+  const [days, setDays] = useState(() =>
+    initialDays && initialDays >= 1 && initialDays <= 90 ? initialDays : 2,
+  );
+  const [pickupDate, setPickupDate] = useState(() =>
+    initialPickupDate && initialPickupDate >= todayStr
+      ? initialPickupDate
+      : getDefaultPickupDateString(),
+  );
   const [pickupTime, setPickupTime] = useState('10:00');
 
   const [loading, setLoading] = useState(false);
@@ -125,17 +133,36 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   const [createdBooking, setCreatedBooking] = useState<CreatedBooking | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
 
-  const airportLocations = useMemo(
-    () => MOROCCAN_PICKUP_LOCATIONS.filter((loc) => loc.category === 'airport'),
-    [],
-  );
-  const cityLocations = useMemo(
-    () => MOROCCAN_PICKUP_LOCATIONS.filter((loc) => loc.category === 'city'),
-    [],
-  );
+  const resolvedPickupLocation = pickupLocation.trim();
 
-  const resolvedPickupLocation =
-    selectedPickupOption === '__custom__' ? customPickupLocation.trim() : selectedPickupOption;
+  const handleDetectCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationNote('المتصفح لا يدعم تحديد الموقع، اكتب عنوانك الحالي أدناه.');
+      return;
+    }
+
+    setDetectingLocation(true);
+    setLocationNote(null);
+    setErrorMsg(null);
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        const nearest = findNearestMoroccanCity(lat, lng);
+        const formattedLocation = `الموقع الحالي (${nearest.city.nameAr}) — ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+        setLocationCoords({ lat, lng });
+        setPickupLocation(formattedLocation);
+        setLocationNote(`تم تحديد موقعك قرب ${nearest.city.nameAr} لتسهيل تسليم السيارة.`);
+        setDetectingLocation(false);
+      },
+      () => {
+        setLocationNote('تعذر الوصول للموقع تلقائياً، يرجى كتابة عنوانك الحالي أدناه.');
+        setDetectingLocation(false);
+      },
+      { enableHighAccuracy: true, timeout: 8000 },
+    );
+  };
 
   const licenseInfo = useMemo(
     () => getLicenseSeniorityInfo(customerLicenseIssueDate),
@@ -146,7 +173,6 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   const commissionAmount = Number((totalAmount * 0.1).toFixed(2));
   const agencyPayoutAmount = Number((totalAmount - commissionAmount).toFixed(2));
 
-  // Ensure mobile virtual keyboard never covers the currently focused input
   const handleFieldFocus = (
     e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
@@ -169,7 +195,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       !customerLicenseNumber.trim() ||
       !customerLicenseIssueDate
     ) {
-      setErrorMsg('يرجى ملء جميع الحقول الإجبارية بما فيها رقم وتاريخ إصدار رخصة السياقة.');
+      setErrorMsg('يرجى ملء جميع الحقول الإجبارية.');
       return;
     }
 
@@ -179,12 +205,12 @@ export const BookingModal: React.FC<BookingModalProps> = ({
     }
 
     if (!resolvedPickupLocation) {
-      setErrorMsg('يرجى اختيار مكان استلام السيارة أو إدخال العنوان المخصص.');
+      setErrorMsg('يرجى تحديد موقعك الحالي أو كتابة عنوان الاستلام.');
       return;
     }
 
     if (!pickupDate || !pickupTime) {
-      setErrorMsg('يرجى تحديد تاريخ ووقت استلام السيارة.');
+      setErrorMsg('يرجى تحديد تاريخ ووقت الاستلام.');
       return;
     }
 
@@ -219,7 +245,6 @@ export const BookingModal: React.FC<BookingModalProps> = ({
           p_pickup_location: resolvedPickupLocation,
         });
 
-        // Graceful fallback if deployed DB hasn't been re-migrated with new optional parameters yet
         if (
           rpcResult.error &&
           (rpcResult.error.message.includes('Could not find the function') ||
@@ -267,7 +292,6 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         }
       }
 
-      // Demo / pre-migration mode
       const fallbackCode = `KRY-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
       const demoBooking: CreatedBooking = {
         booking_id: crypto.randomUUID(),
@@ -320,22 +344,23 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-5"
       dir="rtl"
     >
-      <div className="bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-xl shadow-xl border border-slate-200 overflow-hidden flex flex-col max-h-[92dvh] sm:max-h-[90dvh]">
+      <div className="bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92dvh] sm:max-h-[90dvh]">
         {/* Mobile grab handle */}
-        <div className="sm:hidden flex justify-center pt-2.5 pb-1 bg-[#FAFBF8] shrink-0">
+        <div className="sm:hidden flex justify-center pt-2.5 pb-1 bg-white shrink-0">
           <span className="w-10 h-1 rounded-full bg-slate-300" aria-hidden="true" />
         </div>
 
         {/* Sticky Modal Header */}
-        <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-100 bg-[#FAFBF8] shrink-0">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 border-b border-slate-100 bg-white shrink-0">
           <div className="min-w-0">
             <h3 className="font-bold text-base sm:text-lg text-slate-900 truncate">
-              {step === 'details' && 'معلومات الحجز واستلام السيارة'}
-              {step === 'payment' && 'الدفع عبر التحويل البنكي'}
-              {step === 'done' && 'تم إرسال طلبك بنجاح'}
+              {step === 'overview' && `${car.brand} ${car.model}`}
+              {step === 'details' && 'بيانات السائق والاستلام'}
+              {step === 'payment' && 'تحويل التسبيق (10%)'}
+              {step === 'done' && 'تذكرة الحجز'}
             </h3>
             <p className="text-xs text-slate-500 mt-0.5 truncate">
-              {car.brand} {car.model} · {getCityLabelAr(car.city)} · {car.agency_name}
+              {getCityLabelAr(car.city)} · {car.agency_name}
             </p>
           </div>
           <button
@@ -348,25 +373,34 @@ export const BookingModal: React.FC<BookingModalProps> = ({
           </button>
         </div>
 
-        {/* Stepper */}
-        <div className="grid grid-cols-3 border-b border-slate-100 text-xs font-semibold text-center bg-slate-50/60 shrink-0">
+        {/* Compact 4-Step Progress Bar */}
+        <div className="grid grid-cols-4 border-b border-slate-100 text-[11px] sm:text-xs font-semibold text-center bg-slate-50/70 shrink-0">
           <div
             className={`py-2.5 px-1 ${
-              step === 'details'
-                ? 'text-emerald-700 border-b-2 border-emerald-600 bg-white'
+              step === 'overview'
+                ? 'text-[#2563EB] border-b-2 border-[#2563EB] bg-white'
                 : 'text-slate-500'
             }`}
           >
-            1. بيانات العميل
+            1. السيارة
+          </div>
+          <div
+            className={`py-2.5 px-1 ${
+              step === 'details'
+                ? 'text-[#2563EB] border-b-2 border-[#2563EB] bg-white'
+                : 'text-slate-500'
+            }`}
+          >
+            2. البيانات
           </div>
           <div
             className={`py-2.5 px-1 ${
               step === 'payment'
-                ? 'text-[#1B5E20] border-b-2 border-[#1B5E20] bg-white'
+                ? 'text-[#2563EB] border-b-2 border-[#2563EB] bg-white'
                 : 'text-slate-500'
             }`}
           >
-            2. التحويل البنكي
+            3. التحويل
           </div>
           <div
             className={`py-2.5 px-1 ${
@@ -375,44 +409,188 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                 : 'text-slate-500'
             }`}
           >
-            3. تأكيد الضمان
+            4. التأكيد
           </div>
         </div>
 
-        {/* Independently Scrollable Body (shrinks cleanly with mobile keyboard via dvh) */}
-        <div className="flex-1 overflow-y-auto overscroll-contain scroll-pb-24 px-4 sm:px-6 py-4 pb-8">
-          {step === 'details' && (
-            <form onSubmit={handleCreateDraftBooking} className="space-y-4">
-              {/* Car Summary Strip */}
-              <div className="flex items-center gap-3.5 rounded-xl bg-slate-50 p-3 border border-slate-200/70">
+        {/* Scrollable Body */}
+        <div className="flex-1 overflow-y-auto overscroll-contain scroll-pb-24 px-4 sm:px-6 py-4 pb-6">
+          {/* STEP 1: CAR SHOWCASE OVERVIEW (Inspired by Screenshots 1 & 2) */}
+          {step === 'overview' && (
+            <div className="space-y-5">
+              <div className="aspect-[16/9] rounded-xl overflow-hidden bg-slate-100">
                 <img
                   src={car.primary_image_url}
                   alt={`${car.brand} ${car.model}`}
                   referrerPolicy="no-referrer"
-                  className="w-24 h-18 rounded-lg object-cover bg-slate-200 shrink-0"
+                  className="w-full h-full object-cover"
                 />
-                <div className="min-w-0 flex-1">
-                  <div className="font-bold text-slate-900 truncate">
-                    {car.brand} {car.model}
+              </div>
+
+              {/* Agency + Rating + Model Year */}
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-bold text-slate-900">
+                    {car.brand} {car.model} {car.model_year ? `· ${car.model_year}` : ''}
                   </div>
-                  <div className="text-xs text-slate-500 mt-0.5">
-                    {car.fuel_type === 'diesel' ? 'ديزل' : 'بنزين'} ·{' '}
+                  <div className="text-xs text-slate-500 mt-0.5">{car.agency_name}</div>
+                </div>
+                <div className="flex items-center gap-1 text-xs font-bold text-slate-800 shrink-0">
+                  <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                  <span className="font-mono-tabular">{car.agency_rating.toFixed(1)}</span>
+                  {car.agency_rating_count > 0 && (
+                    <span className="text-slate-400 font-normal">({car.agency_rating_count})</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Clean 4-Spec Icon Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <div className="rounded-xl bg-[#F8FAFC] border border-slate-200/75 p-3 space-y-1">
+                  <Fuel className="w-4 h-4 text-[#2563EB]" />
+                  <div className="text-[11px] text-slate-500">الوقود</div>
+                  <div className="text-xs font-bold text-slate-900">
+                    {car.fuel_type === 'diesel' ? 'ديزل' : 'بنزين'}
+                  </div>
+                </div>
+                <div className="rounded-xl bg-[#F8FAFC] border border-slate-200/75 p-3 space-y-1">
+                  <Gauge className="w-4 h-4 text-[#2563EB]" />
+                  <div className="text-[11px] text-slate-500">ناقل الحركة</div>
+                  <div className="text-xs font-bold text-slate-900">
                     {car.transmission === 'automatic' ? 'أوتوماتيك' : 'يدوي'}
                   </div>
-                  <div className="text-sm font-bold text-emerald-700 mt-1 font-mono-tabular">
-                    {formatDH(car.daily_price)} / يوم
+                </div>
+                <div className="rounded-xl bg-[#F8FAFC] border border-slate-200/75 p-3 space-y-1">
+                  <Users className="w-4 h-4 text-[#2563EB]" />
+                  <div className="text-[11px] text-slate-500">السعة</div>
+                  <div className="text-xs font-bold text-slate-900">{car.seats} مقاعد</div>
+                </div>
+                <div className="rounded-xl bg-[#F8FAFC] border border-slate-200/75 p-3 space-y-1">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                  <div className="text-[11px] text-slate-500">الضمان</div>
+                  <div className="text-xs font-bold text-slate-900">استرجاع 100%</div>
+                </div>
+              </div>
+
+              {/* Date, Time & Days Stepper */}
+              <div className="rounded-xl bg-[#F8FAFC] border border-slate-200/75 p-4 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label
+                      htmlFor="overview-days"
+                      className="block text-xs font-semibold text-slate-600 mb-1"
+                    >
+                      عدد الأيام
+                    </label>
+                    <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-2 min-h-[42px]">
+                      <button
+                        type="button"
+                        onClick={() => setDays((d) => Math.max(1, d - 1))}
+                        aria-label="تقليل الأيام"
+                        className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-700"
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </button>
+                      <span id="overview-days" className="font-mono-tabular font-bold text-sm text-slate-900">
+                        {days} {days === 1 ? 'يوم' : 'أيام'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setDays((d) => Math.min(90, d + 1))}
+                        aria-label="زيادة الأيام"
+                        className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-700"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="overview-pickup-date"
+                      className="block text-xs font-semibold text-slate-600 mb-1"
+                    >
+                      تاريخ الاستلام
+                    </label>
+                    <input
+                      id="overview-pickup-date"
+                      type="date"
+                      min={todayStr}
+                      value={pickupDate}
+                      onChange={(e) => setPickupDate(e.target.value)}
+                      className="w-full min-h-[42px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs sm:text-sm font-mono-tabular focus:border-[#2563EB] focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="overview-pickup-time"
+                      className="block text-xs font-semibold text-slate-600 mb-1"
+                    >
+                      الوقت
+                    </label>
+                    <select
+                      id="overview-pickup-time"
+                      dir="ltr"
+                      value={pickupTime}
+                      onChange={(e) => setPickupTime(e.target.value)}
+                      className="w-full min-h-[42px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs sm:text-sm font-mono-tabular text-center focus:border-[#2563EB] focus:outline-none"
+                    >
+                      {TIME_SLOTS.map((slot) => (
+                        <option key={slot} value={slot}>
+                          {slot}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Live Price Breakdown */}
+                <div className="pt-3 border-t border-slate-200/75 space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between text-slate-600">
+                    <span>
+                      الإجمالي ({days} × {car.daily_price} DH)
+                    </span>
+                    <span className="font-mono-tabular font-semibold text-slate-900">
+                      {formatDH(totalAmount)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm font-bold text-slate-900">
+                    <span>تسبيق التأكيد الآن (10%)</span>
+                    <span className="font-mono-tabular text-[#2563EB] text-base">
+                      {formatDH(commissionAmount)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-slate-500">
+                    <span>يُدفع للوكالة عند الاستلام (90%)</span>
+                    <span className="font-mono-tabular font-semibold">
+                      {formatDH(agencyPayoutAmount)}
+                    </span>
                   </div>
                 </div>
               </div>
 
-              {/* Customer Identity & Driver License */}
+              <button
+                type="button"
+                onClick={() => setStep('details')}
+                className="w-full min-h-[48px] rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white py-3.5 px-5 font-bold text-sm transition-colors flex items-center justify-center gap-2 shadow-sm shadow-blue-600/15"
+              >
+                <span>متابعة الحجز</span>
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {/* STEP 2: DRIVER DETAILS & PICKUP */}
+          {step === 'details' && (
+            <form onSubmit={handleCreateDraftBooking} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div className="sm:col-span-2">
                   <label
                     htmlFor="booking-customer-name"
                     className="block text-xs font-semibold text-slate-700 mb-1.5"
                   >
-                    الاسم الكامل <span className="text-amber-600">*</span>
+                    الاسم الكامل
                   </label>
                   <input
                     id="booking-customer-name"
@@ -423,7 +601,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                     value={customerName}
                     onFocus={handleFieldFocus}
                     onChange={(e) => setCustomerName(e.target.value)}
-                    className="w-full min-h-[44px] rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-base sm:text-sm focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/15"
+                    className="w-full min-h-[44px] rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-base sm:text-sm focus:border-[#2563EB] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/15"
                   />
                 </div>
 
@@ -432,7 +610,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                     htmlFor="booking-customer-cin"
                     className="block text-xs font-semibold text-slate-700 mb-1.5"
                   >
-                    رقم بطاقة التعريف (CIN) <span className="text-amber-600">*</span>
+                    رقم البطاقة الوطنية (CIN)
                   </label>
                   <input
                     id="booking-customer-cin"
@@ -443,7 +621,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                     value={customerCin}
                     onFocus={handleFieldFocus}
                     onChange={(e) => setCustomerCin(e.target.value)}
-                    className="w-full min-h-[44px] rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-base sm:text-sm font-mono uppercase focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/15"
+                    className="w-full min-h-[44px] rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-base sm:text-sm font-mono uppercase focus:border-[#2563EB] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/15"
                   />
                 </div>
 
@@ -452,7 +630,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                     htmlFor="booking-customer-phone"
                     className="block text-xs font-semibold text-slate-700 mb-1.5"
                   >
-                    رقم الهاتف <span className="text-amber-600">*</span>
+                    رقم الهاتف
                   </label>
                   <input
                     id="booking-customer-phone"
@@ -465,7 +643,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                     value={customerPhone}
                     onFocus={handleFieldFocus}
                     onChange={(e) => setCustomerPhone(e.target.value)}
-                    className="w-full min-h-[44px] rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-base sm:text-sm font-mono focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/15"
+                    className="w-full min-h-[44px] rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-base sm:text-sm font-mono focus:border-[#2563EB] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/15"
                   />
                 </div>
 
@@ -474,7 +652,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                     htmlFor="booking-license-number"
                     className="block text-xs font-semibold text-slate-700 mb-1.5"
                   >
-                    رقم رخصة السياقة (Permis de conduire) <span className="text-amber-600">*</span>
+                    رقم رخصة السياقة
                   </label>
                   <div className="relative">
                     <CreditCard className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -487,7 +665,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                       value={customerLicenseNumber}
                       onFocus={handleFieldFocus}
                       onChange={(e) => setCustomerLicenseNumber(e.target.value)}
-                      className="w-full min-h-[44px] rounded-xl border border-slate-200 bg-white pr-3.5 pl-9 py-2.5 text-base sm:text-sm font-mono uppercase focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/15"
+                      className="w-full min-h-[44px] rounded-xl border border-slate-200 bg-white pr-3.5 pl-9 py-2.5 text-base sm:text-sm font-mono uppercase focus:border-[#2563EB] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/15"
                     />
                   </div>
                 </div>
@@ -497,7 +675,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                     htmlFor="booking-license-date"
                     className="block text-xs font-semibold text-slate-700 mb-1.5"
                   >
-                    تاريخ إصدار رخصة السياقة <span className="text-amber-600">*</span>
+                    تاريخ إصدار الرخصة
                   </label>
                   <input
                     id="booking-license-date"
@@ -507,7 +685,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                     value={customerLicenseIssueDate}
                     onFocus={handleFieldFocus}
                     onChange={(e) => setCustomerLicenseIssueDate(e.target.value)}
-                    className="w-full min-h-[44px] rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-base sm:text-sm font-mono-tabular focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/15"
+                    className="w-full min-h-[44px] rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-base sm:text-sm font-mono-tabular focus:border-[#2563EB] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/15"
                   />
                 </div>
 
@@ -526,153 +704,61 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                   </div>
                 )}
 
-                {/* Smart Pickup Location Selector */}
-                <div className="sm:col-span-2">
+                <div className="sm:col-span-2 space-y-2">
                   <label
                     htmlFor="booking-pickup-location"
-                    className="block text-xs font-semibold text-slate-700 mb-1.5"
+                    className="block text-xs font-semibold text-slate-700"
                   >
-                    مكان استلام السيارة <span className="text-amber-600">*</span>
+                    موقع استلام السيارة
                   </label>
+
+                  <button
+                    type="button"
+                    onClick={handleDetectCurrentLocation}
+                    disabled={detectingLocation}
+                    className={`w-full min-h-[46px] rounded-xl border px-4 py-2.5 text-sm font-bold transition-colors flex items-center justify-center gap-2 ${
+                      locationCoords
+                        ? 'border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100/70'
+                        : 'border-[#2563EB]/35 bg-blue-50/70 text-[#2563EB] hover:bg-blue-100/70'
+                    }`}
+                  >
+                    {detectingLocation ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Navigation className="w-4 h-4" />
+                    )}
+                    <span>
+                      {detectingLocation
+                        ? 'جاري تحديد موقعك الحالي...'
+                        : locationCoords
+                          ? 'تم تحديد موقعك الحالي (تحديث)'
+                          : 'حدد موقعك الحالي'}
+                    </span>
+                  </button>
+
                   <div className="relative">
-                    <MapPin className="w-4 h-4 text-emerald-700 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    <select
+                    <MapPin className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
                       id="booking-pickup-location"
                       required
-                      value={selectedPickupOption}
-                      onFocus={handleFieldFocus}
-                      onChange={(e) => setSelectedPickupOption(e.target.value)}
-                      className="w-full min-h-[44px] appearance-none rounded-xl border border-slate-200 bg-white pr-9 pl-4 py-2.5 text-base sm:text-sm font-medium text-slate-900 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/15"
-                    >
-                      <optgroup label="المطارات الرئيسية في المغرب">
-                        {airportLocations.map((loc) => (
-                          <option key={loc.id} value={loc.label}>
-                            {loc.label}
-                          </option>
-                        ))}
-                      </optgroup>
-                      <optgroup label="المدن ومراكز الاستلام">
-                        {cityLocations.map((loc) => (
-                          <option key={loc.id} value={loc.label}>
-                            {loc.label}
-                          </option>
-                        ))}
-                      </optgroup>
-                      <option value="__custom__">نقطة استلام أخرى (فندق، محطة، عنوان مخصص...)</option>
-                    </select>
-                  </div>
-
-                  {selectedPickupOption === '__custom__' && (
-                    <input
-                      required
                       type="text"
-                      placeholder="اكتب عنوان الاستلام الدقيق (مثال: فندق المامونية، مراكش)"
-                      value={customPickupLocation}
+                      placeholder="أو اكتب عنوانك الحالي لتساعد الوكالة على تسليم السيارة"
+                      value={pickupLocation}
                       onFocus={handleFieldFocus}
-                      onChange={(e) => setCustomPickupLocation(e.target.value)}
-                      className="mt-2.5 w-full min-h-[44px] rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-base sm:text-sm focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/15"
+                      onChange={(e) => setPickupLocation(e.target.value)}
+                      className="w-full min-h-[44px] rounded-xl border border-slate-200 bg-white pr-9 pl-3.5 py-2.5 text-base sm:text-sm focus:border-[#2563EB] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/15"
                     />
+                  </div>
+
+                  {locationNote && (
+                    <p
+                      className={`text-xs ${
+                        locationCoords ? 'text-emerald-700 font-medium' : 'text-slate-500'
+                      }`}
+                    >
+                      {locationNote}
+                    </p>
                   )}
-                </div>
-
-                {/* Duration + Precise Pick-up Date & Time */}
-                <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label
-                      htmlFor="booking-days"
-                      className="block text-xs font-semibold text-slate-700 mb-1.5"
-                    >
-                      عدد أيام الكراء <span className="text-amber-600">*</span>
-                    </label>
-                    <input
-                      id="booking-days"
-                      required
-                      type="number"
-                      inputMode="numeric"
-                      min={1}
-                      max={90}
-                      value={days}
-                      onFocus={handleFieldFocus}
-                      onChange={(e) =>
-                        setDays(Math.min(90, Math.max(1, parseInt(e.target.value || '1', 10))))
-                      }
-                      className="w-full min-h-[44px] rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-base sm:text-sm font-mono-tabular focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/15"
-                    />
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="booking-pickup-date"
-                      className="block text-xs font-semibold text-slate-700 mb-1.5"
-                    >
-                      تاريخ الاستلام <span className="text-amber-600">*</span>
-                    </label>
-                    <input
-                      id="booking-pickup-date"
-                      required
-                      type="date"
-                      min={todayStr}
-                      value={pickupDate}
-                      onFocus={handleFieldFocus}
-                      onChange={(e) => setPickupDate(e.target.value)}
-                      className="w-full min-h-[44px] rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-base sm:text-sm font-mono-tabular focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/15"
-                    />
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="booking-pickup-time"
-                      className="block text-xs font-semibold text-slate-700 mb-1.5"
-                    >
-                      وقت الاستلام <span className="text-amber-600">*</span>
-                    </label>
-                    <select
-                      id="booking-pickup-time"
-                      required
-                      dir="ltr"
-                      value={pickupTime}
-                      onFocus={handleFieldFocus}
-                      onChange={(e) => setPickupTime(e.target.value)}
-                      className="w-full min-h-[44px] rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-base sm:text-sm font-mono-tabular text-center focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/15"
-                    >
-                      {TIME_SLOTS.map((slot) => (
-                        <option key={slot} value={slot}>
-                          {slot}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Financial Breakdown & Guarantee */}
-              <div className="rounded-xl bg-emerald-50 border border-emerald-200/70 p-4 space-y-2">
-                <div className="flex items-center justify-between text-xs text-slate-600">
-                  <span>
-                    إجمالي الكراء ({days} أيام × {car.daily_price} DH)
-                  </span>
-                  <span className="font-semibold text-slate-800 font-mono-tabular">
-                    {formatDH(totalAmount)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-sm text-emerald-950 font-bold">
-                  <span>عربون تأكيد الحجز الآن (10%)</span>
-                  <span className="text-lg text-[#1B5E20] font-mono-tabular">
-                    {formatDH(commissionAmount)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-xs text-slate-600">
-                  <span>يُدفع مباشرة للوكالة عند استلام السيارة (90%)</span>
-                  <span className="font-semibold text-slate-800 font-mono-tabular">
-                    {formatDH(agencyPayoutAmount)}
-                  </span>
-                </div>
-                <div className="flex items-start gap-2 text-xs text-emerald-800 pt-2 border-t border-emerald-200/70">
-                  <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
-                  <span>
-                    في حال عدم تسليم السيارة، استرجع عربونك كاملاً عبر التحويل الفوري لرقم هاتفك أو
-                    حسابك البنكي (مثل Cash Plus أو التطبيقات البنكية) خلال ساعات من التحقق.
-                  </span>
                 </div>
               </div>
 
@@ -686,26 +772,38 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                 </div>
               )}
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full min-h-[48px] rounded-xl bg-[#1B5E20] hover:bg-[#144718] disabled:opacity-65 disabled:cursor-not-allowed text-white py-3.5 px-5 font-bold text-sm transition-colors flex items-center justify-center gap-2"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>جاري تجهيز طلب تحويل العربون...</span>
-                  </>
-                ) : (
-                  <>
-                    <CalendarClock className="w-4 h-4" />
-                    <span>متابعة تحويل العربون ({formatDH(commissionAmount)})</span>
-                  </>
-                )}
-              </button>
+              <div className="flex items-center gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setStep('overview')}
+                  className="min-h-[48px] rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 px-4 py-3 text-sm font-bold transition-colors flex items-center gap-1.5 shrink-0"
+                >
+                  <ArrowRight className="w-4 h-4" />
+                  <span>رجوع</span>
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 min-h-[48px] rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] disabled:opacity-65 disabled:cursor-not-allowed text-white py-3 px-5 font-bold text-sm transition-colors flex items-center justify-center gap-2"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>جاري التجهيز...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CalendarClock className="w-4 h-4" />
+                      <span>الانتقال للدفع ({formatDH(commissionAmount)})</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </form>
           )}
 
+          {/* STEP 3: BANK TRANSFER */}
           {step === 'payment' && createdBooking && (
             <BankTransferCheckout
               booking={createdBooking}
@@ -714,27 +812,23 @@ export const BookingModal: React.FC<BookingModalProps> = ({
             />
           )}
 
+          {/* STEP 4: DIGITAL BOOKING PASS */}
           {step === 'done' && createdBooking && (
-            <div className="text-center space-y-4 py-3">
-              <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-700 mx-auto flex items-center justify-center">
-                <CheckCircle2 className="w-9 h-9" />
+            <div className="text-center space-y-4 py-2">
+              <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-700 mx-auto flex items-center justify-center">
+                <CheckCircle2 className="w-8 h-8" />
               </div>
 
               <div>
-                <h4 className="text-xl font-bold text-slate-900">تم استلام وصل العربون بنجاح</h4>
-                <p className="text-sm text-slate-600 mt-1.5 leading-relaxed">
-                  تقوم إدارة Karya الآن بالتحقق من تحويل العربون عبر بنك{' '}
-                  <span className="font-bold text-slate-900">
-                    {createdBooking.selected_bank_code}
-                  </span>{' '}
-                  وإشعار وكالة{' '}
-                  <span className="font-bold text-slate-900">{createdBooking.agency_name}</span>{' '}
-                  لتجهيز السيارة لك.
+                <h4 className="text-xl font-bold text-slate-900">تم استلام وصل التسبيق</h4>
+                <p className="text-xs sm:text-sm text-slate-600 mt-1">
+                  نراجع تحويلك عبر <span className="font-bold">{createdBooking.selected_bank_code}</span> وسنؤكد مع{' '}
+                  <span className="font-bold">{createdBooking.agency_name}</span>.
                 </p>
               </div>
 
-              <div className="rounded-2xl bg-[#FAFBF8] border border-emerald-900/10 p-4 space-y-2.5">
-                <div className="text-xs text-slate-500">كود تتبع الحجز والضمان (احتفظ به)</div>
+              <div className="rounded-2xl bg-[#F8FAFC] border border-slate-200/80 p-4 space-y-2.5">
+                <div className="text-xs text-slate-500">كود تتبع الحجز</div>
                 <div className="flex items-center justify-center gap-2">
                   <span className="font-mono-tabular text-lg font-bold text-slate-900">
                     {createdBooking.booking_code}
@@ -742,7 +836,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                   <button
                     type="button"
                     onClick={copyBookingCode}
-                    className="inline-flex items-center gap-1 rounded-lg bg-emerald-700 text-white px-3 py-1.5 text-xs font-semibold hover:bg-emerald-800 min-h-[36px]"
+                    className="inline-flex items-center gap-1 rounded-lg bg-slate-900 text-white px-3 py-1.5 text-xs font-semibold hover:bg-slate-800 min-h-[36px]"
                   >
                     {copiedCode ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                     <span>{copiedCode ? 'نُسخ' : 'نسخ'}</span>
@@ -750,34 +844,21 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                 </div>
                 {createdBooking.pickup_location && (
                   <div className="text-xs text-slate-600">
-                    مكان الاستلام:{' '}
-                    <span className="font-semibold text-slate-800">
-                      {createdBooking.pickup_location}
-                    </span>
+                    الاستلام: <span className="font-semibold text-slate-800">{createdBooking.pickup_location}</span>
                   </div>
                 )}
-                <div className="text-xs text-emerald-900 font-medium pt-2 border-t border-slate-200/70 space-y-1">
-                  <div>
-                    العربون المحوّل:{' '}
-                    <span className="font-mono-tabular font-bold">
-                      {formatDH(createdBooking.commission_amount)}
-                    </span>
-                  </div>
-                  <div className="text-slate-600">
-                    المتبقي للوكالة عند الاستلام:{' '}
-                    <span className="font-mono-tabular font-bold text-slate-900">
-                      {formatDH(createdBooking.agency_payout_amount)}
-                    </span>
-                  </div>
+                <div className="text-xs text-slate-600 pt-2 border-t border-slate-200/75 flex items-center justify-between">
+                  <span>التسبيق: <strong className="font-mono-tabular text-slate-900">{formatDH(createdBooking.commission_amount)}</strong></span>
+                  <span>عند الاستلام: <strong className="font-mono-tabular text-slate-900">{formatDH(createdBooking.agency_payout_amount)}</strong></span>
                 </div>
               </div>
 
               <button
                 type="button"
                 onClick={onClose}
-                className="w-full min-h-[48px] rounded-xl bg-[#1B5E20] hover:bg-[#144718] text-white py-3 font-bold text-sm transition-colors"
+                className="w-full min-h-[48px] rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white py-3 font-bold text-sm transition-colors"
               >
-                العودة للرئيسية
+                إغلاق والعودة للسيارات
               </button>
             </div>
           )}

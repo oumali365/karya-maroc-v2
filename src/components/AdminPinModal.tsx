@@ -100,9 +100,9 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({ onClose, onSuccess
       aria-labelledby="admin-pin-modal-title"
     >
       <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl border border-slate-200 overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-[#FAFBF8]">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-[#F8FAFC]">
           <div className="flex items-center gap-2.5">
-            <span className="w-8 h-8 rounded-xl bg-emerald-50 text-[#1B5E20] flex items-center justify-center">
+            <span className="w-8 h-8 rounded-xl bg-blue-50 text-[#2563EB] flex items-center justify-center">
               <Lock className="w-4 h-4" />
             </span>
             <div>
@@ -146,7 +146,7 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({ onClose, onSuccess
                       setPin(e.target.value);
                       if (errorMsg) setErrorMsg(null);
                     }}
-                    className="w-full min-h-[44px] rounded-xl border border-slate-200 bg-white pr-3.5 pl-10 py-2.5 text-sm font-mono tracking-widest focus:border-[#1B5E20] focus:outline-none focus:ring-2 focus:ring-[#1B5E20]/15"
+                    className="w-full min-h-[44px] rounded-xl border border-slate-200 bg-white pr-3.5 pl-10 py-2.5 text-sm font-mono tracking-widest focus:border-[#2563EB] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/15"
                   />
                   <button
                     type="button"
@@ -172,7 +172,7 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({ onClose, onSuccess
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full min-h-[44px] rounded-xl bg-[#1B5E20] hover:bg-[#144718] disabled:opacity-65 text-white py-2.5 px-4 text-sm font-bold transition-colors flex items-center justify-center gap-2"
+                className="w-full min-h-[44px] rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] disabled:opacity-65 text-white py-2.5 px-4 text-sm font-bold transition-colors flex items-center justify-center gap-2"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
                 <span>{loading ? 'جاري التحقق...' : 'فتح لوحة الإدارة'}</span>
@@ -198,7 +198,7 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({ onClose, onSuccess
                     setEmail(e.target.value);
                     if (errorMsg) setErrorMsg(null);
                   }}
-                  className="w-full min-h-[42px] rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-[#1B5E20] focus:outline-none"
+                  className="w-full min-h-[42px] rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-[#2563EB] focus:outline-none"
                 />
               </div>
 
@@ -221,7 +221,7 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({ onClose, onSuccess
                       setPassword(e.target.value);
                       if (errorMsg) setErrorMsg(null);
                     }}
-                    className="w-full min-h-[42px] rounded-xl border border-slate-200 bg-white pr-3 pl-10 py-2 text-sm font-mono focus:border-[#1B5E20] focus:outline-none"
+                    className="w-full min-h-[42px] rounded-xl border border-slate-200 bg-white pr-3 pl-10 py-2 text-sm font-mono focus:border-[#2563EB] focus:outline-none"
                   />
                   <button
                     type="button"
@@ -247,7 +247,7 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({ onClose, onSuccess
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full min-h-[44px] rounded-xl bg-[#1B5E20] hover:bg-[#144718] disabled:opacity-65 text-white py-2.5 px-4 text-sm font-bold transition-colors flex items-center justify-center gap-2"
+                className="w-full min-h-[44px] rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] disabled:opacity-65 text-white py-2.5 px-4 text-sm font-bold transition-colors flex items-center justify-center gap-2"
               >
                 {loading && <Loader2 className="w-4 h-4 animate-spin" />}
                 <span>{loading ? 'جاري التحقق...' : 'تسجيل الدخول'}</span>

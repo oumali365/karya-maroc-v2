@@ -1,9 +1,19 @@
-import React, { useEffect, useState } from 'react';
-import { MapPin, Navigation, Search, CarFront, Loader2, ArrowDownLeft } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  MapPin,
+  Search,
+  CarFront,
+  Star,
+  Fuel,
+  Users,
+  Gauge,
+  Calendar,
+  ArrowLeft,
+  Plane,
+} from 'lucide-react';
 import {
   supabase,
   MOROCCAN_CITIES,
-  findNearestMoroccanCity,
   getCityLabelAr,
 } from '../lib/supabase';
 import { DEFAULT_CAR_IMAGE_URL, HERO_IMAGE_URL, STARTER_CARS } from '../data/starterData';
@@ -15,29 +25,50 @@ interface CustomerPortalProps {
   onGoToAgency: () => void;
 }
 
+const POPULAR_AIRPORTS = [
+  { cityFr: 'Casablanca', cityAr: 'الدار البيضاء', airport: 'مطار محمد الخامس', code: 'CMN' },
+  { cityFr: 'Marrakech', cityAr: 'مراكش', airport: 'مطار المنارة', code: 'RAK' },
+  { cityFr: 'Agadir', cityAr: 'أكادير', airport: 'مطار المسيرة', code: 'AGA' },
+  { cityFr: 'Tangier', cityAr: 'طنجة', airport: 'مطار ابن بطوطة', code: 'TNG' },
+];
+
+function getDefaultPickupDate(): string {
+  const dt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+}
+
+function getFuelLabel(fuel: CarOffer['fuel_type']): string {
+  if (fuel === 'diesel') return 'ديزل';
+  if (fuel === 'hybrid') return 'هجين';
+  if (fuel === 'electric') return 'كهرباء';
+  return 'بنزين';
+}
+
 export const CustomerPortal: React.FC<CustomerPortalProps> = ({
   onBookingCreated,
   onGoToAgency,
 }) => {
   const [selectedCity, setSelectedCity] = useState<string>('Casablanca');
-  const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [gpsStatusText, setGpsStatusText] = useState<string | null>(null);
-  const [locating, setLocating] = useState(false);
+
+  const [searchPickupDate, setSearchPickupDate] = useState<string>(getDefaultPickupDate);
+  const [searchDays, setSearchDays] = useState<number>(2);
 
   const [cars, setCars] = useState<CarOffer[]>([]);
   const [loadingCars, setLoadingCars] = useState(true);
   const [dbConnected, setDbConnected] = useState(false);
 
+  const [brandFilter, setBrandFilter] = useState<string>('all');
   const [transmissionFilter, setTransmissionFilter] = useState<'all' | 'automatic' | 'manual'>('all');
   const [selectedCar, setSelectedCar] = useState<CarOffer | null>(null);
 
-  const loadCars = async (cityToLoad: string, coords: { lat: number; lng: number } | null) => {
+  const loadCars = async (cityToLoad: string) => {
     setLoadingCars(true);
     try {
       const { data, error } = await supabase.rpc('get_nearby_cars', {
         p_city: cityToLoad,
-        p_lat: coords?.lat ?? null,
-        p_lng: coords?.lng ?? null,
+        p_lat: null,
+        p_lng: null,
         p_radius_km: 80,
       });
 
@@ -115,7 +146,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
         return;
       }
     } catch {
-      // Smoothly fall through to starter fleet if schema hasn't been created
+      // Smoothly fall through to starter fleet
     }
 
     const demoCityCars = STARTER_CARS.filter(
@@ -127,199 +158,266 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
   };
 
   useEffect(() => {
-    loadCars(selectedCity, gpsCoords);
+    setBrandFilter('all');
+    loadCars(selectedCity);
   }, [selectedCity]);
 
-  const handleDetectGps = () => {
-    if (!navigator.geolocation) {
-      setGpsStatusText('متصفحك لا يدعم تحديد الموقع، يرجى اختيار المدينة يدوياً.');
-      return;
-    }
-
-    setLocating(true);
-    setGpsStatusText(null);
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-        const nearest = findNearestMoroccanCity(lat, lng);
-        setGpsCoords({ lat, lng });
-        setSelectedCity(nearest.city.nameFr);
-        setGpsStatusText(
-          `موقعك الحالي قرب ${nearest.city.nameAr} (${nearest.distanceKm.toFixed(1)} كم)`,
-        );
-        loadCars(nearest.city.nameFr, { lat, lng });
-        setLocating(false);
-      },
-      () => {
-        setGpsStatusText('تعذر تحديد الموقع، اختر مدينتك من القائمة.');
-        setLocating(false);
-      },
-      { enableHighAccuracy: true, timeout: 8000 },
-    );
-  };
-
-  const handleDiscoverClick = () => {
-    loadCars(selectedCity, gpsCoords);
+  const handleDiscoverClick = (e: React.FormEvent) => {
+    e.preventDefault();
+    loadCars(selectedCity);
     document.getElementById('fleet-offers')?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const filteredCars = cars.filter((car) => {
-    if (transmissionFilter === 'all') return true;
-    return car.transmission === transmissionFilter;
-  });
+  const handleSelectAirportCity = (cityFr: string) => {
+    setSelectedCity(cityFr);
+    document.getElementById('fleet-offers')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const availableBrands = useMemo(() => {
+    return Array.from(new Set(cars.map((c) => c.brand).filter(Boolean)));
+  }, [cars]);
+
+  const filteredCars = useMemo(() => {
+    return cars.filter((car) => {
+      const matchTransmission =
+        transmissionFilter === 'all' || car.transmission === transmissionFilter;
+      const matchBrand = brandFilter === 'all' || car.brand === brandFilter;
+      return matchTransmission && matchBrand;
+    });
+  }, [cars, transmissionFilter, brandFilter]);
 
   return (
     <div dir="rtl">
-      {/* 1. Clean Hero & Smart City + GPS Discovery */}
-      <section className="bg-white">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 lg:py-16 grid grid-cols-1 lg:grid-cols-12 gap-10 items-stretch">
-          <div className="lg:col-span-6 flex flex-col justify-center space-y-7">
-            <div className="space-y-3">
-              <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 leading-tight [text-wrap:balance]">
-                اكتشف السيارات المتاحة في مدينتك واحجز في دقائق
-              </h1>
-              <p className="text-slate-600 text-base leading-relaxed max-w-lg">
-                صور حقيقية لأسطول الوكالات المعتمدة في المغرب مع حجز مباشر واستلام ميسّر.
-              </p>
+      {/* 1. Full-Bleed Edge-to-Edge Hero + Floating Fields Only */}
+      <section className="relative w-full overflow-hidden bg-slate-900 min-h-[380px] sm:min-h-[430px] flex flex-col justify-end">
+        <img
+          src={HERO_IMAGE_URL}
+          alt="سيارة كراء حديثة في المغرب"
+          referrerPolicy="no-referrer"
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+        <div
+          className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/50 to-slate-950/25"
+          aria-hidden="true"
+        />
+
+        <div className="relative z-10 w-full max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10 space-y-6">
+          <div className="max-w-xl space-y-2">
+            <h1 className="text-2xl sm:text-4xl font-extrabold text-white leading-[1.2] [text-wrap:balance]">
+              احجز سيارتك في المغرب خلال دقائق
+            </h1>
+            <p className="text-slate-200 text-sm sm:text-base">
+              وكالات موثقة بأسعار واضحة · 10% تسبيق والباقي عند الاستلام.
+            </p>
+          </div>
+
+          {/* Floating Inputs Only (Zero White Wrapper Background) */}
+          <form
+            onSubmit={handleDiscoverClick}
+            className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end"
+          >
+            <div className="sm:col-span-5">
+              <label
+                htmlFor="hero-city-select"
+                className="block text-xs font-semibold text-white/90 mb-1.5"
+              >
+                المدينة
+              </label>
+              <div className="relative">
+                <MapPin className="w-4 h-4 text-[#2563EB] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <select
+                  id="hero-city-select"
+                  value={selectedCity}
+                  onChange={(e) => setSelectedCity(e.target.value)}
+                  className="w-full min-h-[46px] appearance-none rounded-xl bg-white pr-9 pl-3 py-2.5 text-sm font-semibold text-slate-900 shadow-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB]/40"
+                >
+                  {MOROCCAN_CITIES.map((city) => (
+                    <option key={city.slug} value={city.nameFr}>
+                      {city.nameAr} ({city.nameFr})
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
-            {/* Smart City + GPS Box */}
-            <div className="rounded-2xl bg-[#F6F8F6] p-5 sm:p-6 space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                    المدينة
-                  </label>
-                  <div className="relative">
-                    <MapPin className="w-4 h-4 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    <select
-                      value={selectedCity}
-                      onChange={(e) => setSelectedCity(e.target.value)}
-                      className="w-full min-h-[44px] appearance-none rounded-xl bg-white pr-9 pl-4 py-2.5 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1B5E20]/25"
-                    >
-                      {MOROCCAN_CITIES.map((city) => (
-                        <option key={city.slug} value={city.nameFr}>
-                          {city.nameAr} ({city.nameFr})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                    تحديد الموقع
-                  </label>
-                  <button
-                    type="button"
-                    onClick={handleDetectGps}
-                    disabled={locating}
-                    className="w-full min-h-[44px] rounded-xl bg-white hover:bg-slate-50 text-slate-800 px-4 py-2.5 text-sm font-bold transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
-                  >
-                    {locating ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Navigation className="w-4 h-4 text-slate-600" />
-                    )}
-                    <span>{locating ? 'جاري التحديد...' : 'موقعي الحالي GPS'}</span>
-                  </button>
-                </div>
+            <div className="sm:col-span-3">
+              <label
+                htmlFor="hero-pickup-date"
+                className="block text-xs font-semibold text-white/90 mb-1.5"
+              >
+                تاريخ الاستلام
+              </label>
+              <div className="relative">
+                <Calendar className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none hidden lg:block" />
+                <input
+                  id="hero-pickup-date"
+                  type="date"
+                  value={searchPickupDate}
+                  onChange={(e) => setSearchPickupDate(e.target.value)}
+                  className="w-full min-h-[46px] rounded-xl bg-white px-3 lg:pr-9 py-2.5 text-xs sm:text-sm font-mono-tabular text-slate-900 shadow-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB]/40"
+                />
               </div>
+            </div>
 
-              {gpsStatusText && (
-                <div className="text-xs font-medium text-slate-700 px-1">{gpsStatusText}</div>
-              )}
+            <div className="sm:col-span-2">
+              <label
+                htmlFor="hero-days"
+                className="block text-xs font-semibold text-white/90 mb-1.5"
+              >
+                المدة
+              </label>
+              <select
+                id="hero-days"
+                value={searchDays}
+                onChange={(e) => setSearchDays(Number(e.target.value))}
+                className="w-full min-h-[46px] rounded-xl bg-white px-3 py-2.5 text-sm font-semibold text-slate-900 shadow-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB]/40"
+              >
+                {[1, 2, 3, 4, 5, 7, 10, 14, 30].map((d) => (
+                  <option key={d} value={d}>
+                    {d === 1 ? 'يوم واحد' : d === 2 ? 'يومان' : `${d} أيام`}
+                  </option>
+                ))}
+              </select>
+            </div>
 
+            <div className="sm:col-span-2">
               <button
-                type="button"
-                onClick={handleDiscoverClick}
-                className="w-full min-h-[48px] rounded-xl bg-[#1B5E20] hover:bg-[#144718] text-white py-3.5 px-6 font-bold text-base transition-colors flex items-center justify-center gap-2"
+                type="submit"
+                className="w-full min-h-[46px] rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-4 py-2.5 font-bold text-sm shadow-lg transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap"
               >
                 <Search className="w-4 h-4" />
-                <span>اكتشف العروض في منطقتك</span>
+                <span>بحث</span>
               </button>
             </div>
-          </div>
-
-          <div className="lg:col-span-6">
-            <div className="h-64 sm:h-80 lg:h-full min-h-[300px] rounded-2xl overflow-hidden bg-slate-100">
-              <img
-                src={HERO_IMAGE_URL}
-                alt="سيارة كراء حديثة في المغرب"
-                referrerPolicy="no-referrer"
-                className="w-full h-full object-cover"
-              />
-            </div>
-          </div>
+          </form>
         </div>
       </section>
 
-      {/* 2. Fleet Visual Discovery Grid */}
-      <section id="fleet-offers" className="max-w-6xl mx-auto px-4 sm:px-6 py-12 space-y-8">
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-bold text-slate-900">
-              السيارات المتاحة في {getCityLabelAr(selectedCity)}
+      {/* 2. Quick Moroccan Airports & Cities Strip */}
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-5 pb-2">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {POPULAR_AIRPORTS.map((item) => {
+            const active = selectedCity.toLowerCase() === item.cityFr.toLowerCase();
+            return (
+              <button
+                key={item.code}
+                type="button"
+                onClick={() => handleSelectAirportCity(item.cityFr)}
+                className={`text-right rounded-xl border px-3.5 py-2.5 transition-colors flex items-center justify-between gap-2 ${
+                  active
+                    ? 'bg-blue-50/70 border-[#2563EB]/50 text-slate-900'
+                    : 'bg-white border-slate-200/80 hover:border-slate-300 text-slate-800'
+                }`}
+              >
+                <div className="min-w-0">
+                  <div className="text-xs font-bold truncate">{item.cityAr}</div>
+                  <div className="text-[11px] text-slate-500 truncate">{item.airport}</div>
+                </div>
+                <span className="inline-flex items-center gap-1 font-mono-tabular text-[11px] font-bold text-[#2563EB] shrink-0">
+                  <Plane className="w-3.5 h-3.5" />
+                  <span>{item.code}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* 3. Fleet Discovery Grid */}
+      <section id="fleet-offers" className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
+              السيارات في {getCityLabelAr(selectedCity)}
             </h2>
-            <p className="text-sm text-slate-500 mt-1">اختر السيارة المناسبة لإتمام الحجز</p>
+            {!dbConnected && cars.length > 0 && (
+              <p className="text-xs text-slate-500">
+                عروض توضيحية ·{' '}
+                <button
+                  type="button"
+                  onClick={onGoToAgency}
+                  className="font-semibold text-[#2563EB] hover:underline"
+                >
+                  أضف أسطولك كوكالة
+                </button>
+              </p>
+            )}
           </div>
 
-          {/* Interactive filter segmented buttons */}
-          <div className="flex items-center gap-1 p-1 bg-white rounded-xl shadow-xs self-start">
-            <button
-              type="button"
-              onClick={() => setTransmissionFilter('all')}
-              className={`px-3.5 py-2 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap ${
-                transmissionFilter === 'all'
-                  ? 'bg-slate-900 text-white'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              الكل ({cars.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setTransmissionFilter('automatic')}
-              className={`px-3.5 py-2 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap ${
-                transmissionFilter === 'automatic'
-                  ? 'bg-slate-900 text-white'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              أوتوماتيك
-            </button>
-            <button
-              type="button"
-              onClick={() => setTransmissionFilter('manual')}
-              className={`px-3.5 py-2 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap ${
-                transmissionFilter === 'manual'
-                  ? 'bg-slate-900 text-white'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              يدوي
-            </button>
+          {/* Clean Filters: Brands + Transmission */}
+          <div className="flex flex-wrap items-center gap-2.5">
+            {availableBrands.length > 1 && (
+              <div className="flex items-center gap-1 p-1 bg-white border border-slate-200/80 rounded-xl overflow-x-auto">
+                <button
+                  type="button"
+                  onClick={() => setBrandFilter('all')}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 ${
+                    brandFilter === 'all'
+                      ? 'bg-[#2563EB] text-white'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  كل الماركات
+                </button>
+                {availableBrands.map((brand) => (
+                  <button
+                    key={brand}
+                    type="button"
+                    onClick={() => setBrandFilter(brand)}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 ${
+                      brandFilter === brand
+                        ? 'bg-[#2563EB] text-white'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {brand}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="flex items-center gap-1 p-1 bg-white border border-slate-200/80 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setTransmissionFilter('all')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 ${
+                  transmissionFilter === 'all'
+                    ? 'bg-slate-900 text-white'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                الكل ({cars.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setTransmissionFilter('automatic')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 ${
+                  transmissionFilter === 'automatic'
+                    ? 'bg-slate-900 text-white'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                أوتوماتيك
+              </button>
+              <button
+                type="button"
+                onClick={() => setTransmissionFilter('manual')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 ${
+                  transmissionFilter === 'manual'
+                    ? 'bg-slate-900 text-white'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                يدوي
+              </button>
+            </div>
           </div>
         </div>
 
-        {!dbConnected && cars.length > 0 && (
-          <div className="rounded-xl bg-white px-4 py-3 text-xs text-slate-600 flex flex-wrap items-center justify-between gap-2">
-            <span>نماذج توضيحية ريثما تضيف الوكالات سياراتها في هذه المدينة.</span>
-            <button
-              type="button"
-              onClick={onGoToAgency}
-              className="font-bold text-slate-900 hover:underline whitespace-nowrap"
-            >
-              أضف سيارتك من بوابة الوكالات ←
-            </button>
-          </div>
-        )}
-
         {loadingCars ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[1, 2, 3].map((n) => (
-              <div key={n} className="bg-white rounded-2xl overflow-hidden animate-pulse">
+              <div key={n} className="bg-white rounded-2xl border border-slate-200/75 overflow-hidden animate-pulse">
                 <div className="aspect-[4/3] bg-slate-200" />
                 <div className="p-5 space-y-3">
                   <div className="h-5 bg-slate-200 rounded w-1/2" />
@@ -330,23 +428,22 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
             ))}
           </div>
         ) : filteredCars.length === 0 ? (
-          <div className="bg-white rounded-2xl p-12 text-center space-y-3">
+          <div className="bg-white rounded-2xl border border-slate-200/75 p-12 text-center space-y-3">
             <CarFront className="w-10 h-10 text-slate-300 mx-auto" />
-            <h3 className="font-bold text-lg text-slate-900">
-              لا توجد سيارات مطابقة في هذه المدينة حالياً
-            </h3>
-            <p className="text-sm text-slate-500">جرّب اختيار "الكل" أو مدينة قريبة.</p>
+            <h3 className="font-bold text-lg text-slate-900">لا توجد سيارات مطابقة حالياً</h3>
+            <p className="text-sm text-slate-500">جرّب تغيير الفلتر أو اختيار مدينة أخرى.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredCars.map((car) => (
               <article
                 key={car.id}
-                className="group bg-white rounded-2xl shadow-xs hover:shadow-md transition-all overflow-hidden flex flex-col"
+                className="group bg-white rounded-2xl border border-slate-200/80 hover:border-slate-300 hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col"
               >
-                <div
+                <button
+                  type="button"
                   onClick={() => setSelectedCar(car)}
-                  className="aspect-[4/3] bg-slate-100 overflow-hidden cursor-pointer"
+                  className="aspect-[4/3] bg-slate-100 overflow-hidden block w-full text-right cursor-pointer"
                 >
                   <img
                     src={car.primary_image_url}
@@ -354,50 +451,62 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
                     referrerPolicy="no-referrer"
                     className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
                   />
-                </div>
+                </button>
 
                 <div className="p-5 flex-1 flex flex-col">
+                  {/* Title + Rating */}
                   <div className="flex items-start justify-between gap-2">
-                    <h3 className="font-bold text-lg text-slate-900">
-                      {car.brand} {car.model}
-                    </h3>
-                    <div className="text-left shrink-0">
-                      <span className="font-mono-tabular font-extrabold text-base text-slate-900">
-                        {car.daily_price} DH
-                      </span>
-                      <span className="text-xs text-slate-500 block">/ يوم</span>
+                    <div>
+                      <h3 className="font-bold text-base sm:text-lg text-slate-900 leading-snug">
+                        {car.brand} {car.model}
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-0.5">{car.agency_name}</p>
+                    </div>
+                    <div className="flex items-center gap-1 text-xs font-bold text-slate-700 shrink-0 pt-1">
+                      <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                      <span className="font-mono-tabular">{car.agency_rating.toFixed(1)}</span>
                     </div>
                   </div>
 
-                  {/* Clean zero-pill metadata */}
-                  <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500 mt-1.5">
-                    <span>{car.fuel_type === 'diesel' ? 'ديزل' : 'بنزين'}</span>
-                    <span aria-hidden="true">·</span>
-                    <span>{car.transmission === 'automatic' ? 'أوتوماتيك' : 'يدوي'}</span>
-                    <span aria-hidden="true">·</span>
-                    <span>{car.seats} مقاعد</span>
+                  {/* Clean Spec Strip — Zero Pills */}
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600 mt-3.5 pt-3.5 border-t border-slate-100">
+                    <span className="inline-flex items-center gap-1">
+                      <Fuel className="w-3.5 h-3.5 text-slate-400" />
+                      <span>{getFuelLabel(car.fuel_type)}</span>
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <Gauge className="w-3.5 h-3.5 text-slate-400" />
+                      <span>{car.transmission === 'automatic' ? 'أوتوماتيك' : 'يدوي'}</span>
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <Users className="w-3.5 h-3.5 text-slate-400" />
+                      <span>{car.seats} مقاعد</span>
+                    </span>
                     {car.distance_km != null && (
-                      <>
-                        <span aria-hidden="true">·</span>
-                        <span className="font-mono-tabular">
-                          {car.distance_km.toFixed(1)} كم
-                        </span>
-                      </>
+                      <span className="font-mono-tabular text-slate-400">
+                        · {car.distance_km.toFixed(1)} كم
+                      </span>
                     )}
                   </div>
 
-                  <div className="text-xs text-slate-500 mt-3 pt-3 border-t border-slate-100">
-                    {car.agency_name}
-                  </div>
+                  {/* Price + Primary Action */}
+                  <div className="mt-auto pt-4 flex items-center justify-between gap-3">
+                    <div>
+                      <span className="font-mono-tabular font-extrabold text-lg text-slate-900">
+                        {car.daily_price} DH
+                      </span>
+                      <span className="text-xs text-slate-500"> / يوم</span>
+                    </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setSelectedCar(car)}
-                    className="mt-4 w-full min-h-[44px] rounded-xl bg-[#1B5E20] hover:bg-[#144718] text-white py-2.5 px-4 text-sm font-bold transition-colors flex items-center justify-center gap-2"
-                  >
-                    <span>احجز هذه السيارة</span>
-                    <ArrowDownLeft className="w-4 h-4" />
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCar(car)}
+                      className="min-h-[42px] rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-4 py-2 text-xs font-bold transition-colors inline-flex items-center gap-1.5 whitespace-nowrap shrink-0"
+                    >
+                      <span>تفاصيل وحجز</span>
+                      <ArrowLeft className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               </article>
             ))}
@@ -405,27 +514,27 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
         )}
       </section>
 
-      {/* 3. Concise Numbered Steps */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-16">
-        <div className="rounded-2xl bg-white p-6 sm:p-10 grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="space-y-1.5">
-            <h3 className="font-bold text-slate-900">1. اختر السيارة</h3>
-            <p className="text-sm text-slate-600 leading-relaxed">
-              تصفح السيارات المتاحة في مدينتك أو الأقرب إلى موقعك.
+      {/* 4. Concise 3-Step Trust Strip */}
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-12">
+        <div className="rounded-2xl bg-white border border-slate-200/80 p-6 sm:p-8 grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
+          <div className="space-y-1">
+            <h3 className="font-bold text-sm text-slate-900">1. اختر السيارة والتواريخ</h3>
+            <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
+              تصفح المواصفات والسعر النهائي بدون رسوم خفية.
             </p>
           </div>
 
-          <div className="space-y-1.5">
-            <h3 className="font-bold text-slate-900">2. ادفع العربون</h3>
-            <p className="text-sm text-slate-600 leading-relaxed">
-              املأ استمارة الحجز وحوّل مبلغ التأكيد عبر البنك مع إرفاق الوصل.
+          <div className="space-y-1">
+            <h3 className="font-bold text-sm text-slate-900">2. أكد الحجز بـ 10%</h3>
+            <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
+              تحويل بنكي آمن مع ضمان استرجاع 100% عند التعذر.
             </p>
           </div>
 
-          <div className="space-y-1.5">
-            <h3 className="font-bold text-slate-900">3. استلم السيارة</h3>
-            <p className="text-sm text-slate-600 leading-relaxed">
-              استلم سيارتك من النقطة والوقت المحددين وسدد الباقي للوكالة.
+          <div className="space-y-1">
+            <h3 className="font-bold text-sm text-slate-900">3. استلم وسدد 90%</h3>
+            <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
+              استلم السيارة من المطار أو المدينة وادفع الباقي للوكالة.
             </p>
           </div>
         </div>
@@ -434,6 +543,8 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
       {selectedCar && (
         <BookingModal
           car={selectedCar}
+          initialPickupDate={searchPickupDate}
+          initialDays={searchDays}
           onClose={() => setSelectedCar(null)}
           onBookingCompleted={onBookingCreated}
         />

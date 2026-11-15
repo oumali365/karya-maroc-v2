@@ -206,28 +206,28 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
   };
 
   return (
-    <div className="space-y-5" dir="rtl">
+    <div className="space-y-4" dir="rtl">
       {/* Summary bar */}
-      <div className="rounded-xl bg-emerald-50/70 px-4 py-3 border border-emerald-200/70 text-sm space-y-1.5">
+      <div className="rounded-xl bg-[#F8FAFC] px-4 py-3 border border-slate-200/80 text-sm space-y-1.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="text-slate-700">
-            <span className="font-semibold text-slate-900">{booking.car_label}</span>
-            <span className="mx-2 text-slate-400">·</span>
+          <div className="text-slate-700 text-xs sm:text-sm">
+            <span className="font-bold text-slate-900">{booking.car_label}</span>
+            <span className="mx-1.5 text-slate-400">·</span>
             <span>{booking.days} أيام</span>
           </div>
-          <div className="font-mono-tabular text-xs font-semibold text-emerald-800">
-            مرجع الطلب: {booking.booking_code}
+          <div className="font-mono-tabular text-xs font-bold text-[#2563EB]">
+            {booking.booking_code}
           </div>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-1.5 border-t border-emerald-200/60">
-          <span className="text-emerald-900 font-bold">
-            العربون المطلوب تحويله الآن (10%):{' '}
-            <span dir="ltr" className="font-mono-tabular">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-1.5 border-t border-slate-200/70">
+          <span className="text-slate-900 font-bold">
+            التسبيق الآن (10%):{' '}
+            <span dir="ltr" className="font-mono-tabular text-[#2563EB]">
               {formatDH(booking.commission_amount)}
             </span>
           </span>
-          <span className="text-slate-600">
-            الباقي عند الاستلام للوكالة (90%):{' '}
+          <span className="text-slate-500">
+            عند الاستلام:{' '}
             <span dir="ltr" className="font-mono-tabular font-semibold text-slate-800">
               {formatDH(booking.agency_payout_amount)}
             </span>
@@ -237,19 +237,15 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
 
       {/* Bank Selection Radio Cards */}
       <div>
-        <div className="flex items-center gap-2 mb-3">
-          <span className="w-7 h-7 rounded-lg bg-[#1B5E20] text-white flex items-center justify-center shrink-0">
-            <Landmark className="w-4 h-4" />
-          </span>
-          <h4 className="font-bold text-slate-900 text-base">
-            اختر البنك للتحويل <span className="text-amber-600">*</span>
-          </h4>
+        <div className="flex items-center gap-2 mb-2.5">
+          <Landmark className="w-4 h-4 text-[#2563EB]" />
+          <h4 className="font-bold text-slate-900 text-sm">اختر البنك للتحويل</h4>
         </div>
 
         <div
           role="radiogroup"
-          aria-label="اختر البنك لتحويل العربون"
-          className="grid grid-cols-2 sm:grid-cols-3 gap-2.5"
+          aria-label="اختر البنك لتحويل التسبيق"
+          className="grid grid-cols-2 sm:grid-cols-3 gap-2"
         >
           {banks.map((bank) => {
             const isSelected = selectedBank.id === bank.id;
@@ -260,16 +256,16 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
                 role="radio"
                 aria-checked={isSelected}
                 onClick={() => handleSelectBank(bank)}
-                className={`relative flex items-center gap-2.5 rounded-xl p-3 border text-right transition-all min-h-[64px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 ${
+                className={`relative flex items-center gap-2 rounded-xl p-2.5 border text-right transition-all min-h-[58px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB] ${
                   isSelected
-                    ? 'border-[#1B5E20] bg-emerald-50/75 ring-1 ring-[#1B5E20]/25 shadow-xs'
-                    : 'border-slate-200 bg-white hover:border-emerald-300'
+                    ? 'border-[#2563EB] bg-blue-50/60 ring-1 ring-[#2563EB]/20'
+                    : 'border-slate-200 bg-white hover:border-slate-300'
                 }`}
               >
                 <span
                   className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
                     isSelected
-                      ? 'border-[#1B5E20] bg-[#1B5E20] text-white'
+                      ? 'border-[#2563EB] bg-[#2563EB] text-white'
                       : 'border-slate-300 bg-white'
                   }`}
                   aria-hidden="true"
@@ -277,7 +273,7 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
                   {isSelected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
                 </span>
 
-                <BankLogo code={bank.code} className="w-8 h-8 shrink-0" />
+                <BankLogo code={bank.code} className="w-7 h-7 shrink-0" />
 
                 <div className="min-w-0 flex-1">
                   <div className="text-xs font-bold tracking-tight text-slate-900 truncate">
@@ -292,73 +288,45 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
       </div>
 
       {/* Selected Bank RIB Card */}
-      <div className="rounded-2xl border border-emerald-900/15 bg-[#FAFBF8] p-4 space-y-3">
-        <div className="flex items-center justify-between border-b border-slate-200/70 pb-2.5">
-          <span className="text-xs font-medium text-slate-500">الحساب البنكي المحدد</span>
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-bold text-slate-900">
-              {selectedBank.display_name_ar} ({selectedBank.short_name})
-            </span>
-            <BankLogo code={selectedBank.code} className="w-6 h-6" />
-          </div>
+      <div className="rounded-xl border border-slate-200/80 bg-[#F8FAFC] p-4 space-y-2.5">
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-slate-500">المستفيد</span>
+          <span className="font-bold text-slate-900">{selectedBank.account_holder_name}</span>
         </div>
 
-        <div className="flex items-center justify-between border-b border-slate-200/70 pb-2.5">
-          <span className="text-xs font-medium text-slate-500">اسم المستلم</span>
-          <span className="text-sm font-bold text-emerald-800">
-            {selectedBank.account_holder_name}
-          </span>
-        </div>
-
-        <div className="space-y-2 pt-0.5">
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-xs font-medium text-slate-500">رقم الحساب البنكي (RIB)</span>
-            <button
-              type="button"
-              onClick={handleCopyRib}
-              className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-bold transition-colors whitespace-nowrap shrink-0 min-h-[38px] ${
-                copiedRib
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-[#1B5E20] hover:bg-[#144718] text-white'
-              }`}
-            >
-              {copiedRib ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-              <span>{copiedRib ? 'تم النسخ (Copied!)' : 'نسخ (Copy)'}</span>
-            </button>
-          </div>
-
-          <div
-            dir="ltr"
-            className={`rounded-xl border border-dashed px-3 py-3 text-center font-mono-tabular text-sm sm:text-base font-bold tracking-wider select-all transition-colors ${
+        <div className="flex items-center justify-between gap-3 pt-1">
+          <span className="text-xs text-slate-500">رقم RIB</span>
+          <button
+            type="button"
+            onClick={handleCopyRib}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors whitespace-nowrap shrink-0 min-h-[34px] ${
               copiedRib
-                ? 'border-emerald-600 bg-emerald-50 text-emerald-950'
-                : 'border-emerald-700/35 bg-white text-slate-900'
+                ? 'bg-emerald-600 text-white'
+                : 'bg-slate-900 hover:bg-slate-800 text-white'
             }`}
           >
-            {selectedBank.rib}
-          </div>
+            {copiedRib ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+            <span>{copiedRib ? 'تم النسخ' : 'نسخ RIB'}</span>
+          </button>
+        </div>
 
-          {copiedRib && (
-            <div
-              role="status"
-              className="rounded-lg bg-emerald-100/80 border border-emerald-300 px-3 py-1.5 text-xs font-semibold text-emerald-900 flex items-center justify-center gap-1.5"
-            >
-              <Check className="w-3.5 h-3.5 text-emerald-700" />
-              <span>Copied! تم نسخ رقم الـ RIB بنجاح إلى الحافظة</span>
-            </div>
-          )}
+        <div
+          dir="ltr"
+          className={`rounded-xl border px-3 py-2.5 text-center font-mono-tabular text-sm font-bold tracking-wider select-all transition-colors ${
+            copiedRib
+              ? 'border-emerald-500 bg-emerald-50 text-emerald-950'
+              : 'border-slate-200 bg-white text-slate-900'
+          }`}
+        >
+          {selectedBank.rib}
         </div>
       </div>
 
       {/* Receipt Upload Section */}
-      <div className="space-y-2.5">
+      <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <span className="w-7 h-7 rounded-lg bg-[#1B5E20] text-white flex items-center justify-center shrink-0">
-            <Upload className="w-4 h-4" />
-          </span>
-          <h4 className="font-bold text-slate-900 text-base">
-            إرفاق وصل تحويل العربون <span className="text-amber-600">*</span>
-          </h4>
+          <Upload className="w-4 h-4 text-[#2563EB]" />
+          <h4 className="font-bold text-slate-900 text-sm">إرفاق وصل التحويل</h4>
         </div>
 
         <input
@@ -372,41 +340,35 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className={`w-full min-h-[120px] rounded-2xl border-2 border-dashed transition-colors p-5 flex flex-col items-center justify-center gap-2 text-center ${
+          className={`w-full min-h-[104px] rounded-xl border-2 border-dashed transition-colors p-4 flex flex-col items-center justify-center gap-1.5 text-center ${
             fileError
-              ? 'border-red-400 bg-red-50/40 hover:bg-red-50/60'
-              : 'border-emerald-700/25 bg-[#FAFBF8] hover:bg-emerald-50/40 hover:border-emerald-600/50'
+              ? 'border-red-400 bg-red-50/40'
+              : 'border-slate-300 bg-[#F8FAFC] hover:bg-blue-50/30 hover:border-[#2563EB]/50'
           }`}
         >
           {receiptFile ? (
-            <div className="flex flex-col items-center gap-2">
+            <div className="flex flex-col items-center gap-1.5">
               {receiptPreviewUrl ? (
                 <img
                   src={receiptPreviewUrl}
                   alt="معاينة وصل التحويل"
-                  className="h-24 w-auto rounded-lg object-cover border border-slate-200"
+                  className="h-20 w-auto rounded-lg object-cover border border-slate-200"
                 />
               ) : (
-                <div className="w-11 h-11 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center">
-                  <FileText className="w-5 h-5" />
-                </div>
+                <FileText className="w-7 h-7 text-[#2563EB]" />
               )}
-              <span className="text-sm font-bold text-emerald-900 break-all">
+              <span className="text-xs font-bold text-slate-900 break-all">
                 {receiptFile.name}
               </span>
-              <span className="text-xs text-emerald-700 font-mono-tabular">
-                {(receiptFile.size / (1024 * 1024)).toFixed(2)} MB · انقر لتغيير الملف
+              <span className="text-[11px] text-slate-500 font-mono-tabular">
+                {(receiptFile.size / (1024 * 1024)).toFixed(2)} MB · انقر للتغيير
               </span>
             </div>
           ) : (
             <>
-              <span className="w-11 h-11 rounded-xl bg-emerald-100/80 text-[#1B5E20] flex items-center justify-center">
-                <Upload className="w-5 h-5" />
-              </span>
-              <span className="text-sm font-bold text-slate-900">انقر لاختيار وصل التحويل</span>
-              <span className="text-xs text-slate-500">
-                الصيغ المسموح بها: JPG, PNG, PDF (الحد الأقصى 5MB)
-              </span>
+              <Upload className="w-5 h-5 text-[#2563EB]" />
+              <span className="text-xs sm:text-sm font-bold text-slate-800">اختر صورة أو ملف PDF للوصل</span>
+              <span className="text-[11px] text-slate-500">JPG, PNG, PDF — حتى 5MB</span>
             </>
           )}
         </button>
@@ -414,7 +376,7 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
         {fileError && (
           <div
             role="alert"
-            className="rounded-xl bg-red-50 border border-red-200 px-3.5 py-2.5 text-xs sm:text-sm font-medium text-red-700 flex items-center gap-2"
+            className="rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-xs font-medium text-red-700 flex items-center gap-2"
           >
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{fileError}</span>
@@ -425,7 +387,7 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
       {errorMsg && (
         <div
           role="alert"
-          className="rounded-xl bg-red-50 border border-red-200 px-3.5 py-2.5 text-sm text-red-700 flex items-center gap-2"
+          className="rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700 flex items-center gap-2"
         >
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{errorMsg}</span>
@@ -433,26 +395,23 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
       )}
 
       {/* Primary Action Button */}
-      <div className="space-y-2.5 pt-1">
+      <div className="space-y-2 pt-1">
         <button
           type="button"
           disabled={submitting}
           onClick={handleConfirmPayment}
-          className="w-full min-h-[48px] rounded-2xl bg-[#1B5E20] hover:bg-[#144718] disabled:opacity-65 disabled:cursor-not-allowed text-white py-3.5 px-5 font-bold text-base shadow-sm transition-colors flex items-center justify-center gap-3"
+          className="w-full min-h-[48px] rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] disabled:opacity-65 disabled:cursor-not-allowed text-white py-3 px-5 font-bold text-sm transition-colors flex items-center justify-center gap-2.5"
         >
           {submitting ? (
             <>
-              <Loader2 className="w-5 h-5 animate-spin" />
-              <span>جاري تأكيد تحويل العربون...</span>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>جاري الإرسال...</span>
             </>
           ) : (
             <>
               <span>تأكيد الدفع</span>
-              <span
-                dir="ltr"
-                className="rounded-lg bg-[#113D14] border border-amber-400/40 px-2.5 py-0.5 text-xs font-mono-tabular font-bold text-amber-300"
-              >
-                {formatDH(booking.commission_amount)}
+              <span dir="ltr" className="font-mono-tabular text-blue-100">
+                ({formatDH(booking.commission_amount)})
               </span>
             </>
           )}
@@ -463,18 +422,15 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
             type="button"
             disabled={submitting}
             onClick={onBack}
-            className="w-full min-h-[40px] py-2 text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors"
+            className="w-full min-h-[38px] py-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors"
           >
-            تعديل بيانات الحجز
+            العودة لتعديل البيانات
           </button>
         )}
 
-        <div className="flex items-center justify-center gap-1.5 text-xs text-slate-500 pt-1 text-center">
-          <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0" />
-          <span>
-            تحويل مؤمّن · استرجع عربونك كاملاً عبر التحويل الفوري لرقم هاتفك أو حسابك البنكي خلال
-            ساعات من التحقق
-          </span>
+        <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-500 text-center">
+          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+          <span>ضمان استرجاع 100% عند تعذر تسليم السيارة</span>
         </div>
       </div>
     </div>

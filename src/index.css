@@ -4,6 +4,9 @@
   :root {
     --font-sans: 'Cairo', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
     --font-mono: 'IBM Plex Mono', monospace;
+    --surface-canvas: #f8fafc;
+    --brand-primary: #2563eb;
+    --brand-ink: #0f172a;
   }
 
   html {
@@ -12,8 +15,8 @@
   }
 
   body {
-    background-color: #f6f8f6;
-    color: #0f172a;
+    background-color: var(--surface-canvas);
+    color: var(--brand-ink);
   }
 }
 
@@ -24,4 +27,10 @@
 
 .tabular-nums {
   font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
 }
