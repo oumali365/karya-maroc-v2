@@ -1,22 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import {
-  MapPin,
-  Navigation,
-  Search,
-  CarFront,
-  ShieldCheck,
-  CheckCircle2,
-  Building2,
-} from 'lucide-react';
+import { MapPin, Navigation, Search, CarFront, Loader2, ArrowDownLeft } from 'lucide-react';
 import {
   supabase,
   MOROCCAN_CITIES,
   findNearestMoroccanCity,
+  getCityLabelAr,
 } from '../lib/supabase';
 import { DEFAULT_CAR_IMAGE_URL, HERO_IMAGE_URL, STARTER_CARS } from '../data/starterData';
 import { BookingModal } from './BookingModal';
-import { Badge, CarCard, PrimaryButton, SecondaryButton, SelectField } from './ui';
-import { useLanguage } from '../i18n';
 import type { CarOffer, CreatedBooking } from '../types/karya';
 
 interface CustomerPortalProps {
@@ -28,15 +19,9 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
   onBookingCreated,
   onGoToAgency,
 }) => {
-  const { lang, dir, t, getCityLabel } = useLanguage();
-
   const [selectedCity, setSelectedCity] = useState<string>('Casablanca');
   const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [gpsNotice, setGpsNotice] = useState<
-    | { type: 'unsupported' | 'failed' }
-    | { type: 'success'; cityAr: string; cityFr: string; distanceKm: number }
-    | null
-  >(null);
+  const [gpsStatusText, setGpsStatusText] = useState<string | null>(null);
   const [locating, setLocating] = useState(false);
 
   const [cars, setCars] = useState<CarOffer[]>([]);
@@ -147,12 +132,12 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
 
   const handleDetectGps = () => {
     if (!navigator.geolocation) {
-      setGpsNotice({ type: 'unsupported' });
+      setGpsStatusText('متصفحك لا يدعم تحديد الموقع، يرجى اختيار المدينة يدوياً.');
       return;
     }
 
     setLocating(true);
-    setGpsNotice(null);
+    setGpsStatusText(null);
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const lat = position.coords.latitude;
@@ -160,17 +145,14 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
         const nearest = findNearestMoroccanCity(lat, lng);
         setGpsCoords({ lat, lng });
         setSelectedCity(nearest.city.nameFr);
-        setGpsNotice({
-          type: 'success',
-          cityAr: nearest.city.nameAr,
-          cityFr: nearest.city.nameFr,
-          distanceKm: nearest.distanceKm,
-        });
+        setGpsStatusText(
+          `موقعك الحالي قرب ${nearest.city.nameAr} (${nearest.distanceKm.toFixed(1)} كم)`,
+        );
         loadCars(nearest.city.nameFr, { lat, lng });
         setLocating(false);
       },
       () => {
-        setGpsNotice({ type: 'failed' });
+        setGpsStatusText('تعذر تحديد الموقع، اختر مدينتك من القائمة.');
         setLocating(false);
       },
       { enableHighAccuracy: true, timeout: 8000 },
@@ -187,161 +169,149 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
     return car.transmission === transmissionFilter;
   });
 
-  const gpsStatusMessage = (() => {
-    if (!gpsNotice) return null;
-    if (gpsNotice.type === 'success') {
-      return t('search.gpsSuccess', {
-        city: lang === 'ar' ? gpsNotice.cityAr : gpsNotice.cityFr,
-        km: gpsNotice.distanceKm.toFixed(1),
-      });
-    }
-    return gpsNotice.type === 'unsupported' ? t('search.gpsUnsupported') : t('search.gpsFailed');
-  })();
-
   return (
-    <div dir={dir}>
-      {/* 1. Dramatic Hero Section + Floating Search Engine */}
-      <section className="relative bg-navy overflow-hidden">
-        <img
-          src={HERO_IMAGE_URL}
-          alt={t('hero.kicker')}
-          referrerPolicy="no-referrer"
-          className="absolute inset-0 w-full h-full object-cover opacity-50"
-        />
-        <div
-          aria-hidden="true"
-          className={`absolute inset-0 ${
-            dir === 'rtl' ? 'bg-gradient-to-l' : 'bg-gradient-to-r'
-          } from-navy via-navy/80 to-navy/45`}
-        />
-
-        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 pt-14 pb-24 sm:pt-20 sm:pb-28">
-          <div className="max-w-2xl space-y-5">
-            <p className="text-xs sm:text-sm font-semibold text-gold tracking-wide">
-              {t('hero.kicker')}
-            </p>
-            <h1 className="text-3xl sm:text-5xl font-bold text-white leading-[1.22] [text-wrap:balance]">
-              {t('hero.titlePrefix')}{' '}
-              <span className="text-gold">{t('hero.titleHighlight')}</span>{' '}
-              {t('hero.titleSuffix')}
-            </h1>
-            <p className="text-sm sm:text-base text-[#D6DCE3] leading-relaxed max-w-xl">
-              {t('hero.subtitle')}
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Prominent Floating Search Engine */}
-      <section
-        aria-label={t('search.sectionAria')}
-        className="relative z-10 -mt-12 sm:-mt-14 max-w-6xl mx-auto px-4 sm:px-6"
-      >
-        <div className="bg-white rounded-2xl border border-[#E5E0D5] shadow-lg shadow-navy/8 p-4 sm:p-6">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-3.5 items-end">
-            <div className="md:col-span-5">
-              <SelectField
-                label={t('search.cityLabel')}
-                icon={<MapPin className="w-4 h-4 text-gold" />}
-                value={selectedCity}
-                onChange={(e) => setSelectedCity(e.target.value)}
-              >
-                {MOROCCAN_CITIES.map((city) => (
-                  <option key={city.slug} value={city.nameFr}>
-                    {lang === 'ar' ? `${city.nameAr} (${city.nameFr})` : `${city.nameFr} (${city.nameAr})`}
-                  </option>
-                ))}
-              </SelectField>
+    <div dir="rtl">
+      {/* 1. Clean Hero & Smart City + GPS Discovery */}
+      <section className="bg-white">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 lg:py-16 grid grid-cols-1 lg:grid-cols-12 gap-10 items-stretch">
+          <div className="lg:col-span-6 flex flex-col justify-center space-y-7">
+            <div className="space-y-3">
+              <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 leading-tight [text-wrap:balance]">
+                اكتشف السيارات المتاحة في مدينتك واحجز في دقائق
+              </h1>
+              <p className="text-slate-600 text-base leading-relaxed max-w-lg">
+                صور حقيقية لأسطول الوكالات المعتمدة في المغرب مع حجز مباشر واستلام ميسّر.
+              </p>
             </div>
 
-            <div className="md:col-span-3">
-              <SecondaryButton fullWidth loading={locating} onClick={handleDetectGps}>
-                {!locating && <Navigation className="w-4 h-4 text-navy" />}
-                <span>{locating ? t('search.locating') : t('search.gpsBtn')}</span>
-              </SecondaryButton>
-            </div>
+            {/* Smart City + GPS Box */}
+            <div className="rounded-2xl bg-[#F6F8F6] p-5 sm:p-6 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                    المدينة
+                  </label>
+                  <div className="relative">
+                    <MapPin className="w-4 h-4 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <select
+                      value={selectedCity}
+                      onChange={(e) => setSelectedCity(e.target.value)}
+                      className="w-full min-h-[44px] appearance-none rounded-xl bg-white pr-9 pl-4 py-2.5 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1B5E20]/25"
+                    >
+                      {MOROCCAN_CITIES.map((city) => (
+                        <option key={city.slug} value={city.nameFr}>
+                          {city.nameAr} ({city.nameFr})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
 
-            <div className="md:col-span-4">
-              <PrimaryButton fullWidth size="md" onClick={handleDiscoverClick}>
-                <Search className="w-4 h-4" />
-                <span>{t('search.cta')}</span>
-              </PrimaryButton>
-            </div>
-          </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                    تحديد الموقع
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleDetectGps}
+                    disabled={locating}
+                    className="w-full min-h-[44px] rounded-xl bg-white hover:bg-slate-50 text-slate-800 px-4 py-2.5 text-sm font-bold transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+                  >
+                    {locating ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Navigation className="w-4 h-4 text-slate-600" />
+                    )}
+                    <span>{locating ? 'جاري التحديد...' : 'موقعي الحالي GPS'}</span>
+                  </button>
+                </div>
+              </div>
 
-          {gpsStatusMessage && (
-            <div className="mt-3 pt-3 border-t border-[#F0ECE3] flex items-center justify-between gap-2 text-xs text-ink-muted">
-              <span>{gpsStatusMessage}</span>
-              {gpsCoords && (
-                <Badge variant="success" icon={<CheckCircle2 className="w-3.5 h-3.5" />}>
-                  {t('search.gpsActivated')}
-                </Badge>
+              {gpsStatusText && (
+                <div className="text-xs font-medium text-slate-700 px-1">{gpsStatusText}</div>
               )}
+
+              <button
+                type="button"
+                onClick={handleDiscoverClick}
+                className="w-full min-h-[48px] rounded-xl bg-[#1B5E20] hover:bg-[#144718] text-white py-3.5 px-6 font-bold text-base transition-colors flex items-center justify-center gap-2"
+              >
+                <Search className="w-4 h-4" />
+                <span>اكتشف العروض في منطقتك</span>
+              </button>
             </div>
-          )}
+          </div>
+
+          <div className="lg:col-span-6">
+            <div className="h-64 sm:h-80 lg:h-full min-h-[300px] rounded-2xl overflow-hidden bg-slate-100">
+              <img
+                src={HERO_IMAGE_URL}
+                alt="سيارة كراء حديثة في المغرب"
+                referrerPolicy="no-referrer"
+                className="w-full h-full object-cover"
+              />
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* 2. Featured Cars Section */}
-      <section id="fleet-offers" className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16 space-y-8">
+      {/* 2. Fleet Visual Discovery Grid */}
+      <section id="fleet-offers" className="max-w-6xl mx-auto px-4 sm:px-6 py-12 space-y-8">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-          <div className="space-y-1">
-            <h2 className="text-2xl sm:text-3xl font-bold text-ink">
-              {t('fleet.titlePrefix')} {getCityLabel(selectedCity)}
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900">
+              السيارات المتاحة في {getCityLabelAr(selectedCity)}
             </h2>
-            <p className="text-sm text-ink-muted">{t('fleet.subtitle')}</p>
+            <p className="text-sm text-slate-500 mt-1">اختر السيارة المناسبة لإتمام الحجز</p>
           </div>
 
           {/* Interactive filter segmented buttons */}
-          <div className="flex items-center gap-1 p-1 bg-white border border-[#E5E0D5] rounded-xl self-start">
+          <div className="flex items-center gap-1 p-1 bg-white rounded-xl shadow-xs self-start">
             <button
               type="button"
               onClick={() => setTransmissionFilter('all')}
-              className={`px-3.5 py-2 text-xs font-semibold rounded-lg transition-colors duration-150 whitespace-nowrap cursor-pointer ${
+              className={`px-3.5 py-2 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap ${
                 transmissionFilter === 'all'
-                  ? 'bg-navy text-white'
-                  : 'text-ink-muted hover:text-ink'
+                  ? 'bg-slate-900 text-white'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              {t('fleet.all')} ({cars.length})
+              الكل ({cars.length})
             </button>
             <button
               type="button"
               onClick={() => setTransmissionFilter('automatic')}
-              className={`px-3.5 py-2 text-xs font-semibold rounded-lg transition-colors duration-150 whitespace-nowrap cursor-pointer ${
+              className={`px-3.5 py-2 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap ${
                 transmissionFilter === 'automatic'
-                  ? 'bg-navy text-white'
-                  : 'text-ink-muted hover:text-ink'
+                  ? 'bg-slate-900 text-white'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              {t('fleet.automatic')}
+              أوتوماتيك
             </button>
             <button
               type="button"
               onClick={() => setTransmissionFilter('manual')}
-              className={`px-3.5 py-2 text-xs font-semibold rounded-lg transition-colors duration-150 whitespace-nowrap cursor-pointer ${
+              className={`px-3.5 py-2 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap ${
                 transmissionFilter === 'manual'
-                  ? 'bg-navy text-white'
-                  : 'text-ink-muted hover:text-ink'
+                  ? 'bg-slate-900 text-white'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              {t('fleet.manual')}
+              يدوي
             </button>
           </div>
         </div>
 
         {!dbConnected && cars.length > 0 && (
-          <div className="rounded-xl bg-white border border-[#E5E0D5] px-4 py-3 text-xs text-ink-muted flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <Badge variant="warning">{t('fleet.demoBadge')}</Badge>
-              <span>{t('fleet.demoNotice')}</span>
-            </div>
+          <div className="rounded-xl bg-white px-4 py-3 text-xs text-slate-600 flex flex-wrap items-center justify-between gap-2">
+            <span>نماذج توضيحية ريثما تضيف الوكالات سياراتها في هذه المدينة.</span>
             <button
               type="button"
               onClick={onGoToAgency}
-              className="font-bold text-navy hover:text-gold-hover transition-colors whitespace-nowrap cursor-pointer"
+              className="font-bold text-slate-900 hover:underline whitespace-nowrap"
             >
-              {t('fleet.demoAction')}
+              أضف سيارتك من بوابة الوكالات ←
             </button>
           </div>
         )}
@@ -349,88 +319,114 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
         {loadingCars ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7">
             {[1, 2, 3].map((n) => (
-              <div
-                key={n}
-                className="bg-white rounded-2xl border border-[#EAE6DD] overflow-hidden animate-pulse"
-              >
-                <div className="aspect-[4/3] bg-ivory-dark" />
+              <div key={n} className="bg-white rounded-2xl overflow-hidden animate-pulse">
+                <div className="aspect-[4/3] bg-slate-200" />
                 <div className="p-5 space-y-3">
-                  <div className="h-5 bg-ivory-dark rounded w-1/2" />
-                  <div className="h-4 bg-ivory rounded w-2/3" />
-                  <div className="h-11 bg-ivory-dark rounded-xl w-full mt-2" />
+                  <div className="h-5 bg-slate-200 rounded w-1/2" />
+                  <div className="h-4 bg-slate-100 rounded w-2/3" />
+                  <div className="h-10 bg-slate-200 rounded-xl w-full" />
                 </div>
               </div>
             ))}
           </div>
         ) : filteredCars.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-[#EAE6DD] p-12 text-center space-y-3">
-            <CarFront className="w-10 h-10 text-ink-muted/50 mx-auto" />
-            <h3 className="font-bold text-lg text-ink">{t('fleet.emptyTitle')}</h3>
-            <p className="text-sm text-ink-muted">{t('fleet.emptySubtitle')}</p>
+          <div className="bg-white rounded-2xl p-12 text-center space-y-3">
+            <CarFront className="w-10 h-10 text-slate-300 mx-auto" />
+            <h3 className="font-bold text-lg text-slate-900">
+              لا توجد سيارات مطابقة في هذه المدينة حالياً
+            </h3>
+            <p className="text-sm text-slate-500">جرّب اختيار "الكل" أو مدينة قريبة.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7">
             {filteredCars.map((car) => (
-              <CarCard key={car.id} car={car} onBook={setSelectedCar} />
+              <article
+                key={car.id}
+                className="group bg-white rounded-2xl shadow-xs hover:shadow-md transition-all overflow-hidden flex flex-col"
+              >
+                <div
+                  onClick={() => setSelectedCar(car)}
+                  className="aspect-[4/3] bg-slate-100 overflow-hidden cursor-pointer"
+                >
+                  <img
+                    src={car.primary_image_url}
+                    alt={`${car.brand} ${car.model}`}
+                    referrerPolicy="no-referrer"
+                    className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
+                  />
+                </div>
+
+                <div className="p-5 flex-1 flex flex-col">
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="font-bold text-lg text-slate-900">
+                      {car.brand} {car.model}
+                    </h3>
+                    <div className="text-left shrink-0">
+                      <span className="font-mono-tabular font-extrabold text-base text-slate-900">
+                        {car.daily_price} DH
+                      </span>
+                      <span className="text-xs text-slate-500 block">/ يوم</span>
+                    </div>
+                  </div>
+
+                  {/* Clean zero-pill metadata */}
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500 mt-1.5">
+                    <span>{car.fuel_type === 'diesel' ? 'ديزل' : 'بنزين'}</span>
+                    <span aria-hidden="true">·</span>
+                    <span>{car.transmission === 'automatic' ? 'أوتوماتيك' : 'يدوي'}</span>
+                    <span aria-hidden="true">·</span>
+                    <span>{car.seats} مقاعد</span>
+                    {car.distance_km != null && (
+                      <>
+                        <span aria-hidden="true">·</span>
+                        <span className="font-mono-tabular">
+                          {car.distance_km.toFixed(1)} كم
+                        </span>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="text-xs text-slate-500 mt-3 pt-3 border-t border-slate-100">
+                    {car.agency_name}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCar(car)}
+                    className="mt-4 w-full min-h-[44px] rounded-xl bg-[#1B5E20] hover:bg-[#144718] text-white py-2.5 px-4 text-sm font-bold transition-colors flex items-center justify-center gap-2"
+                  >
+                    <span>احجز هذه السيارة</span>
+                    <ArrowDownLeft className="w-4 h-4" />
+                  </button>
+                </div>
+              </article>
             ))}
           </div>
         )}
       </section>
 
-      {/* 3. Booking Steps & Deposit Protection Guarantee */}
+      {/* 3. Concise Numbered Steps */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-16">
-        <div className="bg-navy text-white rounded-2xl p-7 sm:p-10 space-y-8">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-white/10 pb-6">
-            <div className="space-y-2 max-w-2xl">
-              <p className="text-xs font-semibold text-gold">{t('guarantee.kicker')}</p>
-              <h2 className="text-2xl font-bold text-white [text-wrap:balance]">
-                {t('guarantee.title')}
-              </h2>
-            </div>
-            <div className="flex items-center gap-2 text-xs font-semibold text-[#D6DCE3] shrink-0">
-              <ShieldCheck className="w-4 h-4 text-gold shrink-0" />
-              <span>{t('guarantee.refundBadge')}</span>
-            </div>
+        <div className="rounded-2xl bg-white p-6 sm:p-10 grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="space-y-1.5">
+            <h3 className="font-bold text-slate-900">1. اختر السيارة</h3>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              تصفح السيارات المتاحة في مدينتك أو الأقرب إلى موقعك.
+            </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="space-y-2">
-              <div className="font-latin text-xs font-bold text-gold">01</div>
-              <h3 className="font-bold text-base text-white">{t('guarantee.step1Title')}</h3>
-              <p className="text-sm text-[#C7D0DA] leading-relaxed">
-                {t('guarantee.step1Desc')}
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <div className="font-latin text-xs font-bold text-gold">02</div>
-              <h3 className="font-bold text-base text-white">{t('guarantee.step2Title')}</h3>
-              <p className="text-sm text-[#C7D0DA] leading-relaxed">
-                {t('guarantee.step2Desc')}
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <div className="font-latin text-xs font-bold text-gold">03</div>
-              <h3 className="font-bold text-base text-white">{t('guarantee.step3Title')}</h3>
-              <p className="text-sm text-[#C7D0DA] leading-relaxed">
-                {t('guarantee.step3Desc')}
-              </p>
-            </div>
+          <div className="space-y-1.5">
+            <h3 className="font-bold text-slate-900">2. ادفع العربون</h3>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              املأ استمارة الحجز وحوّل مبلغ التأكيد عبر البنك مع إرفاق الوصل.
+            </p>
           </div>
 
-          <div className="pt-6 border-t border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs text-[#C7D0DA]">
-            <div className="flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-gold shrink-0" />
-              <span>{t('guarantee.partnerNote')}</span>
-            </div>
-            <button
-              type="button"
-              onClick={onGoToAgency}
-              className="text-gold hover:text-white font-semibold transition-colors whitespace-nowrap self-start sm:self-auto cursor-pointer"
-            >
-              {t('guarantee.partnerCta')}
-            </button>
+          <div className="space-y-1.5">
+            <h3 className="font-bold text-slate-900">3. استلم السيارة</h3>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              استلم سيارتك من النقطة والوقت المحددين وسدد الباقي للوكالة.
+            </p>
           </div>
         </div>
       </section>

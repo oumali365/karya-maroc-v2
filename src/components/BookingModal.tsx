@@ -6,17 +6,18 @@ import {
   Copy,
   Check,
   CalendarClock,
+  Loader2,
   MapPin,
   CreditCard,
   AlertCircle,
-  User,
-  ArrowLeft,
-  ArrowRight,
 } from 'lucide-react';
-import { supabase, MOROCCAN_PICKUP_LOCATIONS } from '../lib/supabase';
+import {
+  supabase,
+  formatDH,
+  getCityLabelAr,
+  MOROCCAN_PICKUP_LOCATIONS,
+} from '../lib/supabase';
 import { BankTransferCheckout } from './BankTransferCheckout';
-import { Badge, InputField, PrimaryButton, SecondaryButton, SelectField } from './ui';
-import { useLanguage } from '../i18n';
 import type { CarOffer, CreatedBooking } from '../types/karya';
 
 interface BookingModalProps {
@@ -25,36 +26,12 @@ interface BookingModalProps {
   onBookingCompleted: (booking: CreatedBooking) => void;
 }
 
-type ModalStep = 'driver' | 'pickup' | 'payment' | 'done';
-
 const TIME_SLOTS: string[] = Array.from({ length: 34 }, (_, idx) => {
   const totalMinutes = 7 * 60 + idx * 30; // 07:00 to 23:30
   const hours = String(Math.floor(totalMinutes / 60)).padStart(2, '0');
   const mins = String(totalMinutes % 60).padStart(2, '0');
   return `${hours}:${mins}`;
 });
-
-const PICKUP_FR_LABELS: Record<string, string> = {
-  'cmn-airport': 'Aéroport Mohammed V — Casablanca',
-  'rak-airport': 'Aéroport Marrakech-Ménara — Marrakech',
-  'aga-airport': 'Aéroport Agadir-Al Massira — Agadir',
-  'tng-airport': 'Aéroport Tanger-Ibn Battouta — Tanger',
-  'fez-airport': 'Aéroport Fès-Saïss — Fès',
-  'rba-airport': 'Aéroport Rabat-Salé — Rabat',
-  'oud-airport': 'Aéroport Oujda-Angads — Oujda',
-  'casablanca-city': 'Centre-ville Casablanca / Gare Casa-Voyageurs',
-  'marrakech-city': 'Centre-ville Marrakech (Guéliz / Gare)',
-  'rabat-city': 'Centre-ville Rabat (Agdal / Gare)',
-  'tangier-city': 'Centre-ville Tanger (Port / Gare Al Boraq)',
-  'fes-city': 'Centre-ville Fès (Ville Nouvelle)',
-  'agadir-city': 'Centre-ville Agadir (Corniche / Centre)',
-  'meknes-city': 'Centre-ville Meknès',
-  'kenitra-city': 'Centre-ville Kénitra (Gare)',
-  'tetouan-city': 'Centre-ville Tétouan',
-  'essaouira-city': 'Centre-ville Essaouira',
-  'oujda-city': 'Centre-ville Oujda',
-  'nador-city': 'Centre-ville Nador',
-};
 
 function getTodayDateString(): string {
   const now = new Date();
@@ -75,15 +52,58 @@ function getDefaultPickupLocation(city: string): string {
   return match ? match.label : MOROCCAN_PICKUP_LOCATIONS[0].label;
 }
 
+function getLicenseSeniorityInfo(issueDateStr: string): {
+  valid: boolean;
+  years: number;
+  message: string;
+  isRecent: boolean;
+} | null {
+  if (!issueDateStr) return null;
+  const parsed = new Date(`${issueDateStr}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return null;
+
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+  if (parsed > today) {
+    return {
+      valid: false,
+      years: 0,
+      message: 'تاريخ إصدار الرخصة لا يمكن أن يكون في المستقبل.',
+      isRecent: true,
+    };
+  }
+
+  const diffYears = (Date.now() - parsed.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+  const wholeYears = Math.floor(diffYears);
+
+  if (diffYears < 1) {
+    return {
+      valid: true,
+      years: 0,
+      message: 'رخصة حديثة (أقل من سنة) — قد تطلب بعض الوكالات ضماناً إضافياً عند التسليم.',
+      isRecent: true,
+    };
+  }
+
+  return {
+    valid: true,
+    years: wholeYears,
+    message:
+      wholeYears === 1
+        ? 'أقدمية الرخصة: سنة واحدة (مؤهل للكراء).'
+        : `أقدمية الرخصة: ${wholeYears} سنوات (مؤهل للكراء).`,
+    isRecent: false,
+  };
+}
+
 export const BookingModal: React.FC<BookingModalProps> = ({
   car,
   onClose,
   onBookingCompleted,
 }) => {
-  const { lang, dir, t, formatPrice, getCityLabel } = useLanguage();
   const todayStr = useMemo(() => getTodayDateString(), []);
 
-  const [step, setStep] = useState<ModalStep>('driver');
+  const [step, setStep] = useState<'details' | 'payment' | 'done'>('details');
   const [customerName, setCustomerName] = useState('');
   const [customerCin, setCustomerCin] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -117,52 +137,16 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   const resolvedPickupLocation =
     selectedPickupOption === '__custom__' ? customPickupLocation.trim() : selectedPickupOption;
 
-  const displayLocationOption = (loc: (typeof MOROCCAN_PICKUP_LOCATIONS)[number]) =>
-    lang === 'fr' ? PICKUP_FR_LABELS[loc.id] || loc.label : loc.label;
-
-  const licenseInfo = useMemo(() => {
-    if (!customerLicenseIssueDate) return null;
-    const parsed = new Date(`${customerLicenseIssueDate}T00:00:00`);
-    if (Number.isNaN(parsed.getTime())) return null;
-
-    const today = new Date();
-    today.setHours(23, 59, 59, 999);
-    if (parsed > today) {
-      return {
-        valid: false,
-        years: 0,
-        message: t('booking.licenseFutureError'),
-        isRecent: true,
-      };
-    }
-
-    const diffYears = (Date.now() - parsed.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
-    const wholeYears = Math.floor(diffYears);
-
-    if (diffYears < 1) {
-      return {
-        valid: true,
-        years: 0,
-        message: t('booking.licenseRecentWarn'),
-        isRecent: true,
-      };
-    }
-
-    return {
-      valid: true,
-      years: wholeYears,
-      message:
-        wholeYears === 1
-          ? t('booking.licenseOneYear')
-          : t('booking.licenseYears', { years: wholeYears }),
-      isRecent: false,
-    };
-  }, [customerLicenseIssueDate, lang]);
+  const licenseInfo = useMemo(
+    () => getLicenseSeniorityInfo(customerLicenseIssueDate),
+    [customerLicenseIssueDate],
+  );
 
   const totalAmount = Number((car.daily_price * days).toFixed(2));
   const commissionAmount = Number((totalAmount * 0.1).toFixed(2));
   const agencyPayoutAmount = Number((totalAmount - commissionAmount).toFixed(2));
 
+  // Ensure mobile virtual keyboard never covers the currently focused input
   const handleFieldFocus = (
     e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
@@ -172,8 +156,10 @@ export const BookingModal: React.FC<BookingModalProps> = ({
     }, 180);
   };
 
-  const handleAdvanceToPickup = (e: React.FormEvent) => {
+  const handleCreateDraftBooking = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submittingRef.current || loading) return;
+
     setErrorMsg(null);
 
     if (
@@ -183,7 +169,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       !customerLicenseNumber.trim() ||
       !customerLicenseIssueDate
     ) {
-      setErrorMsg(t('booking.driverValidationError'));
+      setErrorMsg('يرجى ملء جميع الحقول الإجبارية بما فيها رقم وتاريخ إصدار رخصة السياقة.');
       return;
     }
 
@@ -192,24 +178,20 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       return;
     }
 
-    setStep('pickup');
-  };
+    if (!resolvedPickupLocation) {
+      setErrorMsg('يرجى اختيار مكان استلام السيارة أو إدخال العنوان المخصص.');
+      return;
+    }
 
-  const handleCreateDraftBooking = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (submittingRef.current || loading) return;
-
-    setErrorMsg(null);
-
-    if (!resolvedPickupLocation || !pickupDate || !pickupTime) {
-      setErrorMsg(t('booking.pickupValidationError'));
+    if (!pickupDate || !pickupTime) {
+      setErrorMsg('يرجى تحديد تاريخ ووقت استلام السيارة.');
       return;
     }
 
     const deliveryAtLocal = `${pickupDate}T${pickupTime}`;
     const deliveryDateObj = new Date(deliveryAtLocal);
     if (Number.isNaN(deliveryDateObj.getTime())) {
-      setErrorMsg(t('booking.invalidDateError'));
+      setErrorMsg('تاريخ أو وقت الاستلام غير صالح.');
       return;
     }
 
@@ -237,6 +219,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
           p_pickup_location: resolvedPickupLocation,
         });
 
+        // Graceful fallback if deployed DB hasn't been re-migrated with new optional parameters yet
         if (
           rpcResult.error &&
           (rpcResult.error.message.includes('Could not find the function') ||
@@ -284,6 +267,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         }
       }
 
+      // Demo / pre-migration mode
       const fallbackCode = `KRY-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
       const demoBooking: CreatedBooking = {
         booking_id: crypto.randomUUID(),
@@ -307,7 +291,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       setCreatedBooking(demoBooking);
       setStep('payment');
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : t('booking.createError'));
+      setErrorMsg(err instanceof Error ? err.message : 'حدث خطأ أثناء إنشاء الطلب.');
     } finally {
       setLoading(false);
       submittingRef.current = false;
@@ -331,458 +315,470 @@ export const BookingModal: React.FC<BookingModalProps> = ({
     }
   };
 
-  const stepIndex = step === 'driver' ? 0 : step === 'pickup' ? 1 : step === 'payment' ? 2 : 3;
-  const stepperItems = [
-    t('booking.step1'),
-    t('booking.step2'),
-    t('booking.step3'),
-    t('booking.step4'),
-  ];
-
-  const ForwardIcon = dir === 'rtl' ? ArrowLeft : ArrowRight;
-  const BackIcon = dir === 'rtl' ? ArrowRight : ArrowLeft;
-
   return (
     <div
-      className="fixed inset-0 z-50 bg-navy/65 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-5"
-      dir={dir}
+      className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-5"
+      dir="rtl"
     >
-      <div className="bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-xl shadow-2xl border border-[#E5E0D5] overflow-hidden flex flex-col max-h-[92dvh] sm:max-h-[90dvh]">
+      <div className="bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-xl shadow-xl border border-slate-200 overflow-hidden flex flex-col max-h-[92dvh] sm:max-h-[90dvh]">
         {/* Mobile grab handle */}
-        <div className="sm:hidden flex justify-center pt-2.5 pb-1 bg-ivory/70 shrink-0">
-          <span className="w-10 h-1 rounded-full bg-[#D5CFC2]" aria-hidden="true" />
+        <div className="sm:hidden flex justify-center pt-2.5 pb-1 bg-[#FAFBF8] shrink-0">
+          <span className="w-10 h-1 rounded-full bg-slate-300" aria-hidden="true" />
         </div>
 
         {/* Sticky Modal Header */}
-        <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-[#EFECE5] bg-ivory/60 shrink-0">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-100 bg-[#FAFBF8] shrink-0">
           <div className="min-w-0">
-            <h3 className="font-bold text-base sm:text-lg text-navy truncate">
-              {step === 'driver' && t('booking.titleDriver')}
-              {step === 'pickup' && t('booking.titlePickup')}
-              {step === 'payment' && t('booking.titlePayment')}
-              {step === 'done' && t('booking.titleDone')}
+            <h3 className="font-bold text-base sm:text-lg text-slate-900 truncate">
+              {step === 'details' && 'معلومات الحجز واستلام السيارة'}
+              {step === 'payment' && 'الدفع عبر التحويل البنكي'}
+              {step === 'done' && 'تم إرسال طلبك بنجاح'}
             </h3>
-            <p className="text-xs text-ink-muted mt-0.5 truncate">
-              <span className="font-latin font-semibold text-ink">
-                {car.brand} {car.model}
-              </span>{' '}
-              · {getCityLabel(car.city)} · {car.agency_name}
+            <p className="text-xs text-slate-500 mt-0.5 truncate">
+              {car.brand} {car.model} · {getCityLabelAr(car.city)} · {car.agency_name}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label={t('common.close')}
-            className="min-h-[44px] min-w-[44px] rounded-xl flex items-center justify-center text-ink-muted hover:text-navy hover:bg-ivory-dark/70 transition-colors shrink-0 cursor-pointer"
+            aria-label="إغلاق"
+            className="min-h-[44px] min-w-[44px] rounded-xl flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Clean 4-Step Progress Stepper */}
-        <div className="grid grid-cols-4 border-b border-[#EFECE5] bg-ivory/40 shrink-0">
-          {stepperItems.map((label, idx) => {
-            const isActive = idx === stepIndex;
-            const isCompleted = idx < stepIndex;
-            return (
-              <div
-                key={label}
-                className={`py-2.5 px-1.5 text-center text-[11px] sm:text-xs font-semibold transition-colors truncate ${
-                  isActive
-                    ? 'text-navy bg-white border-b-2 border-gold font-bold'
-                    : isCompleted
-                      ? 'text-emerald-800 bg-white/60 border-b-2 border-emerald-600/60'
-                      : 'text-ink-muted'
-                }`}
-              >
-                {label}
-              </div>
-            );
-          })}
+        {/* Stepper */}
+        <div className="grid grid-cols-3 border-b border-slate-100 text-xs font-semibold text-center bg-slate-50/60 shrink-0">
+          <div
+            className={`py-2.5 px-1 ${
+              step === 'details'
+                ? 'text-emerald-700 border-b-2 border-emerald-600 bg-white'
+                : 'text-slate-500'
+            }`}
+          >
+            1. بيانات العميل
+          </div>
+          <div
+            className={`py-2.5 px-1 ${
+              step === 'payment'
+                ? 'text-[#1B5E20] border-b-2 border-[#1B5E20] bg-white'
+                : 'text-slate-500'
+            }`}
+          >
+            2. التحويل البنكي
+          </div>
+          <div
+            className={`py-2.5 px-1 ${
+              step === 'done'
+                ? 'text-emerald-700 border-b-2 border-emerald-600 bg-white'
+                : 'text-slate-500'
+            }`}
+          >
+            3. تأكيد الضمان
+          </div>
         </div>
 
-        {/* Scrollable Modal Body */}
-        <div className="flex-1 overflow-y-auto overscroll-contain scroll-pb-24 px-4 sm:px-6 py-5 pb-8">
-          {/* Compact Car Summary Strip on Steps 1 & 2 */}
-          {(step === 'driver' || step === 'pickup') && (
-            <div className="flex items-center gap-3.5 rounded-xl bg-ivory/70 p-3 border border-[#E5E0D5] mb-5">
-              <img
-                src={car.primary_image_url}
-                alt={`${car.brand} ${car.model}`}
-                referrerPolicy="no-referrer"
-                className="w-24 h-16 rounded-lg object-cover bg-ivory-dark shrink-0"
-              />
-              <div className="min-w-0 flex-1">
-                <div className="font-bold text-ink font-latin truncate">
-                  {car.brand} {car.model}
-                </div>
-                <div className="text-xs text-ink-muted mt-0.5">
-                  {t(`car.fuel.${car.fuel_type || 'diesel'}`)} ·{' '}
-                  {t(`car.transmission.${car.transmission || 'manual'}`)}
-                </div>
-                <div className="text-sm font-extrabold text-navy mt-1 font-latin tabular-nums">
-                  {formatPrice(car.daily_price, 0)} {t('common.perDay')}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 1: Driver Identity & License */}
-          {step === 'driver' && (
-            <form onSubmit={handleAdvanceToPickup} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                <InputField
-                  containerClassName="sm:col-span-2"
-                  id="booking-customer-name"
-                  required
-                  type="text"
-                  autoComplete="name"
-                  label={`${t('booking.fullName')} *`}
-                  placeholder={t('booking.fullNamePlaceholder')}
-                  icon={<User className="w-4 h-4" />}
-                  value={customerName}
-                  onFocus={handleFieldFocus}
-                  onChange={(e) => {
-                    setCustomerName(e.target.value);
-                    if (errorMsg) setErrorMsg(null);
-                  }}
-                />
-
-                <InputField
-                  id="booking-customer-cin"
-                  required
-                  type="text"
-                  dir="ltr"
-                  label={`${t('booking.cin')} *`}
-                  placeholder="BK123456"
-                  className="font-mono uppercase"
-                  value={customerCin}
-                  onFocus={handleFieldFocus}
-                  onChange={(e) => {
-                    setCustomerCin(e.target.value);
-                    if (errorMsg) setErrorMsg(null);
-                  }}
-                />
-
-                <InputField
-                  id="booking-customer-phone"
-                  required
-                  type="tel"
-                  inputMode="tel"
-                  autoComplete="tel"
-                  dir="ltr"
-                  label={`${t('booking.phone')} *`}
-                  placeholder="06 12 34 56 78"
-                  className="font-mono"
-                  value={customerPhone}
-                  onFocus={handleFieldFocus}
-                  onChange={(e) => {
-                    setCustomerPhone(e.target.value);
-                    if (errorMsg) setErrorMsg(null);
-                  }}
-                />
-
-                <InputField
-                  id="booking-license-number"
-                  required
-                  type="text"
-                  dir="ltr"
-                  label={`${t('booking.licenseNumber')} *`}
-                  placeholder="12/345678"
-                  icon={<CreditCard className="w-4 h-4" />}
-                  className="font-mono uppercase"
-                  value={customerLicenseNumber}
-                  onFocus={handleFieldFocus}
-                  onChange={(e) => {
-                    setCustomerLicenseNumber(e.target.value);
-                    if (errorMsg) setErrorMsg(null);
-                  }}
-                />
-
-                <InputField
-                  id="booking-license-date"
-                  required
-                  type="date"
-                  max={todayStr}
-                  label={`${t('booking.licenseIssueDate')} *`}
-                  className="font-mono-tabular"
-                  value={customerLicenseIssueDate}
-                  onFocus={handleFieldFocus}
-                  onChange={(e) => {
-                    setCustomerLicenseIssueDate(e.target.value);
-                    if (errorMsg) setErrorMsg(null);
-                  }}
-                />
-              </div>
-
-              {licenseInfo && (
-                <div
-                  className={`text-xs px-3.5 py-2.5 rounded-xl border flex items-center gap-2 ${
-                    !licenseInfo.valid
-                      ? 'bg-rose-50 border-rose-200 text-rose-800'
-                      : licenseInfo.isRecent
-                        ? 'bg-gold-soft border-gold/40 text-[#8A6526]'
-                        : 'bg-emerald-50/80 border-emerald-200 text-emerald-800'
-                  }`}
-                >
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{licenseInfo.message}</span>
-                </div>
-              )}
-
-              {errorMsg && (
-                <div
-                  role="alert"
-                  className="rounded-xl bg-rose-50 border border-rose-200 px-3.5 py-2.5 text-sm text-rose-800 flex items-center gap-2"
-                >
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{errorMsg}</span>
-                </div>
-              )}
-
-              <PrimaryButton type="submit" fullWidth size="lg">
-                <span>{t('booking.nextToPickup')}</span>
-                <ForwardIcon className="w-4 h-4" />
-              </PrimaryButton>
-            </form>
-          )}
-
-          {/* STEP 2: Pickup Location, Date, Time & Financial Summary */}
-          {step === 'pickup' && (
+        {/* Independently Scrollable Body (shrinks cleanly with mobile keyboard via dvh) */}
+        <div className="flex-1 overflow-y-auto overscroll-contain scroll-pb-24 px-4 sm:px-6 py-4 pb-8">
+          {step === 'details' && (
             <form onSubmit={handleCreateDraftBooking} className="space-y-4">
-              <div className="space-y-2.5">
-                <SelectField
-                  id="booking-pickup-location"
-                  required
-                  label={`${t('booking.pickupLocation')} *`}
-                  icon={<MapPin className="w-4 h-4 text-gold" />}
-                  value={selectedPickupOption}
-                  onFocus={handleFieldFocus}
-                  onChange={(e) => setSelectedPickupOption(e.target.value)}
-                >
-                  <optgroup label={t('booking.airportsGroup')}>
-                    {airportLocations.map((loc) => (
-                      <option key={loc.id} value={loc.label}>
-                        {displayLocationOption(loc)}
-                      </option>
-                    ))}
-                  </optgroup>
-                  <optgroup label={t('booking.citiesGroup')}>
-                    {cityLocations.map((loc) => (
-                      <option key={loc.id} value={loc.label}>
-                        {displayLocationOption(loc)}
-                      </option>
-                    ))}
-                  </optgroup>
-                  <option value="__custom__">{t('booking.customLocationOption')}</option>
-                </SelectField>
+              {/* Car Summary Strip */}
+              <div className="flex items-center gap-3.5 rounded-xl bg-slate-50 p-3 border border-slate-200/70">
+                <img
+                  src={car.primary_image_url}
+                  alt={`${car.brand} ${car.model}`}
+                  referrerPolicy="no-referrer"
+                  className="w-24 h-18 rounded-lg object-cover bg-slate-200 shrink-0"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold text-slate-900 truncate">
+                    {car.brand} {car.model}
+                  </div>
+                  <div className="text-xs text-slate-500 mt-0.5">
+                    {car.fuel_type === 'diesel' ? 'ديزل' : 'بنزين'} ·{' '}
+                    {car.transmission === 'automatic' ? 'أوتوماتيك' : 'يدوي'}
+                  </div>
+                  <div className="text-sm font-bold text-emerald-700 mt-1 font-mono-tabular">
+                    {formatDH(car.daily_price)} / يوم
+                  </div>
+                </div>
+              </div>
 
-                {selectedPickupOption === '__custom__' && (
-                  <InputField
+              {/* Customer Identity & Driver License */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div className="sm:col-span-2">
+                  <label
+                    htmlFor="booking-customer-name"
+                    className="block text-xs font-semibold text-slate-700 mb-1.5"
+                  >
+                    الاسم الكامل <span className="text-amber-600">*</span>
+                  </label>
+                  <input
+                    id="booking-customer-name"
                     required
                     type="text"
-                    placeholder={t('booking.customLocationPlaceholder')}
-                    value={customPickupLocation}
+                    autoComplete="name"
+                    placeholder="مثال: يوسف بنعلي"
+                    value={customerName}
                     onFocus={handleFieldFocus}
-                    onChange={(e) => setCustomPickupLocation(e.target.value)}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    className="w-full min-h-[44px] rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-base sm:text-sm focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/15"
                   />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="booking-customer-cin"
+                    className="block text-xs font-semibold text-slate-700 mb-1.5"
+                  >
+                    رقم بطاقة التعريف (CIN) <span className="text-amber-600">*</span>
+                  </label>
+                  <input
+                    id="booking-customer-cin"
+                    required
+                    type="text"
+                    dir="ltr"
+                    placeholder="BK123456"
+                    value={customerCin}
+                    onFocus={handleFieldFocus}
+                    onChange={(e) => setCustomerCin(e.target.value)}
+                    className="w-full min-h-[44px] rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-base sm:text-sm font-mono uppercase focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/15"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="booking-customer-phone"
+                    className="block text-xs font-semibold text-slate-700 mb-1.5"
+                  >
+                    رقم الهاتف <span className="text-amber-600">*</span>
+                  </label>
+                  <input
+                    id="booking-customer-phone"
+                    required
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    dir="ltr"
+                    placeholder="06 12 34 56 78"
+                    value={customerPhone}
+                    onFocus={handleFieldFocus}
+                    onChange={(e) => setCustomerPhone(e.target.value)}
+                    className="w-full min-h-[44px] rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-base sm:text-sm font-mono focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/15"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="booking-license-number"
+                    className="block text-xs font-semibold text-slate-700 mb-1.5"
+                  >
+                    رقم رخصة السياقة (Permis de conduire) <span className="text-amber-600">*</span>
+                  </label>
+                  <div className="relative">
+                    <CreditCard className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      id="booking-license-number"
+                      required
+                      type="text"
+                      dir="ltr"
+                      placeholder="12/345678"
+                      value={customerLicenseNumber}
+                      onFocus={handleFieldFocus}
+                      onChange={(e) => setCustomerLicenseNumber(e.target.value)}
+                      className="w-full min-h-[44px] rounded-xl border border-slate-200 bg-white pr-3.5 pl-9 py-2.5 text-base sm:text-sm font-mono uppercase focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/15"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="booking-license-date"
+                    className="block text-xs font-semibold text-slate-700 mb-1.5"
+                  >
+                    تاريخ إصدار رخصة السياقة <span className="text-amber-600">*</span>
+                  </label>
+                  <input
+                    id="booking-license-date"
+                    required
+                    type="date"
+                    max={todayStr}
+                    value={customerLicenseIssueDate}
+                    onFocus={handleFieldFocus}
+                    onChange={(e) => setCustomerLicenseIssueDate(e.target.value)}
+                    className="w-full min-h-[44px] rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-base sm:text-sm font-mono-tabular focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/15"
+                  />
+                </div>
+
+                {licenseInfo && (
+                  <div
+                    className={`sm:col-span-2 text-xs px-3 py-2 rounded-lg border flex items-center gap-2 ${
+                      !licenseInfo.valid
+                        ? 'bg-red-50 border-red-200 text-red-700'
+                        : licenseInfo.isRecent
+                          ? 'bg-amber-50 border-amber-200 text-amber-800'
+                          : 'bg-emerald-50/70 border-emerald-200 text-emerald-800'
+                    }`}
+                  >
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{licenseInfo.message}</span>
+                  </div>
                 )}
+
+                {/* Smart Pickup Location Selector */}
+                <div className="sm:col-span-2">
+                  <label
+                    htmlFor="booking-pickup-location"
+                    className="block text-xs font-semibold text-slate-700 mb-1.5"
+                  >
+                    مكان استلام السيارة <span className="text-amber-600">*</span>
+                  </label>
+                  <div className="relative">
+                    <MapPin className="w-4 h-4 text-emerald-700 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <select
+                      id="booking-pickup-location"
+                      required
+                      value={selectedPickupOption}
+                      onFocus={handleFieldFocus}
+                      onChange={(e) => setSelectedPickupOption(e.target.value)}
+                      className="w-full min-h-[44px] appearance-none rounded-xl border border-slate-200 bg-white pr-9 pl-4 py-2.5 text-base sm:text-sm font-medium text-slate-900 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/15"
+                    >
+                      <optgroup label="المطارات الرئيسية في المغرب">
+                        {airportLocations.map((loc) => (
+                          <option key={loc.id} value={loc.label}>
+                            {loc.label}
+                          </option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="المدن ومراكز الاستلام">
+                        {cityLocations.map((loc) => (
+                          <option key={loc.id} value={loc.label}>
+                            {loc.label}
+                          </option>
+                        ))}
+                      </optgroup>
+                      <option value="__custom__">نقطة استلام أخرى (فندق، محطة، عنوان مخصص...)</option>
+                    </select>
+                  </div>
+
+                  {selectedPickupOption === '__custom__' && (
+                    <input
+                      required
+                      type="text"
+                      placeholder="اكتب عنوان الاستلام الدقيق (مثال: فندق المامونية، مراكش)"
+                      value={customPickupLocation}
+                      onFocus={handleFieldFocus}
+                      onChange={(e) => setCustomPickupLocation(e.target.value)}
+                      className="mt-2.5 w-full min-h-[44px] rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-base sm:text-sm focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/15"
+                    />
+                  )}
+                </div>
+
+                {/* Duration + Precise Pick-up Date & Time */}
+                <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label
+                      htmlFor="booking-days"
+                      className="block text-xs font-semibold text-slate-700 mb-1.5"
+                    >
+                      عدد أيام الكراء <span className="text-amber-600">*</span>
+                    </label>
+                    <input
+                      id="booking-days"
+                      required
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      max={90}
+                      value={days}
+                      onFocus={handleFieldFocus}
+                      onChange={(e) =>
+                        setDays(Math.min(90, Math.max(1, parseInt(e.target.value || '1', 10))))
+                      }
+                      className="w-full min-h-[44px] rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-base sm:text-sm font-mono-tabular focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/15"
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="booking-pickup-date"
+                      className="block text-xs font-semibold text-slate-700 mb-1.5"
+                    >
+                      تاريخ الاستلام <span className="text-amber-600">*</span>
+                    </label>
+                    <input
+                      id="booking-pickup-date"
+                      required
+                      type="date"
+                      min={todayStr}
+                      value={pickupDate}
+                      onFocus={handleFieldFocus}
+                      onChange={(e) => setPickupDate(e.target.value)}
+                      className="w-full min-h-[44px] rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-base sm:text-sm font-mono-tabular focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/15"
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="booking-pickup-time"
+                      className="block text-xs font-semibold text-slate-700 mb-1.5"
+                    >
+                      وقت الاستلام <span className="text-amber-600">*</span>
+                    </label>
+                    <select
+                      id="booking-pickup-time"
+                      required
+                      dir="ltr"
+                      value={pickupTime}
+                      onFocus={handleFieldFocus}
+                      onChange={(e) => setPickupTime(e.target.value)}
+                      className="w-full min-h-[44px] rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-base sm:text-sm font-mono-tabular text-center focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/15"
+                    >
+                      {TIME_SLOTS.map((slot) => (
+                        <option key={slot} value={slot}>
+                          {slot}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <InputField
-                  id="booking-days"
-                  required
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
-                  max={90}
-                  label={`${t('booking.daysLabel')} *`}
-                  className="font-mono-tabular"
-                  value={days}
-                  onFocus={handleFieldFocus}
-                  onChange={(e) =>
-                    setDays(Math.min(90, Math.max(1, parseInt(e.target.value || '1', 10))))
-                  }
-                />
-
-                <InputField
-                  id="booking-pickup-date"
-                  required
-                  type="date"
-                  min={todayStr}
-                  label={`${t('booking.pickupDate')} *`}
-                  className="font-mono-tabular"
-                  value={pickupDate}
-                  onFocus={handleFieldFocus}
-                  onChange={(e) => setPickupDate(e.target.value)}
-                />
-
-                <SelectField
-                  id="booking-pickup-time"
-                  required
-                  dir="ltr"
-                  label={`${t('booking.pickupTime')} *`}
-                  className="font-mono-tabular text-center"
-                  value={pickupTime}
-                  onFocus={handleFieldFocus}
-                  onChange={(e) => setPickupTime(e.target.value)}
-                >
-                  {TIME_SLOTS.map((slot) => (
-                    <option key={slot} value={slot}>
-                      {slot}
-                    </option>
-                  ))}
-                </SelectField>
-              </div>
-
-              {/* Financial Breakdown & 10% Deposit Guarantee */}
-              <div className="rounded-2xl bg-ivory/80 border border-[#E5E0D5] p-4 space-y-2.5">
-                <div className="flex items-center justify-between text-xs text-ink-muted">
+              {/* Financial Breakdown & Guarantee */}
+              <div className="rounded-xl bg-emerald-50 border border-emerald-200/70 p-4 space-y-2">
+                <div className="flex items-center justify-between text-xs text-slate-600">
                   <span>
-                    {t('booking.totalRental')} ({days} × {formatPrice(car.daily_price, 0)})
+                    إجمالي الكراء ({days} أيام × {car.daily_price} DH)
                   </span>
-                  <span className="font-semibold text-ink font-latin tabular-nums">
-                    {formatPrice(totalAmount)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-sm text-navy font-bold">
-                  <span>{t('booking.depositNow')}</span>
-                  <span className="text-base sm:text-lg text-navy font-latin tabular-nums">
-                    {formatPrice(commissionAmount)}
+                  <span className="font-semibold text-slate-800 font-mono-tabular">
+                    {formatDH(totalAmount)}
                   </span>
                 </div>
-                <div className="flex items-center justify-between text-xs text-ink-muted">
-                  <span>{t('booking.payAtPickup')}</span>
-                  <span className="font-semibold text-ink font-latin tabular-nums">
-                    {formatPrice(agencyPayoutAmount)}
+                <div className="flex items-center justify-between text-sm text-emerald-950 font-bold">
+                  <span>عربون تأكيد الحجز الآن (10%)</span>
+                  <span className="text-lg text-[#1B5E20] font-mono-tabular">
+                    {formatDH(commissionAmount)}
                   </span>
                 </div>
-                <div className="flex items-start gap-2 text-xs text-ink pt-2.5 border-t border-[#E5E0D5]">
-                  <ShieldCheck className="w-4 h-4 text-gold shrink-0 mt-0.5" />
-                  <span className="leading-relaxed">{t('booking.protectionText')}</span>
+                <div className="flex items-center justify-between text-xs text-slate-600">
+                  <span>يُدفع مباشرة للوكالة عند استلام السيارة (90%)</span>
+                  <span className="font-semibold text-slate-800 font-mono-tabular">
+                    {formatDH(agencyPayoutAmount)}
+                  </span>
+                </div>
+                <div className="flex items-start gap-2 text-xs text-emerald-800 pt-2 border-t border-emerald-200/70">
+                  <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>
+                    في حال عدم تسليم السيارة، استرجع عربونك كاملاً عبر التحويل الفوري لرقم هاتفك أو
+                    حسابك البنكي (مثل Cash Plus أو التطبيقات البنكية) خلال ساعات من التحقق.
+                  </span>
                 </div>
               </div>
 
               {errorMsg && (
                 <div
                   role="alert"
-                  className="rounded-xl bg-rose-50 border border-rose-200 px-3.5 py-2.5 text-sm text-rose-800 flex items-center gap-2"
+                  className="rounded-xl bg-red-50 border border-red-200 px-3.5 py-2.5 text-sm text-red-700 flex items-center gap-2"
                 >
                   <AlertCircle className="w-4 h-4 shrink-0" />
                   <span>{errorMsg}</span>
                 </div>
               )}
 
-              <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-3 pt-1">
-                <SecondaryButton
-                  type="button"
-                  disabled={loading}
-                  onClick={() => {
-                    setErrorMsg(null);
-                    setStep('driver');
-                  }}
-                >
-                  <BackIcon className="w-4 h-4" />
-                  <span>{t('booking.backToDriver')}</span>
-                </SecondaryButton>
-
-                <PrimaryButton
-                  type="submit"
-                  fullWidth
-                  size="lg"
-                  loading={loading}
-                >
-                  {!loading && <CalendarClock className="w-4 h-4" />}
-                  <span>
-                    {loading
-                      ? t('booking.submittingBooking')
-                      : `${t('booking.submitBooking')} (${formatPrice(commissionAmount)})`}
-                  </span>
-                </PrimaryButton>
-              </div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full min-h-[48px] rounded-xl bg-[#1B5E20] hover:bg-[#144718] disabled:opacity-65 disabled:cursor-not-allowed text-white py-3.5 px-5 font-bold text-sm transition-colors flex items-center justify-center gap-2"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>جاري تجهيز طلب تحويل العربون...</span>
+                  </>
+                ) : (
+                  <>
+                    <CalendarClock className="w-4 h-4" />
+                    <span>متابعة تحويل العربون ({formatDH(commissionAmount)})</span>
+                  </>
+                )}
+              </button>
             </form>
           )}
 
-          {/* STEP 3: Bank Transfer Checkout */}
           {step === 'payment' && createdBooking && (
             <BankTransferCheckout
               booking={createdBooking}
               onPaymentSubmitted={handlePaymentSubmitted}
-              onBack={() => setStep('pickup')}
+              onBack={() => setStep('details')}
             />
           )}
 
-          {/* STEP 4: Confirmation */}
           {step === 'done' && createdBooking && (
-            <div className="text-center space-y-5 py-3">
-              <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 mx-auto flex items-center justify-center">
+            <div className="text-center space-y-4 py-3">
+              <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-700 mx-auto flex items-center justify-center">
                 <CheckCircle2 className="w-9 h-9" />
               </div>
 
-              <div className="space-y-1.5">
-                <h4 className="text-xl font-bold text-navy">{t('booking.doneTitle')}</h4>
-                <p className="text-sm text-ink-muted leading-relaxed">
-                  {t('booking.doneSubtitlePrefix')}{' '}
-                  <span className="font-bold text-ink font-latin">
+              <div>
+                <h4 className="text-xl font-bold text-slate-900">تم استلام وصل العربون بنجاح</h4>
+                <p className="text-sm text-slate-600 mt-1.5 leading-relaxed">
+                  تقوم إدارة Karya الآن بالتحقق من تحويل العربون عبر بنك{' '}
+                  <span className="font-bold text-slate-900">
                     {createdBooking.selected_bank_code}
                   </span>{' '}
-                  {t('booking.doneSubtitleMid')}{' '}
-                  <span className="font-bold text-ink">{createdBooking.agency_name}</span>{' '}
-                  {t('booking.doneSubtitleSuffix')}
+                  وإشعار وكالة{' '}
+                  <span className="font-bold text-slate-900">{createdBooking.agency_name}</span>{' '}
+                  لتجهيز السيارة لك.
                 </p>
               </div>
 
-              <div className="rounded-2xl bg-ivory/75 border border-[#E5E0D5] p-4 sm:p-5 space-y-3">
-                <div className="text-xs text-ink-muted">{t('booking.trackingCodeLabel')}</div>
-                <div className="flex items-center justify-center gap-2.5">
-                  <span className="font-mono-tabular text-lg font-extrabold text-navy">
+              <div className="rounded-2xl bg-[#FAFBF8] border border-emerald-900/10 p-4 space-y-2.5">
+                <div className="text-xs text-slate-500">كود تتبع الحجز والضمان (احتفظ به)</div>
+                <div className="flex items-center justify-center gap-2">
+                  <span className="font-mono-tabular text-lg font-bold text-slate-900">
                     {createdBooking.booking_code}
                   </span>
                   <button
                     type="button"
                     onClick={copyBookingCode}
-                    className="inline-flex items-center gap-1 rounded-lg bg-navy text-white px-3 py-1.5 text-xs font-semibold hover:bg-navy-light min-h-[36px] cursor-pointer"
+                    className="inline-flex items-center gap-1 rounded-lg bg-emerald-700 text-white px-3 py-1.5 text-xs font-semibold hover:bg-emerald-800 min-h-[36px]"
                   >
-                    {copiedCode ? <Check className="w-3.5 h-3.5 text-gold" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>{copiedCode ? t('booking.copied') : t('booking.copy')}</span>
+                    {copiedCode ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedCode ? 'نُسخ' : 'نسخ'}</span>
                   </button>
                 </div>
-
                 {createdBooking.pickup_location && (
-                  <div className="text-xs text-ink-muted">
-                    {t('booking.pickupSummaryLabel')}{' '}
-                    <span className="font-semibold text-ink">
+                  <div className="text-xs text-slate-600">
+                    مكان الاستلام:{' '}
+                    <span className="font-semibold text-slate-800">
                       {createdBooking.pickup_location}
                     </span>
                   </div>
                 )}
-
-                <div className="text-xs pt-3 border-t border-[#E5E0D5] space-y-1.5">
-                  <div className="flex items-center justify-center gap-1.5 text-navy font-semibold">
-                    <span>{t('booking.depositPaidLabel')}</span>
-                    <span className="font-latin tabular-nums font-bold">
-                      {formatPrice(createdBooking.commission_amount)}
+                <div className="text-xs text-emerald-900 font-medium pt-2 border-t border-slate-200/70 space-y-1">
+                  <div>
+                    العربون المحوّل:{' '}
+                    <span className="font-mono-tabular font-bold">
+                      {formatDH(createdBooking.commission_amount)}
                     </span>
                   </div>
-                  <div className="flex items-center justify-center gap-1.5 text-ink-muted">
-                    <span>{t('booking.remainingLabel')}</span>
-                    <span className="font-latin tabular-nums font-bold text-ink">
-                      {formatPrice(createdBooking.agency_payout_amount)}
+                  <div className="text-slate-600">
+                    المتبقي للوكالة عند الاستلام:{' '}
+                    <span className="font-mono-tabular font-bold text-slate-900">
+                      {formatDH(createdBooking.agency_payout_amount)}
                     </span>
                   </div>
-                </div>
-
-                <div className="pt-1 flex justify-center">
-                  <Badge variant="warning" icon={<ShieldCheck className="w-3.5 h-3.5" />}>
-                    {t('checkout.protectionBadge')}
-                  </Badge>
                 </div>
               </div>
 
-              <PrimaryButton fullWidth size="lg" onClick={onClose}>
-                {t('booking.backHome')}
-              </PrimaryButton>
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full min-h-[48px] rounded-xl bg-[#1B5E20] hover:bg-[#144718] text-white py-3 font-bold text-sm transition-colors"
+              >
+                العودة للرئيسية
+              </button>
             </div>
           )}
         </div>
