@@ -103,12 +103,21 @@ async function startServer() {
         });
       }
     } else {
-      const supabaseUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').trim();
-      const supabaseAnonKey = (
+      const rawUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').trim();
+      const rawKey = (
         process.env.SUPABASE_ANON_KEY ||
         process.env.VITE_SUPABASE_ANON_KEY ||
         ''
       ).trim();
+
+      const supabaseUrl =
+        /^https?:\/\//i.test(rawUrl) && !rawUrl.includes('your-project')
+          ? rawUrl
+          : 'https://fvadhrdyxykromonpnoo.supabase.co';
+      const supabaseAnonKey =
+        rawKey.length > 30 && !rawKey.includes('your-supabase-anon-key')
+          ? rawKey
+          : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ2YWRocmR5eHlrcm9tb25wbm9vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ3MzE2NjgsImV4cCI6MjExMDMwNzY2OH0.Snu4HAl3pgxuHcaNMJCSzdKMbe4y6brSWo07hWDFozY';
 
       if (supabaseUrl && supabaseAnonKey) {
         try {

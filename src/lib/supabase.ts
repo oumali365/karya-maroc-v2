@@ -5,10 +5,24 @@ const FALLBACK_SUPABASE_URL = 'https://fvadhrdyxykromonpnoo.supabase.co';
 const FALLBACK_SUPABASE_ANON_KEY =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ2YWRocmR5eHlrcm9tb25wbm9vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ3MzE2NjgsImV4cCI6MjExMDMwNzY2OH0.Snu4HAl3pgxuHcaNMJCSzdKMbe4y6brSWo07hWDFozY';
 
-export const SUPABASE_URL =
-  import.meta.env.VITE_SUPABASE_URL?.trim() || FALLBACK_SUPABASE_URL;
-export const SUPABASE_ANON_KEY =
-  import.meta.env.VITE_SUPABASE_ANON_KEY?.trim() || FALLBACK_SUPABASE_ANON_KEY;
+const rawEnvUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
+const rawEnvAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
+
+const isUsableSupabaseUrl = (val?: string): val is string =>
+  Boolean(
+    val &&
+      /^https?:\/\//i.test(val) &&
+      !val.includes('your-project') &&
+      !val.includes('example.com'),
+  );
+
+const isUsableSupabaseKey = (val?: string): val is string =>
+  Boolean(val && val.length > 30 && !val.includes('your-supabase-anon-key'));
+
+export const SUPABASE_URL = isUsableSupabaseUrl(rawEnvUrl) ? rawEnvUrl : FALLBACK_SUPABASE_URL;
+export const SUPABASE_ANON_KEY = isUsableSupabaseKey(rawEnvAnonKey)
+  ? rawEnvAnonKey
+  : FALLBACK_SUPABASE_ANON_KEY;
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 

@@ -15,6 +15,7 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({ onClose, onSuccess
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -68,7 +69,12 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({ onClose, onSuccess
       });
 
       if (error) {
-        setErrorMsg('بيانات الدخول غير صحيحة أو الحساب غير مفعل.');
+        const msg = error.message?.toLowerCase() || '';
+        if (msg.includes('fetch') || msg.includes('network') || error.status === 0) {
+          setErrorMsg('تعذر الاتصال بخادم المصادقة. يرجى التحقق من الشبكة والمحاولة مرة أخرى.');
+        } else {
+          setErrorMsg('بيانات الدخول غير صحيحة أو الحساب غير مفعل.');
+        }
         return;
       }
 
@@ -188,7 +194,10 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({ onClose, onSuccess
                   dir="ltr"
                   placeholder="admin@karya.ma"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (errorMsg) setErrorMsg(null);
+                  }}
                   className="w-full min-h-[42px] rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-[#1B5E20] focus:outline-none"
                 />
               </div>
@@ -200,16 +209,29 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({ onClose, onSuccess
                 >
                   كلمة المرور
                 </label>
-                <input
-                  id="admin-password-input"
-                  type="password"
-                  required
-                  dir="ltr"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full min-h-[42px] rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-[#1B5E20] focus:outline-none"
-                />
+                <div className="relative">
+                  <input
+                    id="admin-password-input"
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    dir="ltr"
+                    placeholder="••••••"
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (errorMsg) setErrorMsg(null);
+                    }}
+                    className="w-full min-h-[42px] rounded-xl border border-slate-200 bg-white pr-3 pl-10 py-2 text-sm font-mono focus:border-[#1B5E20] focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+                    className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
 
               {errorMsg && (
