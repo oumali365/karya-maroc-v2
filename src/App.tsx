@@ -8,6 +8,7 @@ import { AgencyPortal } from './components/AgencyPortal';
 import { AdminConsole } from './components/AdminConsole';
 import { AdminPinModal } from './components/AdminPinModal';
 import { FloatingWhatsAppButton } from './components/FloatingWhatsAppButton';
+import { useLanguage } from './i18n';
 import type { BookingStatus, CreatedBooking } from './types/karya';
 
 type AppRoute = 'discover' | 'bookings' | 'agency' | 'admin';
@@ -56,6 +57,7 @@ function routeToPath(route: AppRoute): string {
 }
 
 export function App() {
+  const { lang, dir, setLang, t } = useLanguage();
   const [route, setRoute] = useState<AppRoute>(() => pathToRoute(window.location.pathname));
   const [recentBookings, setRecentBookings] = useState<CreatedBooking[]>(() => loadStoredBookings());
   const [isAdmin, setIsAdmin] = useState(false);
@@ -161,103 +163,140 @@ export function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F6F8F6] text-slate-900" dir="rtl">
+    <div className="min-h-screen flex flex-col bg-ivory text-ink" dir={dir}>
       {/* Clean 3-Zone Top Bar Contract */}
-      <header className="bg-white/95 backdrop-blur-xs border-b border-slate-100 sticky top-0 z-30">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-8">
+      <header className="bg-white/95 backdrop-blur-sm border-b border-[#E5E0D5] sticky top-0 z-30">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4 sm:gap-8">
           {/* Zone 1: Single-line Brand Wordmark */}
           <button
             type="button"
             onClick={() => navigate('discover')}
-            className="text-xl font-extrabold tracking-tight text-[#1B5E20] whitespace-nowrap shrink-0"
+            className="text-2xl font-extrabold tracking-tight text-navy font-latin whitespace-nowrap shrink-0 cursor-pointer"
           >
             Karya
           </button>
 
           {/* Zone 2: Clean single-line navigation links */}
-          <nav className="hidden md:flex items-center gap-7 text-sm font-semibold text-slate-600">
+          <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-ink-muted">
             <button
               type="button"
               onClick={() => navigate('discover')}
-              className={`whitespace-nowrap shrink-0 transition-colors hover:text-[#1B5E20] ${
-                route === 'discover' ? 'text-[#1B5E20] underline underline-offset-8 decoration-2' : ''
+              className={`whitespace-nowrap shrink-0 transition-colors duration-150 hover:text-navy cursor-pointer ${
+                route === 'discover'
+                  ? 'text-navy underline underline-offset-8 decoration-2 decoration-gold'
+                  : ''
               }`}
             >
-              اكتشف العروض
+              {t('nav.discover')}
             </button>
             <button
               type="button"
               onClick={() => navigate('bookings')}
-              className={`whitespace-nowrap shrink-0 transition-colors hover:text-[#1B5E20] ${
-                route === 'bookings' ? 'text-[#1B5E20] underline underline-offset-8 decoration-2' : ''
+              className={`whitespace-nowrap shrink-0 transition-colors duration-150 hover:text-navy cursor-pointer ${
+                route === 'bookings'
+                  ? 'text-navy underline underline-offset-8 decoration-2 decoration-gold'
+                  : ''
               }`}
             >
-              حجوزاتي
+              {t('nav.bookings')}
             </button>
             <button
               type="button"
               onClick={() => navigate('agency')}
-              className={`whitespace-nowrap shrink-0 transition-colors hover:text-[#1B5E20] ${
-                route === 'agency' ? 'text-[#1B5E20] underline underline-offset-8 decoration-2' : ''
+              className={`whitespace-nowrap shrink-0 transition-colors duration-150 hover:text-navy cursor-pointer ${
+                route === 'agency'
+                  ? 'text-navy underline underline-offset-8 decoration-2 decoration-gold'
+                  : ''
               }`}
             >
-              بوابة الوكالات
+              {t('nav.agency')}
             </button>
             {isAdmin && (
               <button
                 type="button"
                 onClick={() => navigate('admin')}
-                className={`whitespace-nowrap shrink-0 transition-colors hover:text-[#1B5E20] ${
-                  route === 'admin' ? 'text-[#1B5E20] underline underline-offset-8 decoration-2' : ''
+                className={`whitespace-nowrap shrink-0 transition-colors duration-150 hover:text-navy cursor-pointer ${
+                  route === 'admin'
+                    ? 'text-navy underline underline-offset-8 decoration-2 decoration-gold'
+                    : ''
                 }`}
               >
-                إدارة الوساطة
+                {t('nav.admin')}
               </button>
             )}
           </nav>
 
-          {/* Zone 3: 1 Primary Action */}
-          <div className="flex items-center gap-2 shrink-0">
+          {/* Zone 3: Language Switcher (AR / FR) + Primary Action */}
+          <div className="flex items-center gap-2.5 shrink-0">
+            <div
+              role="group"
+              aria-label={t('nav.switchLangAria')}
+              className="inline-flex items-center rounded-xl border border-[#E5E0D5] bg-ivory p-0.5"
+            >
+              <button
+                type="button"
+                onClick={() => setLang('ar')}
+                className={`px-2.5 py-1.5 text-xs font-bold rounded-lg transition-colors whitespace-nowrap cursor-pointer ${
+                  lang === 'ar'
+                    ? 'bg-navy text-white'
+                    : 'text-ink-muted hover:text-navy'
+                }`}
+              >
+                AR
+              </button>
+              <button
+                type="button"
+                onClick={() => setLang('fr')}
+                className={`px-2.5 py-1.5 text-xs font-bold font-latin rounded-lg transition-colors whitespace-nowrap cursor-pointer ${
+                  lang === 'fr'
+                    ? 'bg-navy text-white'
+                    : 'text-ink-muted hover:text-navy'
+                }`}
+              >
+                FR
+              </button>
+            </div>
+
             <button
               type="button"
               onClick={() => navigate(route === 'agency' ? 'discover' : 'agency')}
-              className="rounded-xl bg-[#1B5E20] hover:bg-[#144718] text-white px-4 py-2 text-xs sm:text-sm font-bold transition-colors whitespace-nowrap shrink-0"
+              className="min-h-[40px] rounded-xl bg-gold hover:bg-gold-hover text-navy px-3.5 sm:px-4 py-2 text-xs sm:text-sm font-bold transition-colors duration-150 whitespace-nowrap shrink-0 cursor-pointer shadow-xs"
             >
-              {route === 'agency' ? 'تصفح السيارات' : 'بوابة الوكالات'}
+              {route === 'agency' ? t('nav.browseCars') : t('nav.agency')}
             </button>
           </div>
         </div>
 
         {/* Mobile navigation strip */}
-        <div className="md:hidden border-t border-slate-100 px-4 py-2 flex items-center gap-5 overflow-x-auto text-xs font-semibold text-slate-600">
+        <div className="md:hidden border-t border-[#EFECE5] px-4 py-2 flex items-center gap-5 overflow-x-auto text-xs font-semibold text-ink-muted">
           <button
             type="button"
             onClick={() => navigate('discover')}
-            className={`whitespace-nowrap shrink-0 ${route === 'discover' ? 'text-[#1B5E20]' : ''}`}
+            className={`whitespace-nowrap shrink-0 ${route === 'discover' ? 'text-navy font-bold' : ''}`}
           >
-            اكتشف العروض
+            {t('nav.discover')}
           </button>
           <button
             type="button"
             onClick={() => navigate('bookings')}
-            className={`whitespace-nowrap shrink-0 ${route === 'bookings' ? 'text-[#1B5E20]' : ''}`}
+            className={`whitespace-nowrap shrink-0 ${route === 'bookings' ? 'text-navy font-bold' : ''}`}
           >
-            حجوزاتي
+            {t('nav.bookings')}
           </button>
           <button
             type="button"
             onClick={() => navigate('agency')}
-            className={`whitespace-nowrap shrink-0 ${route === 'agency' ? 'text-[#1B5E20]' : ''}`}
+            className={`whitespace-nowrap shrink-0 ${route === 'agency' ? 'text-navy font-bold' : ''}`}
           >
-            بوابة الوكالات
+            {t('nav.agency')}
           </button>
           {isAdmin && (
             <button
               type="button"
               onClick={() => navigate('admin')}
-              className={`whitespace-nowrap shrink-0 ${route === 'admin' ? 'text-[#1B5E20]' : ''}`}
+              className={`whitespace-nowrap shrink-0 ${route === 'admin' ? 'text-navy font-bold' : ''}`}
             >
-              إدارة الوساطة
+              {t('nav.admin')}
             </button>
           )}
         </div>
@@ -284,7 +323,7 @@ export function App() {
 
         {route === 'admin' && !adminChecked && (
           <div className="min-h-[60vh] flex items-center justify-center">
-            <Loader2 className="w-8 h-8 animate-spin text-emerald-700" />
+            <Loader2 className="w-8 h-8 animate-spin text-navy" />
           </div>
         )}
 
@@ -297,31 +336,31 @@ export function App() {
       </div>
 
       {/* Quiet Footer */}
-      <footer className="bg-white border-t border-slate-100 py-7 mt-auto">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+      <footer className="bg-white border-t border-[#E5E0D5] py-8 mt-auto">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-ink-muted">
           <div
             onClick={handleCopyrightClick}
-            className="select-none cursor-default"
+            className="select-none cursor-default font-medium text-ink/80"
           >
-            © Karya — منصة كراء السيارات في المغرب
+            © <span className="font-latin font-bold text-navy">Karya</span> — {t('footer.copyright')}
           </div>
-          <div className="flex items-center gap-5">
-            <button type="button" onClick={() => navigate('discover')} className="hover:text-slate-900">
-              السيارات المتاحة
+          <div className="flex items-center gap-6">
+            <button type="button" onClick={() => navigate('discover')} className="hover:text-navy transition-colors cursor-pointer">
+              {t('footer.availableCars')}
             </button>
-            <button type="button" onClick={() => navigate('bookings')} className="hover:text-slate-900">
-              حجوزاتي
+            <button type="button" onClick={() => navigate('bookings')} className="hover:text-navy transition-colors cursor-pointer">
+              {t('footer.myBookings')}
             </button>
-            <button type="button" onClick={() => navigate('agency')} className="hover:text-slate-900">
-              انضم كوكالة
+            <button type="button" onClick={() => navigate('agency')} className="hover:text-navy transition-colors cursor-pointer">
+              {t('footer.joinAgency')}
             </button>
             {route === 'discover' && (
               <button
                 type="button"
                 onClick={handleOpenAdminEntry}
-                aria-label="دخول الإدارة"
+                aria-label={t('footer.adminEntryAria')}
                 title=""
-                className="text-slate-300/60 hover:text-slate-400 transition-colors p-1 -me-1"
+                className="text-ink-muted/40 hover:text-navy transition-colors p-1 -me-1 cursor-pointer"
               >
                 <Lock className="w-3 h-3" />
               </button>

@@ -93,30 +93,30 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({ onClose, onSuccess
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 bg-navy/65 backdrop-blur-xs flex items-center justify-center p-4"
       dir="rtl"
       role="dialog"
       aria-modal="true"
       aria-labelledby="admin-pin-modal-title"
     >
-      <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl border border-slate-200 overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-[#FAFBF8]">
+      <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl border border-[#E5E0D5] overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#EFECE5] bg-ivory/70">
           <div className="flex items-center gap-2.5">
-            <span className="w-8 h-8 rounded-xl bg-emerald-50 text-[#1B5E20] flex items-center justify-center">
+            <span className="w-8 h-8 rounded-xl bg-navy text-gold flex items-center justify-center">
               <Lock className="w-4 h-4" />
             </span>
             <div>
-              <h2 id="admin-pin-modal-title" className="font-bold text-sm text-slate-900">
+              <h2 id="admin-pin-modal-title" className="font-bold text-sm text-navy">
                 دخول إدارة الوساطة
               </h2>
-              <p className="text-[11px] text-slate-500">وصول مقيد لمسؤولي المنصة فقط</p>
+              <p className="text-[11px] text-ink-muted">وصول مقيد لمسؤولي المنصة فقط</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="إغلاق"
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-ink-muted hover:text-navy hover:bg-ivory-dark transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -128,7 +128,7 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({ onClose, onSuccess
               <div>
                 <label
                   htmlFor="admin-pin-input"
-                  className="block text-xs font-semibold text-slate-700 mb-1.5"
+                  className="block text-xs font-semibold text-ink mb-1.5"
                 >
                   الرمز السري للإدارة (Admin PIN)
                 </label>
@@ -146,13 +146,13 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({ onClose, onSuccess
                       setPin(e.target.value);
                       if (errorMsg) setErrorMsg(null);
                     }}
-                    className="w-full min-h-[44px] rounded-xl border border-slate-200 bg-white pr-3.5 pl-10 py-2.5 text-sm font-mono tracking-widest focus:border-[#1B5E20] focus:outline-none focus:ring-2 focus:ring-[#1B5E20]/15"
+                    className="w-full min-h-[44px] rounded-xl border border-[#E2DDD3] bg-white pr-3.5 pl-10 py-2.5 text-sm font-mono tracking-widest focus:border-gold focus:outline-none focus:ring-2 focus:ring-gold/20"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPin((v) => !v)}
                     aria-label={showPin ? 'إخفاء الرمز' : 'إظهار الرمز'}
-                    className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1"
+                    className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-muted hover:text-navy p-1 cursor-pointer"
                   >
                     {showPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -162,7 +162,7 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({ onClose, onSuccess
               {errorMsg && (
                 <div
                   role="alert"
-                  className="rounded-xl bg-red-50 border border-red-200 px-3 py-2.5 text-xs font-medium text-red-700 flex items-start gap-2"
+                  className="rounded-xl bg-rose-50 border border-rose-200 px-3 py-2.5 text-xs font-medium text-rose-800 flex items-start gap-2"
                 >
                   <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                   <span>{errorMsg}</span>
@@ -172,7 +172,7 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({ onClose, onSuccess
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full min-h-[44px] rounded-xl bg-[#1B5E20] hover:bg-[#144718] disabled:opacity-65 text-white py-2.5 px-4 text-sm font-bold transition-colors flex items-center justify-center gap-2"
+                className="w-full min-h-[44px] rounded-xl bg-gold hover:bg-gold-hover disabled:opacity-65 text-navy py-2.5 px-4 text-sm font-bold transition-colors flex items-center justify-center gap-2 cursor-pointer"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
                 <span>{loading ? 'جاري التحقق...' : 'فتح لوحة الإدارة'}</span>
@@ -183,7 +183,7 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({ onClose, onSuccess
               <div>
                 <label
                   htmlFor="admin-email-input"
-                  className="block text-xs font-semibold text-slate-700 mb-1"
+                  className="block text-xs font-semibold text-ink mb-1"
                 >
                   البريد الإلكتروني للمسؤول
                 </label>
@@ -198,14 +198,14 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({ onClose, onSuccess
                     setEmail(e.target.value);
                     if (errorMsg) setErrorMsg(null);
                   }}
-                  className="w-full min-h-[42px] rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-[#1B5E20] focus:outline-none"
+                  className="w-full min-h-[42px] rounded-xl border border-[#E2DDD3] px-3 py-2 text-sm focus:border-gold focus:outline-none"
                 />
               </div>
 
               <div>
                 <label
                   htmlFor="admin-password-input"
-                  className="block text-xs font-semibold text-slate-700 mb-1"
+                  className="block text-xs font-semibold text-ink mb-1"
                 >
                   كلمة المرور
                 </label>
@@ -221,13 +221,13 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({ onClose, onSuccess
                       setPassword(e.target.value);
                       if (errorMsg) setErrorMsg(null);
                     }}
-                    className="w-full min-h-[42px] rounded-xl border border-slate-200 bg-white pr-3 pl-10 py-2 text-sm font-mono focus:border-[#1B5E20] focus:outline-none"
+                    className="w-full min-h-[42px] rounded-xl border border-[#E2DDD3] bg-white pr-3 pl-10 py-2 text-sm font-mono focus:border-gold focus:outline-none"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
                     aria-label={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
-                    className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1"
+                    className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-muted hover:text-navy p-1 cursor-pointer"
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -237,7 +237,7 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({ onClose, onSuccess
               {errorMsg && (
                 <div
                   role="alert"
-                  className="rounded-xl bg-red-50 border border-red-200 px-3 py-2.5 text-xs font-medium text-red-700 flex items-start gap-2"
+                  className="rounded-xl bg-rose-50 border border-rose-200 px-3 py-2.5 text-xs font-medium text-rose-800 flex items-start gap-2"
                 >
                   <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                   <span>{errorMsg}</span>
@@ -247,7 +247,7 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({ onClose, onSuccess
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full min-h-[44px] rounded-xl bg-[#1B5E20] hover:bg-[#144718] disabled:opacity-65 text-white py-2.5 px-4 text-sm font-bold transition-colors flex items-center justify-center gap-2"
+                className="w-full min-h-[44px] rounded-xl bg-gold hover:bg-gold-hover disabled:opacity-65 text-navy py-2.5 px-4 text-sm font-bold transition-colors flex items-center justify-center gap-2 cursor-pointer"
               >
                 {loading && <Loader2 className="w-4 h-4 animate-spin" />}
                 <span>{loading ? 'جاري التحقق...' : 'تسجيل الدخول'}</span>
@@ -255,14 +255,14 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({ onClose, onSuccess
             </form>
           )}
 
-          <div className="pt-2 border-t border-slate-100 text-center">
+          <div className="pt-2 border-t border-[#EFECE5] text-center">
             <button
               type="button"
               onClick={() => {
                 setErrorMsg(null);
                 setAuthMode((m) => (m === 'pin' ? 'supabase' : 'pin'));
               }}
-              className="text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors"
+              className="text-xs font-medium text-ink-muted hover:text-navy transition-colors cursor-pointer"
             >
               {authMode === 'pin'
                 ? 'أو التحقق عبر حساب المسؤول (Supabase)'

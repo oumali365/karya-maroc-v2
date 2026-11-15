@@ -1,8 +1,27 @@
 @import "tailwindcss";
+@config "../tailwind.config.js";
+
+@theme {
+  --color-navy: #101d2b;
+  --color-navy-light: #182a3e;
+  --color-navy-dark: #0a131d;
+  --color-gold: #c69a55;
+  --color-gold-hover: #b38844;
+  --color-gold-soft: #f9f4eb;
+  --color-ivory: #f5f3ee;
+  --color-ivory-dark: #eae6dd;
+  --color-ink: #172333;
+  --color-ink-muted: #718096;
+
+  --font-sans: 'Cairo', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-latin: 'Plus Jakarta Sans', 'Cairo', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+}
 
 @layer base {
   :root {
     --font-sans: 'Cairo', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    --font-latin: 'Plus Jakarta Sans', 'Cairo', system-ui, sans-serif;
     --font-mono: 'IBM Plex Mono', monospace;
   }
 
@@ -12,9 +31,13 @@
   }
 
   body {
-    background-color: #f6f8f6;
-    color: #0f172a;
+    background-color: #f5f3ee;
+    color: #172333;
   }
+}
+
+.font-latin {
+  font-family: var(--font-latin);
 }
 
 .font-mono-tabular {

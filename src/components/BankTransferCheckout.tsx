@@ -6,12 +6,13 @@ import {
   ShieldCheck,
   Upload,
   FileText,
-  Loader2,
   AlertCircle,
 } from 'lucide-react';
-import { supabase, formatDH } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { STARTER_BANKS } from '../data/starterData';
 import { BankLogo } from './BankLogo';
+import { Badge, PrimaryButton } from './ui';
+import { useLanguage } from '../i18n';
 import type { CreatedBooking, PlatformBank } from '../types/karya';
 
 interface BankTransferCheckoutProps {
@@ -29,6 +30,8 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
   onPaymentSubmitted,
   onBack,
 }) => {
+  const { lang, dir, t, formatPrice } = useLanguage();
+
   const [banks, setBanks] = useState<PlatformBank[]>(STARTER_BANKS);
   const [selectedBank, setSelectedBank] = useState<PlatformBank>(STARTER_BANKS[0]);
   const [copiedRib, setCopiedRib] = useState(false);
@@ -114,9 +117,7 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
       setReceiptFile(null);
       setReceiptPreviewUrl(null);
       event.target.value = '';
-      setFileError(
-        'صيغة الملف غير مدعومة. يرجى اختيار صورة بصيغة JPG أو PNG أو ملف PDF فقط.',
-      );
+      setFileError(t('checkout.unsupportedFormat'));
       return;
     }
 
@@ -125,9 +126,7 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
       setReceiptFile(null);
       setReceiptPreviewUrl(null);
       event.target.value = '';
-      setFileError(
-        'صيغة الملف غير مدعومة. يرجى اختيار صورة بصيغة JPG أو PNG أو ملف PDF فقط.',
-      );
+      setFileError(t('checkout.unsupportedFormat'));
       return;
     }
 
@@ -137,9 +136,7 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
       setReceiptFile(null);
       setReceiptPreviewUrl(null);
       event.target.value = '';
-      setFileError(
-        `حجم الملف (${sizeMb} MB) يتجاوز الحد الأقصى المسموح به وهو 5 ميجابايت (5MB).`,
-      );
+      setFileError(t('checkout.fileTooLarge', { size: sizeMb }));
       return;
     }
 
@@ -156,7 +153,7 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
     if (submittingRef.current || submitting) return;
 
     if (!receiptFile) {
-      setFileError('يرجى إرفاق وصل التحويل البنكي بصيغة JPG أو PNG أو PDF (الحد الأقصى 5MB).');
+      setFileError(t('checkout.missingFile'));
       return;
     }
 
@@ -198,7 +195,7 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
         receipt_url: storedReceiptPath,
       });
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'تعذر إرسال وصل التحويل، حاول مرة أخرى.');
+      setErrorMsg(err instanceof Error ? err.message : t('checkout.submitError'));
     } finally {
       setSubmitting(false);
       submittingRef.current = false;
@@ -206,50 +203,60 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
   };
 
   return (
-    <div className="space-y-5" dir="rtl">
-      {/* Summary bar */}
-      <div className="rounded-xl bg-emerald-50/70 px-4 py-3 border border-emerald-200/70 text-sm space-y-1.5">
+    <div className="space-y-5" dir={dir}>
+      {/* 10% Deposit Protection Highlight + Summary */}
+      <div className="rounded-2xl bg-navy text-white p-4 sm:p-5 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="text-slate-700">
-            <span className="font-semibold text-slate-900">{booking.car_label}</span>
-            <span className="mx-2 text-slate-400">·</span>
-            <span>{booking.days} أيام</span>
-          </div>
-          <div className="font-mono-tabular text-xs font-semibold text-emerald-800">
-            مرجع الطلب: {booking.booking_code}
-          </div>
+          <Badge
+            variant="warning"
+            icon={<ShieldCheck className="w-3.5 h-3.5 text-gold" />}
+            className="bg-white/10 text-gold border-gold/40"
+          >
+            {t('checkout.protectionBadge')}
+          </Badge>
+          <span className="font-mono-tabular text-xs font-semibold text-[#D6DCE3]">
+            {t('checkout.refPrefix')} {booking.booking_code}
+          </span>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-1.5 border-t border-emerald-200/60">
-          <span className="text-emerald-900 font-bold">
-            العربون المطلوب تحويله الآن (10%):{' '}
-            <span dir="ltr" className="font-mono-tabular">
-              {formatDH(booking.commission_amount)}
+
+        <div className="space-y-1">
+          <h4 className="font-bold text-sm text-white">{t('checkout.protectionBannerTitle')}</h4>
+          <p className="text-xs text-[#C7D0DA] leading-relaxed">
+            {t('checkout.protectionBannerDesc')}
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-3 border-t border-white/10 text-xs">
+          <div className="flex items-center justify-between sm:block">
+            <span className="text-[#C7D0DA] block">{t('checkout.depositRequired')}</span>
+            <span className="font-latin tabular-nums text-base font-extrabold text-gold">
+              {formatPrice(booking.commission_amount)}
             </span>
-          </span>
-          <span className="text-slate-600">
-            الباقي عند الاستلام للوكالة (90%):{' '}
-            <span dir="ltr" className="font-mono-tabular font-semibold text-slate-800">
-              {formatDH(booking.agency_payout_amount)}
+          </div>
+          <div className="flex items-center justify-between sm:block sm:text-end">
+            <span className="text-[#C7D0DA] block">{t('checkout.remainingAtPickup')}</span>
+            <span className="font-latin tabular-nums text-sm font-bold text-white">
+              {formatPrice(booking.agency_payout_amount)}
             </span>
-          </span>
+          </div>
         </div>
       </div>
 
-      {/* Bank Selection Radio Cards */}
-      <div>
-        <div className="flex items-center gap-2 mb-3">
-          <span className="w-7 h-7 rounded-lg bg-[#1B5E20] text-white flex items-center justify-center shrink-0">
+      {/* 6 Moroccan Bank Account Cards */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <span className="w-7 h-7 rounded-lg bg-navy text-gold flex items-center justify-center shrink-0">
             <Landmark className="w-4 h-4" />
           </span>
-          <h4 className="font-bold text-slate-900 text-base">
-            اختر البنك للتحويل <span className="text-amber-600">*</span>
+          <h4 className="font-bold text-ink text-sm sm:text-base">
+            {t('checkout.selectBankTitle')} <span className="text-gold">*</span>
           </h4>
         </div>
 
         <div
           role="radiogroup"
-          aria-label="اختر البنك لتحويل العربون"
-          className="grid grid-cols-2 sm:grid-cols-3 gap-2.5"
+          aria-label={t('checkout.selectBankTitle')}
+          className="grid grid-cols-2 sm:grid-cols-3 gap-3"
         >
           {banks.map((bank) => {
             const isSelected = selectedBank.id === bank.id;
@@ -260,31 +267,33 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
                 role="radio"
                 aria-checked={isSelected}
                 onClick={() => handleSelectBank(bank)}
-                className={`relative flex items-center gap-2.5 rounded-xl p-3 border text-right transition-all min-h-[64px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 ${
+                className={`relative flex items-center gap-2.5 rounded-xl p-3 border text-start transition-all duration-150 min-h-[68px] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold ${
                   isSelected
-                    ? 'border-[#1B5E20] bg-emerald-50/75 ring-1 ring-[#1B5E20]/25 shadow-xs'
-                    : 'border-slate-200 bg-white hover:border-emerald-300'
+                    ? 'border-gold bg-gold-soft/75 ring-1 ring-gold/40 shadow-xs'
+                    : 'border-[#E5E0D5] bg-white hover:border-navy/35'
                 }`}
               >
+                <BankLogo code={bank.code} className="w-9 h-9 shrink-0" />
+
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-bold tracking-tight text-navy font-latin truncate">
+                    {bank.short_name}
+                  </div>
+                  <div className="text-[11px] text-ink-muted truncate">
+                    {lang === 'ar' ? bank.display_name_ar : bank.short_name}
+                  </div>
+                </div>
+
                 <span
                   className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
                     isSelected
-                      ? 'border-[#1B5E20] bg-[#1B5E20] text-white'
-                      : 'border-slate-300 bg-white'
+                      ? 'border-navy bg-navy text-gold'
+                      : 'border-[#D5CFC2] bg-white'
                   }`}
                   aria-hidden="true"
                 >
                   {isSelected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
                 </span>
-
-                <BankLogo code={bank.code} className="w-8 h-8 shrink-0" />
-
-                <div className="min-w-0 flex-1">
-                  <div className="text-xs font-bold tracking-tight text-slate-900 truncate">
-                    {bank.short_name}
-                  </div>
-                  <div className="text-[11px] text-slate-500 truncate">{bank.display_name_ar}</div>
-                </div>
               </button>
             );
           })}
@@ -292,38 +301,44 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
       </div>
 
       {/* Selected Bank RIB Card */}
-      <div className="rounded-2xl border border-emerald-900/15 bg-[#FAFBF8] p-4 space-y-3">
-        <div className="flex items-center justify-between border-b border-slate-200/70 pb-2.5">
-          <span className="text-xs font-medium text-slate-500">الحساب البنكي المحدد</span>
+      <div className="rounded-2xl border border-[#E5E0D5] bg-ivory/70 p-4 space-y-3">
+        <div className="flex items-center justify-between border-b border-[#E5E0D5] pb-2.5">
+          <span className="text-xs font-medium text-ink-muted">
+            {t('checkout.selectedBankLabel')}
+          </span>
           <div className="flex items-center gap-2">
-            <span className="text-sm font-bold text-slate-900">
-              {selectedBank.display_name_ar} ({selectedBank.short_name})
+            <span className="text-sm font-bold text-ink">
+              {lang === 'ar'
+                ? `${selectedBank.display_name_ar} (${selectedBank.short_name})`
+                : selectedBank.short_name}
             </span>
             <BankLogo code={selectedBank.code} className="w-6 h-6" />
           </div>
         </div>
 
-        <div className="flex items-center justify-between border-b border-slate-200/70 pb-2.5">
-          <span className="text-xs font-medium text-slate-500">اسم المستلم</span>
-          <span className="text-sm font-bold text-emerald-800">
+        <div className="flex items-center justify-between border-b border-[#E5E0D5] pb-2.5">
+          <span className="text-xs font-medium text-ink-muted">
+            {t('checkout.recipientLabel')}
+          </span>
+          <span className="text-sm font-bold text-navy font-latin">
             {selectedBank.account_holder_name}
           </span>
         </div>
 
         <div className="space-y-2 pt-0.5">
           <div className="flex items-center justify-between gap-3">
-            <span className="text-xs font-medium text-slate-500">رقم الحساب البنكي (RIB)</span>
+            <span className="text-xs font-medium text-ink-muted">{t('checkout.ribLabel')}</span>
             <button
               type="button"
               onClick={handleCopyRib}
-              className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-bold transition-colors whitespace-nowrap shrink-0 min-h-[38px] ${
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-bold transition-colors whitespace-nowrap shrink-0 min-h-[36px] cursor-pointer ${
                 copiedRib
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-[#1B5E20] hover:bg-[#144718] text-white'
+                  ? 'bg-emerald-700 text-white'
+                  : 'bg-navy hover:bg-navy-light text-white'
               }`}
             >
               {copiedRib ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-              <span>{copiedRib ? 'تم النسخ (Copied!)' : 'نسخ (Copy)'}</span>
+              <span>{copiedRib ? t('checkout.copiedRib') : t('checkout.copyRib')}</span>
             </button>
           </div>
 
@@ -332,7 +347,7 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
             className={`rounded-xl border border-dashed px-3 py-3 text-center font-mono-tabular text-sm sm:text-base font-bold tracking-wider select-all transition-colors ${
               copiedRib
                 ? 'border-emerald-600 bg-emerald-50 text-emerald-950'
-                : 'border-emerald-700/35 bg-white text-slate-900'
+                : 'border-gold/60 bg-white text-navy'
             }`}
           >
             {selectedBank.rib}
@@ -341,10 +356,10 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
           {copiedRib && (
             <div
               role="status"
-              className="rounded-lg bg-emerald-100/80 border border-emerald-300 px-3 py-1.5 text-xs font-semibold text-emerald-900 flex items-center justify-center gap-1.5"
+              className="rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-900 flex items-center justify-center gap-1.5"
             >
               <Check className="w-3.5 h-3.5 text-emerald-700" />
-              <span>Copied! تم نسخ رقم الـ RIB بنجاح إلى الحافظة</span>
+              <span>{t('checkout.copiedBanner')}</span>
             </div>
           )}
         </div>
@@ -353,11 +368,11 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
       {/* Receipt Upload Section */}
       <div className="space-y-2.5">
         <div className="flex items-center gap-2">
-          <span className="w-7 h-7 rounded-lg bg-[#1B5E20] text-white flex items-center justify-center shrink-0">
+          <span className="w-7 h-7 rounded-lg bg-navy text-gold flex items-center justify-center shrink-0">
             <Upload className="w-4 h-4" />
           </span>
-          <h4 className="font-bold text-slate-900 text-base">
-            إرفاق وصل تحويل العربون <span className="text-amber-600">*</span>
+          <h4 className="font-bold text-ink text-sm sm:text-base">
+            {t('checkout.uploadTitle')} <span className="text-gold">*</span>
           </h4>
         </div>
 
@@ -372,10 +387,10 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className={`w-full min-h-[120px] rounded-2xl border-2 border-dashed transition-colors p-5 flex flex-col items-center justify-center gap-2 text-center ${
+          className={`w-full min-h-[120px] rounded-2xl border-2 border-dashed transition-colors p-5 flex flex-col items-center justify-center gap-2 text-center cursor-pointer ${
             fileError
-              ? 'border-red-400 bg-red-50/40 hover:bg-red-50/60'
-              : 'border-emerald-700/25 bg-[#FAFBF8] hover:bg-emerald-50/40 hover:border-emerald-600/50'
+              ? 'border-rose-400 bg-rose-50/40 hover:bg-rose-50/60'
+              : 'border-gold/45 bg-ivory/60 hover:bg-gold-soft/45 hover:border-gold'
           }`}
         >
           {receiptFile ? (
@@ -383,30 +398,26 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
               {receiptPreviewUrl ? (
                 <img
                   src={receiptPreviewUrl}
-                  alt="معاينة وصل التحويل"
-                  className="h-24 w-auto rounded-lg object-cover border border-slate-200"
+                  alt={t('checkout.uploadTitle')}
+                  className="h-24 w-auto rounded-lg object-cover border border-[#E5E0D5]"
                 />
               ) : (
-                <div className="w-11 h-11 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center">
+                <div className="w-11 h-11 rounded-xl bg-gold-soft text-navy flex items-center justify-center">
                   <FileText className="w-5 h-5" />
                 </div>
               )}
-              <span className="text-sm font-bold text-emerald-900 break-all">
-                {receiptFile.name}
-              </span>
-              <span className="text-xs text-emerald-700 font-mono-tabular">
-                {(receiptFile.size / (1024 * 1024)).toFixed(2)} MB · انقر لتغيير الملف
+              <span className="text-sm font-bold text-navy break-all">{receiptFile.name}</span>
+              <span className="text-xs text-ink-muted font-mono-tabular">
+                {(receiptFile.size / (1024 * 1024)).toFixed(2)} MB · {t('checkout.changeFile')}
               </span>
             </div>
           ) : (
             <>
-              <span className="w-11 h-11 rounded-xl bg-emerald-100/80 text-[#1B5E20] flex items-center justify-center">
+              <span className="w-11 h-11 rounded-xl bg-white border border-[#E5E0D5] text-navy flex items-center justify-center">
                 <Upload className="w-5 h-5" />
               </span>
-              <span className="text-sm font-bold text-slate-900">انقر لاختيار وصل التحويل</span>
-              <span className="text-xs text-slate-500">
-                الصيغ المسموح بها: JPG, PNG, PDF (الحد الأقصى 5MB)
-              </span>
+              <span className="text-sm font-bold text-ink">{t('checkout.uploadClick')}</span>
+              <span className="text-xs text-ink-muted">{t('checkout.uploadFormats')}</span>
             </>
           )}
         </button>
@@ -414,7 +425,7 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
         {fileError && (
           <div
             role="alert"
-            className="rounded-xl bg-red-50 border border-red-200 px-3.5 py-2.5 text-xs sm:text-sm font-medium text-red-700 flex items-center gap-2"
+            className="rounded-xl bg-rose-50 border border-rose-200 px-3.5 py-2.5 text-xs sm:text-sm font-medium text-rose-800 flex items-center gap-2"
           >
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{fileError}</span>
@@ -425,7 +436,7 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
       {errorMsg && (
         <div
           role="alert"
-          className="rounded-xl bg-red-50 border border-red-200 px-3.5 py-2.5 text-sm text-red-700 flex items-center gap-2"
+          className="rounded-xl bg-rose-50 border border-rose-200 px-3.5 py-2.5 text-sm text-rose-800 flex items-center gap-2"
         >
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{errorMsg}</span>
@@ -434,47 +445,38 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
 
       {/* Primary Action Button */}
       <div className="space-y-2.5 pt-1">
-        <button
-          type="button"
-          disabled={submitting}
+        <PrimaryButton
+          fullWidth
+          size="lg"
+          loading={submitting}
           onClick={handleConfirmPayment}
-          className="w-full min-h-[48px] rounded-2xl bg-[#1B5E20] hover:bg-[#144718] disabled:opacity-65 disabled:cursor-not-allowed text-white py-3.5 px-5 font-bold text-base shadow-sm transition-colors flex items-center justify-center gap-3"
         >
           {submitting ? (
-            <>
-              <Loader2 className="w-5 h-5 animate-spin" />
-              <span>جاري تأكيد تحويل العربون...</span>
-            </>
+            <span>{t('checkout.submittingPayment')}</span>
           ) : (
             <>
-              <span>تأكيد الدفع</span>
-              <span
-                dir="ltr"
-                className="rounded-lg bg-[#113D14] border border-amber-400/40 px-2.5 py-0.5 text-xs font-mono-tabular font-bold text-amber-300"
-              >
-                {formatDH(booking.commission_amount)}
+              <span>{t('checkout.confirmPayment')}</span>
+              <span className="font-latin tabular-nums font-extrabold">
+                ({formatPrice(booking.commission_amount)})
               </span>
             </>
           )}
-        </button>
+        </PrimaryButton>
 
         {onBack && (
           <button
             type="button"
             disabled={submitting}
             onClick={onBack}
-            className="w-full min-h-[40px] py-2 text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors"
+            className="w-full min-h-[40px] py-2 text-xs font-semibold text-ink-muted hover:text-navy transition-colors cursor-pointer"
           >
-            تعديل بيانات الحجز
+            {t('checkout.editBooking')}
           </button>
         )}
 
-        <div className="flex items-center justify-center gap-1.5 text-xs text-slate-500 pt-1 text-center">
-          <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0" />
-          <span>
-            تحويل مؤمّن · استرجع عربونك كاملاً عبر التحويل الفوري لرقم هاتفك أو حسابك البنكي خلال
-            ساعات من التحقق
-          </span>
+        <div className="flex items-center justify-center gap-1.5 text-xs text-ink-muted pt-1 text-center">
+          <ShieldCheck className="w-4 h-4 text-gold shrink-0" />
+          <span>{t('checkout.shieldFooter')}</span>
         </div>
       </div>
     </div>
