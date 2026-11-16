@@ -10,12 +10,10 @@ import {
   Calendar,
   ArrowLeft,
   Plane,
+  ShieldCheck,
+  ChevronDown,
 } from 'lucide-react';
-import {
-  supabase,
-  MOROCCAN_CITIES,
-  getCityLabelAr,
-} from '../lib/supabase';
+import { supabase, MOROCCAN_CITIES, getCityLabelAr } from '../lib/supabase';
 import { DEFAULT_CAR_IMAGE_URL, HERO_IMAGE_URL, STARTER_CARS } from '../data/starterData';
 import { BookingModal } from './BookingModal';
 import type { CarOffer, CreatedBooking } from '../types/karya';
@@ -45,12 +43,18 @@ function getFuelLabel(fuel: CarOffer['fuel_type']): string {
   return 'بنزين';
 }
 
+function formatDays(d: number): string {
+  if (d === 1) return 'يوم واحد';
+  if (d === 2) return 'يومان';
+  if (d <= 10) return `${d} أيام`;
+  return `${d} يومًا`;
+}
+
 export const CustomerPortal: React.FC<CustomerPortalProps> = ({
   onBookingCreated,
   onGoToAgency,
 }) => {
   const [selectedCity, setSelectedCity] = useState<string>('Casablanca');
-
   const [searchPickupDate, setSearchPickupDate] = useState<string>(getDefaultPickupDate);
   const [searchDays, setSearchDays] = useState<number>(2);
 
@@ -59,7 +63,8 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
   const [dbConnected, setDbConnected] = useState(false);
 
   const [brandFilter, setBrandFilter] = useState<string>('all');
-  const [transmissionFilter, setTransmissionFilter] = useState<'all' | 'automatic' | 'manual'>('all');
+  const [transmissionFilter, setTransmissionFilter] =
+    useState<'all' | 'automatic' | 'manual'>('all');
   const [selectedCar, setSelectedCar] = useState<CarOffer | null>(null);
 
   const loadCars = async (cityToLoad: string) => {
@@ -122,16 +127,10 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
           transmission: row.transmission || 'manual',
           seats: Number(row.seats ?? 5),
           primary_image_url: String(
-            row.primary_image_url ||
-              row.car_catalog?.image_url ||
-              DEFAULT_CAR_IMAGE_URL,
+            row.primary_image_url || row.car_catalog?.image_url || DEFAULT_CAR_IMAGE_URL,
           ),
           gallery_images: [
-            String(
-              row.primary_image_url ||
-                row.car_catalog?.image_url ||
-                DEFAULT_CAR_IMAGE_URL,
-            ),
+            String(row.primary_image_url || row.car_catalog?.image_url || DEFAULT_CAR_IMAGE_URL),
           ],
           daily_price: Number(row.daily_price),
           deposit_amount: Number(row.deposit_amount ?? 0),
@@ -146,7 +145,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
         return;
       }
     } catch {
-      // Smoothly fall through to starter fleet
+      // fallback to starter fleet
     }
 
     const demoCityCars = STARTER_CARS.filter(
@@ -165,17 +164,18 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
   const handleDiscoverClick = (e: React.FormEvent) => {
     e.preventDefault();
     loadCars(selectedCity);
-    document.getElementById('fleet-offers')?.scrollIntoView({ behavior: 'smooth' });
+    document.getElementById('fleet-offers')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   const handleSelectAirportCity = (cityFr: string) => {
     setSelectedCity(cityFr);
-    document.getElementById('fleet-offers')?.scrollIntoView({ behavior: 'smooth' });
+    document.getElementById('fleet-offers')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  const availableBrands = useMemo(() => {
-    return Array.from(new Set(cars.map((c) => c.brand).filter(Boolean)));
-  }, [cars]);
+  const availableBrands = useMemo(
+    () => Array.from(new Set(cars.map((c) => c.brand).filter(Boolean))),
+    [cars],
+  );
 
   const filteredCars = useMemo(() => {
     return cars.filter((car) => {
@@ -186,10 +186,13 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
     });
   }, [cars, transmissionFilter, brandFilter]);
 
+  const inputBase =
+    'w-full min-h-[48px] rounded-xl bg-white px-3 py-2.5 text-sm font-semibold text-slate-900 shadow-lg ring-1 ring-black/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB] focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900';
+
   return (
-    <div dir="rtl">
-      {/* 1. Full-Bleed Edge-to-Edge Hero + Floating Fields Only */}
-      <section className="relative w-full overflow-hidden bg-slate-900 min-h-[380px] sm:min-h-[430px] flex flex-col justify-end">
+    <div dir="rtl" className="bg-slate-50/50 min-h-screen">
+      {/* ===================== HERO ===================== */}
+      <section className="relative w-full overflow-hidden bg-slate-900 min-h-[420px] sm:min-h-[460px] flex flex-col justify-end">
         <img
           src={HERO_IMAGE_URL}
           alt="سيارة كراء حديثة في المغرب"
@@ -197,29 +200,31 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
           className="absolute inset-0 w-full h-full object-cover"
         />
         <div
-          className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/50 to-slate-950/25"
+          className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/60 to-slate-950/20"
           aria-hidden="true"
         />
 
-        <div className="relative z-10 w-full max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10 space-y-6">
-          <div className="max-w-xl space-y-2">
-            <h1 className="text-2xl sm:text-4xl font-extrabold text-white leading-[1.2] [text-wrap:balance]">
+        <div className="relative z-10 w-full max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-6">
+          <div className="max-w-xl space-y-2.5">
+            <h1 className="text-2xl sm:text-4xl font-extrabold text-white leading-[1.2] [text-wrap:balance] drop-shadow-sm">
               احجز سيارتك في المغرب خلال دقائق
             </h1>
-            <p className="text-slate-200 text-sm sm:text-base">
-              وكالات موثقة بأسعار واضحة · 10% تسبيق والباقي عند الاستلام.
+            <p className="text-slate-200 text-sm sm:text-base leading-relaxed">
+              وكالات موثقة بأسعار واضحة · <span className="font-semibold text-white">10% تسبيق</span> والباقي عند الاستلام.
             </p>
           </div>
 
-          {/* Floating Inputs Only (Zero White Wrapper Background) */}
+          {/* Floating search form */}
           <form
             onSubmit={handleDiscoverClick}
-            className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end"
+            className="grid grid-cols-2 sm:grid-cols-12 gap-3 items-end"
+            aria-label="بحث عن سيارة للإيجار"
           >
-            <div className="sm:col-span-5">
+            {/* City */}
+            <div className="col-span-2 sm:col-span-5">
               <label
                 htmlFor="hero-city-select"
-                className="block text-xs font-semibold text-white/90 mb-1.5"
+                className="block text-[11px] sm:text-xs font-semibold text-white/90 mb-1.5"
               >
                 المدينة
               </label>
@@ -229,7 +234,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
                   id="hero-city-select"
                   value={selectedCity}
                   onChange={(e) => setSelectedCity(e.target.value)}
-                  className="w-full min-h-[46px] appearance-none rounded-xl bg-white pr-9 pl-3 py-2.5 text-sm font-semibold text-slate-900 shadow-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB]/40"
+                  className={`${inputBase} appearance-none pr-9 pl-8`}
                 >
                   {MOROCCAN_CITIES.map((city) => (
                     <option key={city.slug} value={city.nameFr}>
@@ -237,32 +242,36 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
                     </option>
                   ))}
                 </select>
+                <ChevronDown className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
             </div>
 
-            <div className="sm:col-span-3">
+            {/* Date */}
+            <div className="col-span-2 sm:col-span-3">
               <label
                 htmlFor="hero-pickup-date"
-                className="block text-xs font-semibold text-white/90 mb-1.5"
+                className="block text-[11px] sm:text-xs font-semibold text-white/90 mb-1.5"
               >
                 تاريخ الاستلام
               </label>
               <div className="relative">
-                <Calendar className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none hidden lg:block" />
+                <Calendar className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none hidden sm:block" />
                 <input
                   id="hero-pickup-date"
                   type="date"
                   value={searchPickupDate}
+                  min={new Date().toISOString().slice(0, 10)}
                   onChange={(e) => setSearchPickupDate(e.target.value)}
-                  className="w-full min-h-[46px] rounded-xl bg-white px-3 lg:pr-9 py-2.5 text-xs sm:text-sm font-mono-tabular text-slate-900 shadow-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB]/40"
+                  className={`${inputBase} text-xs sm:text-sm font-mono-tabular sm:pr-9`}
                 />
               </div>
             </div>
 
-            <div className="sm:col-span-2">
+            {/* Days */}
+            <div className="col-span-1 sm:col-span-2">
               <label
                 htmlFor="hero-days"
-                className="block text-xs font-semibold text-white/90 mb-1.5"
+                className="block text-[11px] sm:text-xs font-semibold text-white/90 mb-1.5"
               >
                 المدة
               </label>
@@ -270,31 +279,42 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
                 id="hero-days"
                 value={searchDays}
                 onChange={(e) => setSearchDays(Number(e.target.value))}
-                className="w-full min-h-[46px] rounded-xl bg-white px-3 py-2.5 text-sm font-semibold text-slate-900 shadow-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB]/40"
+                className={`${inputBase} appearance-none px-2`}
               >
                 {[1, 2, 3, 4, 5, 7, 10, 14, 30].map((d) => (
                   <option key={d} value={d}>
-                    {d === 1 ? 'يوم واحد' : d === 2 ? 'يومان' : `${d} أيام`}
+                    {formatDays(d)}
                   </option>
                 ))}
               </select>
             </div>
 
-            <div className="sm:col-span-2">
+            {/* Search button */}
+            <div className="col-span-1 sm:col-span-2">
               <button
                 type="submit"
-                className="w-full min-h-[46px] rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-4 py-2.5 font-bold text-sm shadow-lg transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap"
+                className="w-full min-h-[48px] rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] active:bg-[#1E40AF] text-white px-4 py-2.5 font-bold text-sm shadow-lg transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
+                aria-label="بحث عن السيارات"
               >
-                <Search className="w-4 h-4" />
-                <span>بحث</span>
+                <Search className="w-4 h-4" aria-hidden="true" />
+                <span className="hidden sm:inline">بحث</span>
               </button>
             </div>
           </form>
+
+          {/* Trust micro-copy */}
+          <p className="flex items-center gap-1.5 text-[11px] sm:text-xs text-slate-300/90">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" aria-hidden="true" />
+            إلغاء مجاني حتى 24 ساعة قبل الاستلام
+          </p>
         </div>
       </section>
 
-      {/* 2. Quick Moroccan Airports & Cities Strip */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-5 pb-2">
+      {/* ===================== POPULAR AIRPORTS ===================== */}
+      <section
+        className="max-w-6xl mx-auto px-4 sm:px-6 pt-5 pb-2"
+        aria-label="مطارات مغربية شائعة"
+      >
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {POPULAR_AIRPORTS.map((item) => {
             const active = selectedCity.toLowerCase() === item.cityFr.toLowerCase();
@@ -303,10 +323,11 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
                 key={item.code}
                 type="button"
                 onClick={() => handleSelectAirportCity(item.cityFr)}
-                className={`text-right rounded-xl border px-3.5 py-2.5 transition-colors flex items-center justify-between gap-2 ${
+                aria-pressed={active}
+                className={`text-right rounded-xl border px-3.5 py-2.5 transition-all duration-150 flex items-center justify-between gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB] focus-visible:ring-offset-2 ${
                   active
-                    ? 'bg-blue-50/70 border-[#2563EB]/50 text-slate-900'
-                    : 'bg-white border-slate-200/80 hover:border-slate-300 text-slate-800'
+                    ? 'bg-blue-50/80 border-[#2563EB] text-slate-900 shadow-sm'
+                    : 'bg-white border-slate-200 hover:border-[#2563EB]/40 hover:shadow-sm text-slate-800'
                 }`}
               >
                 <div className="min-w-0">
@@ -314,7 +335,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
                   <div className="text-[11px] text-slate-500 truncate">{item.airport}</div>
                 </div>
                 <span className="inline-flex items-center gap-1 font-mono-tabular text-[11px] font-bold text-[#2563EB] shrink-0">
-                  <Plane className="w-3.5 h-3.5" />
+                  <Plane className="w-3.5 h-3.5" aria-hidden="true" />
                   <span>{item.code}</span>
                 </span>
               </button>
@@ -323,38 +344,61 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
         </div>
       </section>
 
-      {/* 3. Fleet Discovery Grid */}
-      <section id="fleet-offers" className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* ===================== FLEET ===================== */}
+      <section
+        id="fleet-offers"
+        className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-6 scroll-mt-4"
+      >
+        {/* Section header */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div className="space-y-1">
             <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
-              السيارات في {getCityLabelAr(selectedCity)}
+              السيارات المتاحة في {getCityLabelAr(selectedCity)}
             </h2>
-            {!dbConnected && cars.length > 0 && (
-              <p className="text-xs text-slate-500">
-                عروض توضيحية ·{' '}
-                <button
-                  type="button"
-                  onClick={onGoToAgency}
-                  className="font-semibold text-[#2563EB] hover:underline"
-                >
-                  أضف أسطولك كوكالة
-                </button>
-              </p>
-            )}
+            <p className="text-xs text-slate-500">
+              {loadingCars ? (
+                'جارٍ تحميل العروض...'
+              ) : (
+                <span aria-live="polite">
+                  {filteredCars.length} سيارة متاحة · {formatDays(searchDays)} · استلام{' '}
+                  <span className="font-mono-tabular">{searchPickupDate}</span>
+                </span>
+              )}
+              {!dbConnected && cars.length > 0 && (
+                <>
+                  {' '}·{' '}
+                  <span className="text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
+                    عروض توضيحية
+                  </span>{' '}
+                  <button
+                    type="button"
+                    onClick={onGoToAgency}
+                    className="font-semibold text-[#2563EB] hover:underline"
+                  >
+                    أضف أسطولك
+                  </button>
+                </>
+              )}
+            </p>
           </div>
 
-          {/* Clean Filters: Brands + Transmission */}
-          <div className="flex flex-wrap items-center gap-2.5">
+          {/* Filters (scrollable on mobile) */}
+          <div className="flex flex-col gap-2.5 md:flex-row md:items-center">
             {availableBrands.length > 1 && (
-              <div className="flex items-center gap-1 p-1 bg-white border border-slate-200/80 rounded-xl overflow-x-auto">
+              <div
+                className="flex items-center gap-1 p-1 bg-white border border-slate-200 rounded-xl overflow-x-auto no-scrollbar"
+                role="tablist"
+                aria-label="تصفية حسب الماركة"
+              >
                 <button
                   type="button"
+                  role="tab"
+                  aria-selected={brandFilter === 'all'}
                   onClick={() => setBrandFilter('all')}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 ${
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB] ${
                     brandFilter === 'all'
-                      ? 'bg-[#2563EB] text-white'
-                      : 'text-slate-600 hover:text-slate-900'
+                      ? 'bg-[#2563EB] text-white shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                   }`}
                 >
                   كل الماركات
@@ -363,11 +407,13 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
                   <button
                     key={brand}
                     type="button"
+                    role="tab"
+                    aria-selected={brandFilter === brand}
                     onClick={() => setBrandFilter(brand)}
-                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 ${
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB] ${
                       brandFilter === brand
-                        ? 'bg-[#2563EB] text-white'
-                        : 'text-slate-600 hover:text-slate-900'
+                        ? 'bg-[#2563EB] text-white shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                     }`}
                   >
                     {brand}
@@ -376,177 +422,194 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
               </div>
             )}
 
-            <div className="flex items-center gap-1 p-1 bg-white border border-slate-200/80 rounded-xl">
-              <button
-                type="button"
-                onClick={() => setTransmissionFilter('all')}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 ${
-                  transmissionFilter === 'all'
-                    ? 'bg-slate-900 text-white'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                الكل ({cars.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setTransmissionFilter('automatic')}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 ${
-                  transmissionFilter === 'automatic'
-                    ? 'bg-slate-900 text-white'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                أوتوماتيك
-              </button>
-              <button
-                type="button"
-                onClick={() => setTransmissionFilter('manual')}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 ${
-                  transmissionFilter === 'manual'
-                    ? 'bg-slate-900 text-white'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                يدوي
-              </button>
+            <div
+              className="flex items-center gap-1 p-1 bg-white border border-slate-200 rounded-xl"
+              role="tablist"
+              aria-label="تصفية حسب ناقل الحركة"
+            >
+              {(
+                [
+                  { key: 'all', label: `الكل (${cars.length})` },
+                  { key: 'automatic', label: 'أوتوماتيك' },
+                  { key: 'manual', label: 'يدوي' },
+                ] as const
+              ).map(({ key, label }) => (
+                <button
+                  key={key}
+                  type="button"
+                  role="tab"
+                  aria-selected={transmissionFilter === key}
+                  onClick={() => setTransmissionFilter(key)}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 ${
+                    transmissionFilter === key
+                      ? 'bg-slate-900 text-white shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
           </div>
         </div>
 
+        {/* Results */}
         {loadingCars ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[1, 2, 3].map((n) => (
-              <div key={n} className="bg-white rounded-2xl border border-slate-200/75 overflow-hidden animate-pulse">
+              <div
+                key={n}
+                className="bg-white rounded-2xl border border-slate-200/75 overflow-hidden animate-pulse"
+                aria-hidden="true"
+              >
                 <div className="aspect-[4/3] bg-slate-200" />
                 <div className="p-5 space-y-3">
                   <div className="h-5 bg-slate-200 rounded w-1/2" />
                   <div className="h-4 bg-slate-100 rounded w-2/3" />
-                  <div className="h-10 bg-slate-200 rounded-xl w-full" />
+                  <div className="h-3 bg-slate-100 rounded w-1/3" />
+                  <div className="flex justify-between items-center pt-3 border-t border-slate-100">
+                    <div className="h-6 bg-slate-200 rounded w-1/3" />
+                    <div className="h-9 bg-slate-200 rounded-xl w-1/4" />
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         ) : filteredCars.length === 0 ? (
           <div className="bg-white rounded-2xl border border-slate-200/75 p-12 text-center space-y-3">
-            <CarFront className="w-10 h-10 text-slate-300 mx-auto" />
+            <CarFront className="w-10 h-10 text-slate-300 mx-auto" aria-hidden="true" />
             <h3 className="font-bold text-lg text-slate-900">لا توجد سيارات مطابقة حالياً</h3>
-            <p className="text-sm text-slate-500">جرّب تغيير الفلتر أو اختيار مدينة أخرى.</p>
+            <p className="text-sm text-slate-500">
+              جرّب إزالة أحد الفلاتر أو اختيار مدينة أخرى.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setBrandFilter('all');
+                setTransmissionFilter('all');
+              }}
+              className="inline-flex items-center gap-1.5 mt-2 px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition-colors"
+            >
+              إعادة تعيين الفلاتر
+            </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredCars.map((car) => (
-              <article
-                key={car.id}
-                className="group bg-white rounded-2xl border border-slate-200/80 hover:border-slate-300 hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col"
-              >
-                <button
-                  type="button"
-                  onClick={() => setSelectedCar(car)}
-                  className="aspect-[4/3] bg-slate-100 overflow-hidden block w-full text-right cursor-pointer"
+            {filteredCars.map((car) => {
+              const total = car.daily_price * searchDays;
+              return (
+                <article
+                  key={car.id}
+                  className="group bg-white rounded-2xl border border-slate-200/80 hover:border-slate-300 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 overflow-hidden flex flex-col"
                 >
-                  <img
-                    src={car.primary_image_url}
-                    alt={`${car.brand} ${car.model}`}
-                    referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
-                  />
-                </button>
-
-                <div className="p-5 flex-1 flex flex-col">
-                  {/* Title + Rating */}
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <h3 className="font-bold text-base sm:text-lg text-slate-900 leading-snug">
-                        {car.brand} {car.model}
-                      </h3>
-                      <p className="text-xs text-slate-500 mt-0.5">{car.agency_name}</p>
-                    </div>
-                    <div className="flex items-center gap-1 text-xs font-bold text-slate-700 shrink-0 pt-1">
-                      <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                      <span className="font-mono-tabular">{car.agency_rating.toFixed(1)}</span>
-                    </div>
-                  </div>
-
-                  {/* Clean Spec Strip — Zero Pills */}
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600 mt-3.5 pt-3.5 border-t border-slate-100">
-                    <span className="inline-flex items-center gap-1">
-                      <Fuel className="w-3.5 h-3.5 text-slate-400" />
-                      <span>{getFuelLabel(car.fuel_type)}</span>
-                    </span>
-                    <span className="inline-flex items-center gap-1">
-                      <Gauge className="w-3.5 h-3.5 text-slate-400" />
-                      <span>{car.transmission === 'automatic' ? 'أوتوماتيك' : 'يدوي'}</span>
-                    </span>
-                    <span className="inline-flex items-center gap-1">
-                      <Users className="w-3.5 h-3.5 text-slate-400" />
-                      <span>{car.seats} مقاعد</span>
-                    </span>
-                    {car.distance_km != null && (
-                      <span className="font-mono-tabular text-slate-400">
-                        · {car.distance_km.toFixed(1)} كم
+                  {/* Image */}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCar(car)}
+                    className="aspect-[4/3] bg-slate-100 overflow-hidden block w-full text-right cursor-pointer relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#2563EB]"
+                    aria-label={`عرض تفاصيل ${car.brand} ${car.model}`}
+                  >
+                    <img
+                      src={car.primary_image_url}
+                      alt={`${car.brand} ${car.model}`}
+                      referrerPolicy="no-referrer"
+                      loading="lazy"
+                      className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500 ease-out"
+                    />
+                    {car.model_year && (
+                      <span className="absolute top-3 right-3 inline-flex items-center gap-1 rounded-full bg-white/95 backdrop-blur-sm text-slate-800 text-[11px] font-bold px-2.5 py-1 shadow-sm">
+                        {car.model_year}
                       </span>
                     )}
-                  </div>
+                  </button>
 
-                  {/* Price + Primary Action */}
-                  <div className="mt-auto pt-4 flex items-center justify-between gap-3">
-                    <div>
-                      <span className="font-mono-tabular font-extrabold text-lg text-slate-900">
-                        {car.daily_price} DH
-                      </span>
-                      <span className="text-xs text-slate-500"> / يوم</span>
+                  {/* Content */}
+                  <div className="p-5 flex-1 flex flex-col">
+                    {/* Title row */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <h3 className="font-bold text-base sm:text-lg text-slate-900 leading-snug truncate">
+                          {car.brand} {car.model}
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-0.5 truncate">
+                          {car.agency_name}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1 text-xs font-bold text-slate-700 shrink-0 pt-1">
+                        <Star
+                          className="w-3.5 h-3.5 fill-amber-400 text-amber-400"
+                          aria-hidden="true"
+                        />
+                        <span className="font-mono-tabular">
+                          {car.agency_rating.toFixed(1)}
+                        </span>
+                      </div>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => setSelectedCar(car)}
-                      className="min-h-[42px] rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-4 py-2 text-xs font-bold transition-colors inline-flex items-center gap-1.5 whitespace-nowrap shrink-0"
-                    >
-                      <span>تفاصيل وحجز</span>
-                      <ArrowLeft className="w-3.5 h-3.5" />
-                    </button>
+                    {/* Specs strip */}
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-slate-600 mt-3.5 pt-3.5 border-t border-slate-100">
+                      <span className="inline-flex items-center gap-1.5">
+                        <Fuel className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
+                        {getFuelLabel(car.fuel_type)}
+                      </span>
+                      <span className="w-px h-3 bg-slate-200" aria-hidden="true" />
+                      <span className="inline-flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
+                        {car.seats} مقاعد
+                      </span>
+                      <span className="w-px h-3 bg-slate-200" aria-hidden="true" />
+                      <span className="inline-flex items-center gap-1.5">
+                        <Gauge className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
+                        {car.transmission === 'automatic' ? 'أوتوماتيك' : 'يدوي'}
+                      </span>
+                    </div>
+
+                    {/* Price + CTA */}
+                    <div className="mt-auto pt-4 flex items-end justify-between gap-3">
+                      <div>
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-2xl font-extrabold text-slate-900 font-mono-tabular leading-none">
+                            {car.daily_price}
+                          </span>
+                          <span className="text-xs font-semibold text-slate-500">
+                            درهم / يوم
+                          </span>
+                        </div>
+                        {total > 0 && (
+                          <p className="text-[11px] text-slate-500 mt-1.5 font-mono-tabular">
+                            ≈ <span className="font-bold text-slate-700">{total}</span> درهم
+                            لـ {formatDays(searchDays)}
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedCar(car)}
+                        className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] active:bg-[#1E40AF] text-white text-sm font-bold shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB] focus-visible:ring-offset-2"
+                      >
+                        احجز
+                        <ArrowLeft className="w-4 h-4" aria-hidden="true" />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              </article>
-            ))}
+                </article>
+              );
+            })}
           </div>
         )}
       </section>
 
-      {/* 4. Concise 3-Step Trust Strip */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-12">
-        <div className="rounded-2xl bg-white border border-slate-200/80 p-6 sm:p-8 grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
-          <div className="space-y-1">
-            <h3 className="font-bold text-sm text-slate-900">1. اختر السيارة والتواريخ</h3>
-            <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
-              تصفح المواصفات والسعر النهائي بدون رسوم خفية.
-            </p>
-          </div>
-
-          <div className="space-y-1">
-            <h3 className="font-bold text-sm text-slate-900">2. أكد الحجز بـ 10%</h3>
-            <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
-              تحويل بنكي آمن مع ضمان استرجاع 100% عند التعذر.
-            </p>
-          </div>
-
-          <div className="space-y-1">
-            <h3 className="font-bold text-sm text-slate-900">3. استلم وسدد 90%</h3>
-            <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
-              استلم السيارة من المطار أو المدينة وادفع الباقي للوكالة.
-            </p>
-          </div>
-        </div>
-      </section>
-
+      {/* Booking modal */}
       {selectedCar && (
         <BookingModal
           car={selectedCar}
-          initialPickupDate={searchPickupDate}
-          initialDays={searchDays}
+          pickupDate={searchPickupDate}
+          days={searchDays}
           onClose={() => setSelectedCar(null)}
-          onBookingCompleted={onBookingCreated}
+          onBookingCreated={(booking) => {
+            onBookingCreated(booking);
+            setSelectedCar(null);
+          }}
         />
       )}
     </div>
