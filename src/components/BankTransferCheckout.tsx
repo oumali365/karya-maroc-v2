@@ -207,27 +207,27 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
 
   return (
     <div className="space-y-4" dir="rtl">
-      <div className="rounded-xl bg-[#F4F6F9] px-4 py-3 border border-slate-200/80 text-sm space-y-1.5">
+      <div className="rounded-xl bg-[var(--karya-bg)] px-4 py-3 border border-[var(--karya-border)] text-sm space-y-1.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="text-slate-700 text-xs sm:text-sm">
-            <span className="font-extrabold text-[#0F2942]">{booking.car_label}</span>
+          <div className="text-[var(--karya-text)] text-xs sm:text-sm">
+            <span className="font-extrabold text-[var(--karya-primary)]">{booking.car_label}</span>
             <span className="mx-1.5 text-slate-400">·</span>
             <span>{booking.days} أيام</span>
           </div>
-          <div className="font-mono-tabular text-xs font-bold text-[#0F2942]">
+          <div className="font-mono-tabular text-xs font-bold text-[var(--karya-primary)]">
             {booking.booking_code}
           </div>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-1.5 border-t border-slate-200/80">
-          <span className="text-[#0F2942] font-bold">
-            التسبيق الآن (10%):{' '}
-            <span dir="ltr" className="font-mono-tabular text-[#0D9488] font-extrabold">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-1.5 border-t border-[var(--karya-border)]">
+          <span className="text-[var(--karya-primary)] font-bold">
+            لتأكيد الحجز الآن (10%):{' '}
+            <span dir="ltr" className="font-mono-tabular text-[var(--karya-action)] font-extrabold">
               {formatDH(booking.commission_amount)}
             </span>
           </span>
-          <span className="text-slate-600">
-            عند الاستلام:{' '}
-            <span dir="ltr" className="font-mono-tabular font-bold text-[#0F2942]">
+          <span className="text-[var(--karya-text-muted)]">
+            المبلغ المتبقي عند الاستلام (90%):{' '}
+            <span dir="ltr" className="font-mono-tabular font-bold text-[var(--karya-primary)]">
               {formatDH(booking.agency_payout_amount)}
             </span>
           </span>
@@ -236,13 +236,13 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
 
       <div>
         <div className="flex items-center gap-2 mb-2.5">
-          <Landmark className="w-4 h-4 text-[#0F2942]" />
-          <h4 className="font-bold text-[#0F2942] text-sm">اختر البنك للتحويل</h4>
+          <Landmark className="w-4 h-4 text-[var(--karya-primary)]" />
+          <h4 className="font-bold text-[var(--karya-primary)] text-sm">اختر البنك للتحويل</h4>
         </div>
 
         <div
           role="radiogroup"
-          aria-label="اختر البنك لتحويل التسبيق"
+          aria-label="اختر البنك لتحويل مبلغ تأكيد الحجز"
           className="grid grid-cols-2 sm:grid-cols-3 gap-2"
         >
           {banks.map((bank) => {
@@ -254,16 +254,16 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
                 role="radio"
                 aria-checked={isSelected}
                 onClick={() => handleSelectBank(bank)}
-                className={`relative flex items-center gap-2 rounded-xl p-2.5 border text-right transition-all min-h-[58px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] ${
+                className={`relative flex items-center gap-2 rounded-lg p-2.5 border text-right transition-all min-h-[58px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--karya-action)] ${
                   isSelected
-                    ? 'border-[#0D9488] bg-teal-50/70 ring-1 ring-[#0D9488]/25'
-                    : 'border-slate-200 bg-white hover:border-slate-300'
+                    ? 'border-[var(--karya-action)] bg-[var(--karya-action-soft)] ring-1 ring-[var(--karya-action)]/20'
+                    : 'border-[var(--karya-border)] bg-white hover:border-[var(--karya-action)]/45'
                 }`}
               >
                 <span
                   className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
                     isSelected
-                      ? 'border-[#0D9488] bg-[#0D9488] text-white'
+                      ? 'border-[var(--karya-action)] bg-[var(--karya-action)] text-white'
                       : 'border-slate-300 bg-white'
                   }`}
                   aria-hidden="true"
@@ -274,10 +274,12 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
                 <BankLogo code={bank.code} className="w-7 h-7 shrink-0" />
 
                 <div className="min-w-0 flex-1">
-                  <div className="text-xs font-bold tracking-tight text-[#0F2942] truncate">
+                  <div className="text-xs font-bold tracking-tight text-[var(--karya-primary)] truncate">
                     {bank.short_name}
                   </div>
-                  <div className="text-[11px] text-slate-500 truncate">{bank.display_name_ar}</div>
+                  <div className="text-[11px] text-[var(--karya-text-muted)] truncate">
+                    {bank.display_name_ar}
+                  </div>
                 </div>
               </button>
             );
@@ -285,21 +287,21 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
         </div>
       </div>
 
-      <div className="rounded-xl border border-slate-200/80 bg-[#F4F6F9] p-4 space-y-2.5">
+      <div className="rounded-xl border border-[var(--karya-border)] bg-[var(--karya-bg)] p-4 space-y-2.5">
         <div className="flex items-center justify-between text-xs">
-          <span className="text-slate-500">المستفيد</span>
-          <span className="font-bold text-[#0F2942]">{selectedBank.account_holder_name}</span>
+          <span className="text-[var(--karya-text-muted)]">المستفيد</span>
+          <span className="font-bold text-[var(--karya-primary)]">{selectedBank.account_holder_name}</span>
         </div>
 
         <div className="flex items-center justify-between gap-3 pt-1">
-          <span className="text-xs text-slate-500">رقم RIB</span>
+          <span className="text-xs text-[var(--karya-text-muted)]">رقم RIB</span>
           <button
             type="button"
             onClick={handleCopyRib}
-            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors whitespace-nowrap shrink-0 min-h-[34px] ${
+            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors whitespace-nowrap shrink-0 min-h-[36px] ${
               copiedRib
-                ? 'bg-[#0D9488] text-white'
-                : 'bg-[#0F2942] hover:bg-[#173B5E] text-white'
+                ? 'bg-emerald-700 text-white'
+                : 'bg-[var(--karya-primary)] hover:bg-[var(--karya-primary-hover)] text-white'
             }`}
           >
             {copiedRib ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
@@ -309,10 +311,10 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
 
         <div
           dir="ltr"
-          className={`rounded-xl border px-3 py-2.5 text-center font-mono-tabular text-sm font-bold tracking-wider select-all transition-colors ${
+          className={`rounded-lg border px-3 py-2.5 text-center font-mono-tabular text-sm font-bold tracking-wider select-all transition-colors ${
             copiedRib
-              ? 'border-[#0D9488] bg-teal-50 text-[#0F2942]'
-              : 'border-slate-200 bg-white text-[#0F2942]'
+              ? 'border-emerald-300 bg-emerald-50 text-[var(--karya-primary)]'
+              : 'border-[var(--karya-border)] bg-white text-[var(--karya-primary)]'
           }`}
         >
           {selectedBank.rib}
@@ -321,8 +323,8 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
 
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <Upload className="w-4 h-4 text-[#0F2942]" />
-          <h4 className="font-bold text-[#0F2942] text-sm">إرفاق وصل التحويل</h4>
+          <Upload className="w-4 h-4 text-[var(--karya-primary)]" />
+          <h4 className="font-bold text-[var(--karya-primary)] text-sm">إرفاق وصل التحويل</h4>
         </div>
 
         <input
@@ -339,7 +341,7 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
           className={`w-full min-h-[104px] rounded-xl border-2 border-dashed transition-colors p-4 flex flex-col items-center justify-center gap-1.5 text-center ${
             fileError
               ? 'border-red-400 bg-red-50/40'
-              : 'border-slate-300 bg-[#F4F6F9] hover:bg-teal-50/30 hover:border-[#0D9488]/60'
+              : 'border-slate-300 bg-[var(--karya-bg)] hover:bg-[var(--karya-action-soft)] hover:border-[var(--karya-action)]'
           }`}
         >
           {receiptFile ? (
@@ -348,25 +350,25 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
                 <img
                   src={receiptPreviewUrl}
                   alt="معاينة وصل التحويل"
-                  className="h-20 w-auto rounded-lg object-cover border border-slate-200"
+                  className="h-20 w-auto rounded-lg object-cover border border-[var(--karya-border)]"
                 />
               ) : (
-                <FileText className="w-7 h-7 text-[#0F2942]" />
+                <FileText className="w-7 h-7 text-[var(--karya-primary)]" />
               )}
-              <span className="text-xs font-bold text-[#0F2942] break-all">
+              <span className="text-xs font-bold text-[var(--karya-primary)] break-all">
                 {receiptFile.name}
               </span>
-              <span className="text-[11px] text-slate-500 font-mono-tabular">
+              <span className="text-[11px] text-[var(--karya-text-muted)] font-mono-tabular">
                 {(receiptFile.size / (1024 * 1024)).toFixed(2)} MB · انقر للتغيير
               </span>
             </div>
           ) : (
             <>
-              <Upload className="w-5 h-5 text-[#0D9488]" />
-              <span className="text-xs sm:text-sm font-bold text-[#0F2942]">
+              <Upload className="w-5 h-5 text-[var(--karya-action)]" />
+              <span className="text-xs sm:text-sm font-bold text-[var(--karya-primary)]">
                 اختر صورة أو ملف PDF للوصل
               </span>
-              <span className="text-[11px] text-slate-500">JPG, PNG, PDF — حتى 5MB</span>
+              <span className="text-[11px] text-[var(--karya-text-muted)]">JPG, PNG, PDF — حتى 5MB</span>
             </>
           )}
         </button>
@@ -374,7 +376,7 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
         {fileError && (
           <div
             role="alert"
-            className="rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-xs font-medium text-red-700 flex items-center gap-2"
+            className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs font-medium text-red-700 flex items-center gap-2"
           >
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{fileError}</span>
@@ -385,7 +387,7 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
       {errorMsg && (
         <div
           role="alert"
-          className="rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700 flex items-center gap-2"
+          className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700 flex items-center gap-2"
         >
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{errorMsg}</span>
@@ -397,7 +399,7 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
           type="button"
           disabled={submitting}
           onClick={handleConfirmPayment}
-          className="w-full min-h-[48px] rounded-xl bg-[#0D9488] hover:bg-[#0F766E] disabled:opacity-65 disabled:cursor-not-allowed text-white py-3 px-5 font-extrabold text-sm transition-colors flex items-center justify-center gap-2 shadow-md shadow-teal-600/20"
+          className="w-full min-h-[48px] rounded-lg bg-[var(--karya-action)] hover:bg-[var(--karya-action-hover)] disabled:opacity-65 disabled:cursor-not-allowed text-white py-3 px-5 font-extrabold text-sm transition-colors flex items-center justify-center gap-2 shadow-sm"
         >
           {submitting ? (
             <>
@@ -407,7 +409,7 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
           ) : (
             <>
               <span>تأكيد وإرسال الوصل</span>
-              <span dir="ltr" className="font-mono-tabular text-teal-100">
+              <span dir="ltr" className="font-mono-tabular text-sky-100">
                 ({formatDH(booking.commission_amount)})
               </span>
             </>
@@ -419,15 +421,15 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
             type="button"
             disabled={submitting}
             onClick={onBack}
-            className="w-full min-h-[38px] py-1.5 text-xs font-semibold text-slate-500 hover:text-[#0F2942] transition-colors"
+            className="w-full min-h-[40px] py-1.5 text-xs font-semibold text-[var(--karya-text-muted)] hover:text-[var(--karya-primary)] transition-colors"
           >
             العودة لتعديل البيانات
           </button>
         )}
 
-        <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-500 text-center">
-          <ShieldCheck className="w-3.5 h-3.5 text-[#0D9488] shrink-0" />
-          <span>ضمان استرجاع 100% عند تعذر تسليم السيارة</span>
+        <div className="flex items-center justify-center gap-1.5 text-[11px] text-[var(--karya-text-muted)] text-center">
+          <ShieldCheck className="w-3.5 h-3.5 text-[var(--karya-action)] shrink-0" />
+          <span>استرجاع مبلغ تأكيد الحجز وفق الإجراءات المعتمدة إذا لم تتمكن الوكالة من تسليم السيارة</span>
         </div>
       </div>
     </div>

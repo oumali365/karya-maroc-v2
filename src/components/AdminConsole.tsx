@@ -291,15 +291,15 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
 
     const lines = [
       `السلام عليكم وكالة ${b.agency_name || ''}،`,
-      `لديكم حجز مؤكد من منصة كراء بدون ضمان (0 DH):`,
+      `لديكم حجز مؤكد من منصة Karya (بدون ضمانة مالية):`,
       `• رمز الحجز: ${b.booking_code}`,
       `• السيارة: ${b.car_brand || ''} ${b.car_model || ''}`.trim(),
       `• المدة: ${b.days} أيام | موعد الاستلام: ${formattedDate}`,
       b.pickup_location ? `• مكان الاستلام: ${b.pickup_location}` : '',
       `• العميل: ${b.customer_name} | الهاتف: ${b.customer_phone}`,
       `• البطاقة الوطنية: ${b.customer_cin}${b.customer_license_number ? ` | الرخصة: ${b.customer_license_number}` : ''}`,
-      `• المبلغ المستخلص عند التسليم (90%): ${formatDH(Number(b.agency_payout_amount))}`,
-      `ملاحظة: يرجى تأكيد تسليم السيارة في بوابة الوكالات عند تسليم المفاتيح (بدون ضمان 0 DH).`,
+      `• المبلغ المتبقي عند التسليم (90%): ${formatDH(Number(b.agency_payout_amount))}`,
+      `ملاحظة: يرجى التحقق من البطاقة الوطنية ورخصة السياقة (منذ سنتين+) وتوقيع عقد الكراء الرسمي، ثم تأكيد تسليم السيارة في بوابة الوكالات.`,
     ]
       .filter(Boolean)
       .join('\n');
@@ -331,7 +331,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
   if (loading) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#2563EB]" />
+        <Loader2 className="w-8 h-8 animate-spin text-[var(--karya-primary)]" />
       </div>
     );
   }
@@ -355,14 +355,14 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
         return { label: 'مؤكد', cls: 'text-emerald-700' };
       case 'car_delivered':
       case 'completed':
-        return { label: 'تم التسليم', cls: 'text-slate-700' };
+        return { label: 'تم التسليم', cls: 'text-[var(--karya-primary)]' };
       case 'refund_requested':
         return { label: 'طلب استرجاع', cls: 'text-red-700' };
       case 'refunded':
       case 'cancelled':
         return { label: 'مسترجع / ملغى', cls: 'text-red-700' };
       default:
-        return { label: 'بانتظار الدفع', cls: 'text-slate-500' };
+        return { label: 'بانتظار الدفع', cls: 'text-[var(--karya-text-muted)]' };
     }
   };
 
@@ -379,17 +379,17 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
     <section className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-6" dir="rtl">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="text-xs text-slate-400 mb-0.5">الإدارة / مراجعة العمليات</div>
-          <h1 className="text-2xl font-bold text-slate-900">لوحة إدارة الوساطة</h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            تأكيد وصولات التسبيق، متابعة الاسترجاع، توثيق الوكالات، وإدارة الكتالوج المركزي.
+          <div className="text-xs font-semibold text-[var(--karya-text-muted)] mb-0.5">الإدارة / مراجعة العمليات</div>
+          <h1 className="text-2xl font-extrabold text-[var(--karya-primary)]">لوحة إدارة الوساطة</h1>
+          <p className="text-xs sm:text-sm text-[var(--karya-text-muted)] mt-0.5">
+            تأكيد وصولات الحجز (10%)، متابعة طلبات الاسترجاع، توثيق الوكالات، وإدارة الكتالوج المركزي.
           </p>
         </div>
 
         <button
           type="button"
           onClick={handleLogout}
-          className="self-start sm:self-auto rounded-xl border border-slate-200 bg-white hover:bg-red-50 hover:border-red-200 text-slate-600 hover:text-red-700 px-3.5 py-2 text-xs font-bold transition-colors flex items-center gap-1.5"
+          className="self-start sm:self-auto min-h-[42px] rounded-xl border border-[var(--karya-border)] bg-[var(--karya-surface)] hover:bg-red-50 hover:border-red-200 text-[var(--karya-text-muted)] hover:text-red-700 px-3.5 py-2 text-xs font-bold transition-colors flex items-center gap-1.5 shadow-xs"
         >
           <LogOut className="w-4 h-4" />
           <span>قفل الإدارة</span>
@@ -398,21 +398,21 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
 
       {/* 3-Column KPI Strip */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-5">
-          <div className="text-xs text-slate-500">عائدات المنصة المؤكدة (10%)</div>
-          <div className="font-mono-tabular font-extrabold text-2xl text-[#2563EB] mt-1">
+        <div className="bg-[var(--karya-surface)] rounded-xl border border-[var(--karya-border)] shadow-xs p-5">
+          <div className="text-xs font-semibold text-[var(--karya-text-muted)]">عائدات المنصة المؤكدة (10%)</div>
+          <div className="font-mono-tabular font-extrabold text-2xl text-[var(--karya-action)] mt-1">
             {formatDH(totalCommission)}
           </div>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-5">
-          <div className="text-xs text-slate-500">وصولات بانتظار المراجعة</div>
-          <div className="font-mono-tabular font-extrabold text-2xl text-slate-900 mt-1">
+        <div className="bg-[var(--karya-surface)] rounded-xl border border-[var(--karya-border)] shadow-xs p-5">
+          <div className="text-xs font-semibold text-[var(--karya-text-muted)]">وصولات بانتظار المراجعة</div>
+          <div className="font-mono-tabular font-extrabold text-2xl text-[var(--karya-primary)] mt-1">
             {pendingReceiptsCount}
           </div>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-5">
-          <div className="text-xs text-slate-500">الكتالوج المركزي للسيارات</div>
-          <div className="font-mono-tabular font-extrabold text-2xl text-slate-900 mt-1">
+        <div className="bg-[var(--karya-surface)] rounded-xl border border-[var(--karya-border)] shadow-xs p-5">
+          <div className="text-xs font-semibold text-[var(--karya-text-muted)]">الكتالوج المركزي للسيارات</div>
+          <div className="font-mono-tabular font-extrabold text-2xl text-[var(--karya-primary)] mt-1">
             {catalog.length} / {MAX_CATALOG_CARS}
           </div>
         </div>
@@ -425,12 +425,14 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
       )}
 
       {/* Segmented Tabs */}
-      <div className="flex flex-wrap items-center gap-1 p-1 bg-white border border-slate-200/80 rounded-xl self-start w-fit">
+      <div className="flex flex-wrap items-center gap-1 p-1 bg-[var(--karya-surface)] border border-[var(--karya-border)] rounded-xl self-start w-fit shadow-xs">
         <button
           type="button"
           onClick={() => setTab('receipts')}
-          className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 ${
-            tab === 'receipts' ? 'bg-[#2563EB] text-white' : 'text-slate-600 hover:text-slate-900'
+          className={`min-h-[40px] px-4 py-2 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 ${
+            tab === 'receipts'
+              ? 'bg-[var(--karya-primary)] text-white'
+              : 'text-[var(--karya-text-muted)] hover:text-[var(--karya-primary)]'
           }`}
         >
           <Shield className="w-3.5 h-3.5" />
@@ -440,8 +442,10 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
         <button
           type="button"
           onClick={() => setTab('payouts')}
-          className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 ${
-            tab === 'payouts' ? 'bg-[#2563EB] text-white' : 'text-slate-600 hover:text-slate-900'
+          className={`min-h-[40px] px-4 py-2 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 ${
+            tab === 'payouts'
+              ? 'bg-[var(--karya-primary)] text-white'
+              : 'text-[var(--karya-text-muted)] hover:text-[var(--karya-primary)]'
           }`}
         >
           <Wallet className="w-3.5 h-3.5" />
@@ -451,8 +455,10 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
         <button
           type="button"
           onClick={() => setTab('agencies')}
-          className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 ${
-            tab === 'agencies' ? 'bg-[#2563EB] text-white' : 'text-slate-600 hover:text-slate-900'
+          className={`min-h-[40px] px-4 py-2 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 ${
+            tab === 'agencies'
+              ? 'bg-[var(--karya-primary)] text-white'
+              : 'text-[var(--karya-text-muted)] hover:text-[var(--karya-primary)]'
           }`}
         >
           <Building2 className="w-3.5 h-3.5" />
@@ -462,8 +468,10 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
         <button
           type="button"
           onClick={() => setTab('catalog')}
-          className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 ${
-            tab === 'catalog' ? 'bg-[#2563EB] text-white' : 'text-slate-600 hover:text-slate-900'
+          className={`min-h-[40px] px-4 py-2 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 ${
+            tab === 'catalog'
+              ? 'bg-[var(--karya-primary)] text-white'
+              : 'text-[var(--karya-text-muted)] hover:text-[var(--karya-primary)]'
           }`}
         >
           <CarFront className="w-3.5 h-3.5" />
@@ -508,8 +516,8 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
                   onClick={() => setBookingFilter(f.key)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
                     bookingFilter === f.key
-                      ? 'bg-slate-900 text-white'
-                      : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900'
+                      ? 'bg-[var(--karya-primary)] text-white'
+                      : 'bg-[var(--karya-surface)] border border-[var(--karya-border)] text-[var(--karya-text-muted)] hover:text-[var(--karya-primary)]'
                   }`}
                 >
                   {f.label}
@@ -518,13 +526,13 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
             </div>
           )}
 
-          <div className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden">
+          <div className="bg-[var(--karya-surface)] rounded-xl border border-[var(--karya-border)] shadow-xs overflow-hidden">
             {bookings.length === 0 ? (
-              <div className="p-10 text-center text-sm text-slate-500">
+              <div className="p-10 text-center text-sm text-[var(--karya-text-muted)]">
                 لا توجد طلبات بانتظار المراجعة حالياً.
               </div>
             ) : (
-              <div className="divide-y divide-slate-100">
+              <div className="divide-y divide-[var(--karya-border)]">
                 {bookings
                   .filter((b) => {
                     if (bookingFilter === 'pending') return b.status === 'payment_uploaded';
@@ -556,51 +564,51 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
                       className={`p-4 space-y-3 transition-colors ${
                         b.agency_ack_status === 'unavailable'
                           ? 'bg-red-50/40'
-                          : 'hover:bg-slate-50/60'
+                          : 'hover:bg-[var(--karya-surface-muted)]'
                       }`}
                     >
                       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                         <div className="space-y-1.5 min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-mono-tabular font-bold text-slate-900">
+                            <span className="font-mono-tabular font-extrabold text-[var(--karya-primary)]">
                               {b.booking_code}
                             </span>
-                            <span className="text-slate-300">·</span>
-                            <span className="font-semibold text-slate-800">
+                            <span className="text-[var(--karya-border)]">·</span>
+                            <span className="font-bold text-[var(--karya-text)]">
                               {b.car_brand} {b.car_model}
                             </span>
-                            <span className="text-slate-300">·</span>
-                            <span className="text-xs text-slate-600 font-medium">
+                            <span className="text-[var(--karya-border)]">·</span>
+                            <span className="text-xs text-[var(--karya-text-muted)] font-medium">
                               {b.agency_name}
                               {b.agency_phone ? ` (${b.agency_phone})` : ''}
                             </span>
                             {b.reassigned_at && (
-                              <span className="rounded-full bg-blue-100 text-[#2563EB] px-2 py-0.5 text-[11px] font-bold">
+                              <span className="rounded-md bg-[var(--karya-action-soft)] text-[var(--karya-action)] px-2 py-0.5 text-[11px] font-bold">
                                 تم تحويله لوكالة بديلة
                               </span>
                             )}
                           </div>
 
-                          <div className="text-xs text-slate-600 flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <div className="text-xs text-[var(--karya-text-muted)] flex flex-wrap items-center gap-x-2 gap-y-1">
                             <span>
-                              العميل: <strong className="text-slate-900">{b.customer_name}</strong>{' '}
+                              العميل: <strong className="text-[var(--karya-primary)]">{b.customer_name}</strong>{' '}
                               (<span dir="ltr" className="font-mono">{b.customer_phone}</span>)
                             </span>
                             <span>·</span>
                             <span>
-                              البنك: <span className="font-bold">{b.selected_bank_code || 'غير محدد'}</span>
+                              البنك: <span className="font-bold text-[var(--karya-text)]">{b.selected_bank_code || 'غير محدد'}</span>
                             </span>
                             <span>·</span>
                             <span>
-                              التسبيق (10%):{' '}
-                              <span className="font-mono-tabular font-bold text-[#2563EB]">
+                              لتأكيد الحجز (10%):{' '}
+                              <span className="font-mono-tabular font-bold text-[var(--karya-action)]">
                                 {formatDH(Number(b.commission_amount))}
                               </span>
                             </span>
                             <span>·</span>
                             <span>
                               للوكالة (90%):{' '}
-                              <span className="font-mono-tabular font-bold text-slate-800">
+                              <span className="font-mono-tabular font-bold text-[var(--karya-primary)]">
                                 {formatDH(Number(b.agency_payout_amount))}
                               </span>
                             </span>
@@ -613,7 +621,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
                                   ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                   : b.agency_ack_status === 'unavailable'
                                     ? 'bg-red-100 text-red-800 border border-red-200 font-bold'
-                                    : 'bg-slate-100 text-slate-600'
+                                    : 'bg-[var(--karya-bg)] text-[var(--karya-text-muted)] border border-[var(--karya-border)]'
                               }`}
                             >
                               {b.agency_ack_status === 'available'
@@ -649,9 +657,9 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
                             <button
                               type="button"
                               onClick={() => openReceiptPreview(b.booking_code, b.receipt_url)}
-                              className="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 px-3 py-2 text-xs font-bold transition-colors inline-flex items-center gap-1.5"
+                              className="min-h-[38px] rounded-lg border border-[var(--karya-border)] bg-[var(--karya-surface)] hover:bg-[var(--karya-surface-muted)] text-[var(--karya-primary)] px-3 py-2 text-xs font-bold transition-colors inline-flex items-center gap-1.5"
                             >
-                              <FileText className="w-3.5 h-3.5 text-[#2563EB]" />
+                              <FileText className="w-3.5 h-3.5 text-[var(--karya-action)]" />
                               <span>عرض الوصل</span>
                             </button>
                           )}
@@ -660,7 +668,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
                             <button
                               type="button"
                               onClick={() => handleVerifyPayment(b.id)}
-                              className="rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-3.5 py-2 text-xs font-bold transition-colors"
+                              className="min-h-[38px] rounded-lg bg-[var(--karya-action)] hover:bg-[var(--karya-action-hover)] text-white px-3.5 py-2 text-xs font-bold transition-colors"
                             >
                               تأكيد الاستلام
                             </button>
@@ -671,9 +679,9 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
                               href={waUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 text-xs font-bold transition-colors inline-flex items-center gap-1.5"
+                              className="min-h-[38px] rounded-lg bg-[var(--karya-primary)] hover:bg-[var(--karya-primary-hover)] text-white px-3 py-2 text-xs font-bold transition-colors inline-flex items-center gap-1.5"
                             >
-                              <MessageCircle className="w-3.5 h-3.5" />
+                              <MessageCircle className="w-3.5 h-3.5 text-[var(--karya-accent)]" />
                               <span>إشعار الوكالة واتساب</span>
                             </a>
                           )}
@@ -690,10 +698,10 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
                                   setReassignTargetCarId(candidateCars[0]?.car_id || '');
                                 }
                               }}
-                              className={`rounded-xl px-3 py-2 text-xs font-bold border transition-colors inline-flex items-center gap-1.5 ${
+                              className={`min-h-[38px] rounded-lg px-3 py-2 text-xs font-bold border transition-colors inline-flex items-center gap-1.5 ${
                                 b.agency_ack_status === 'unavailable'
                                   ? 'bg-red-600 hover:bg-red-700 border-red-600 text-white'
-                                  : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
+                                  : 'bg-[var(--karya-surface)] hover:bg-[var(--karya-surface-muted)] border-[var(--karya-border)] text-[var(--karya-text)]'
                               }`}
                             >
                               <ArrowRightLeft className="w-3.5 h-3.5" />
@@ -706,7 +714,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
                               <button
                                 type="button"
                                 onClick={() => handleAllowRefund(b.id)}
-                                className="rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-900 px-3 py-2 text-xs font-bold transition-colors"
+                                className="min-h-[38px] rounded-lg border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-900 px-3 py-2 text-xs font-bold transition-colors"
                               >
                                 فتح الاسترجاع للعميل
                               </button>
@@ -717,9 +725,9 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
                       {reassignBookingId === b.id && (
                         <form
                           onSubmit={(e) => handleReassignBooking(e, b.id)}
-                          className="rounded-xl border border-blue-200 bg-blue-50/50 p-3.5 space-y-2.5"
+                          className="rounded-xl border border-[var(--karya-border)] bg-[var(--karya-action-soft)] p-3.5 space-y-2.5"
                         >
-                          <div className="text-xs font-bold text-slate-800">
+                          <div className="text-xs font-bold text-[var(--karya-primary)]">
                             تحويل الطلب {b.booking_code} إلى وكالة بديلة موثقة ({getCityLabelAr(b.car_city || '')})
                           </div>
                           {candidateCars.length === 0 ? (
@@ -732,7 +740,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
                                 required
                                 value={reassignTargetCarId}
                                 onChange={(e) => setReassignTargetCarId(e.target.value)}
-                                className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold focus:border-[#2563EB] focus:outline-none"
+                                className="flex-1 min-h-[40px] rounded-lg border border-[var(--karya-border)] bg-[var(--karya-surface)] px-3 py-2 text-xs font-semibold text-[var(--karya-text)] focus:border-[var(--karya-action)] focus:outline-none"
                               >
                                 {candidateCars.some(
                                   (c) =>
@@ -776,7 +784,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
                               <button
                                 type="submit"
                                 disabled={reassigning}
-                                className="rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] disabled:opacity-60 text-white px-4 py-2 text-xs font-bold inline-flex items-center justify-center gap-1.5"
+                                className="min-h-[40px] rounded-lg bg-[var(--karya-action)] hover:bg-[var(--karya-action-hover)] disabled:opacity-60 text-white px-4 py-2 text-xs font-bold inline-flex items-center justify-center gap-1.5"
                               >
                                 {reassigning && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                                 <span>تأكيد التحويل الآن</span>
@@ -787,7 +795,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
                                   setReassignBookingId(null);
                                   setReassignTargetCarId('');
                                 }}
-                                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600"
+                                className="min-h-[40px] rounded-lg border border-[var(--karya-border)] bg-[var(--karya-surface)] px-3 py-2 text-xs font-semibold text-[var(--karya-text-muted)]"
                               >
                                 إلغاء
                               </button>
@@ -805,33 +813,33 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
       )}
 
       {tab === 'payouts' && (
-        <div className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden">
+        <div className="bg-[var(--karya-surface)] rounded-xl border border-[var(--karya-border)] shadow-xs overflow-hidden">
           {payouts.length === 0 ? (
-            <div className="p-10 text-center text-sm text-slate-500">
-              لا توجد طلبات استرجاع تسبيق مسجلة حالياً.
+            <div className="p-10 text-center text-sm text-[var(--karya-text-muted)]">
+              لا توجد طلبات استرجاع مسجلة حالياً.
             </div>
           ) : (
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-[var(--karya-border)]">
               {payouts.map((p) => (
                 <div
                   key={p.id}
-                  className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-slate-50/60 transition-colors"
+                  className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-[var(--karya-surface-muted)] transition-colors"
                 >
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900">استرجاع التسبيق للعميل</span>
-                      <span className="text-slate-400">·</span>
-                      <span className="text-sm text-slate-700">{p.recipient_name}</span>
+                      <span className="font-bold text-[var(--karya-primary)]">استرجاع مبلغ تأكيد الحجز للعميل</span>
+                      <span className="text-[var(--karya-text-muted)]">·</span>
+                      <span className="text-sm text-[var(--karya-text)]">{p.recipient_name}</span>
                     </div>
-                    <div className="text-xs text-slate-500 flex flex-wrap items-center gap-2">
+                    <div className="text-xs text-[var(--karya-text-muted)] flex flex-wrap items-center gap-2">
                       <span>{p.recipient_bank}</span>
-                      <span dir="ltr" className="font-mono text-slate-800">
+                      <span dir="ltr" className="font-mono text-[var(--karya-text)]">
                         {p.recipient_rib}
                       </span>
                       <button
                         type="button"
                         onClick={() => copyText(p.id, p.recipient_rib)}
-                        className="inline-flex items-center gap-1 text-[#2563EB] font-semibold hover:underline"
+                        className="inline-flex items-center gap-1 text-[var(--karya-action)] font-semibold hover:underline"
                       >
                         {copiedId === p.id ? (
                           <Check className="w-3 h-3" />
@@ -844,14 +852,14 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <span className="font-mono-tabular font-bold text-base text-[#2563EB]">
+                    <span className="font-mono-tabular font-extrabold text-base text-[var(--karya-primary)]">
                       {formatDH(Number(p.amount))}
                     </span>
                     {p.status === 'pending' ? (
                       <button
                         type="button"
                         onClick={() => handleMarkPayoutSent(p.id)}
-                        className="rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-3.5 py-2 text-xs font-bold transition-colors"
+                        className="min-h-[38px] rounded-lg bg-[var(--karya-action)] hover:bg-[var(--karya-action-hover)] text-white px-3.5 py-2 text-xs font-bold transition-colors"
                       >
                         تأكيد إرسال الاسترجاع
                       </button>
@@ -884,22 +892,22 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
             </div>
           )}
 
-          <div className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden">
+          <div className="bg-[var(--karya-surface)] rounded-xl border border-[var(--karya-border)] shadow-xs overflow-hidden">
             {agencies.length === 0 ? (
-              <div className="p-10 text-center text-sm text-slate-500">
+              <div className="p-10 text-center text-sm text-[var(--karya-text-muted)]">
                 لا توجد وكالات مسجلة للمراجعة حالياً.
               </div>
             ) : (
-              <div className="divide-y divide-slate-100">
+              <div className="divide-y divide-[var(--karya-border)]">
                 {agencies.map((ag) => (
                   <div
                     key={ag.id}
-                    className="p-4 space-y-3 hover:bg-slate-50/60 transition-colors"
+                    className="p-4 space-y-3 hover:bg-[var(--karya-surface-muted)] transition-colors"
                   >
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                       <div className="space-y-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-bold text-slate-900">
+                          <span className="font-extrabold text-[var(--karya-primary)]">
                             {ag.name} · {getCityLabelAr(ag.city)}
                           </span>
                           <span
@@ -918,14 +926,14 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
                                 : 'قيد المراجعة'}
                           </span>
                         </div>
-                        <div className="text-xs text-slate-500 flex flex-wrap items-center gap-2">
+                        <div className="text-xs text-[var(--karya-text-muted)] flex flex-wrap items-center gap-2">
                           <span>
-                            الهاتف: <span dir="ltr" className="font-mono text-slate-800">{ag.phone}</span>
+                            الهاتف: <span dir="ltr" className="font-mono text-[var(--karya-text)]">{ag.phone}</span>
                           </span>
                           <span>·</span>
                           <span className={ag.terms_accepted_at ? 'text-emerald-700 font-semibold' : 'text-amber-700'}>
                             {ag.terms_accepted_at
-                              ? 'موافق على: بدون ضمان (0 DH) + عمولة 10%'
+                              ? 'موافق على: بدون ضمانة مالية + عمولة 10%'
                               : 'إقرار قديم'}
                           </span>
                           {(ag.strike_count ?? 0) > 0 && (
@@ -953,16 +961,16 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
                               setResetError(null);
                             }
                           }}
-                          className="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 px-3 py-1.5 text-xs font-semibold transition-colors inline-flex items-center gap-1.5"
+                          className="min-h-[38px] rounded-lg border border-[var(--karya-border)] bg-[var(--karya-surface)] hover:bg-[var(--karya-bg)] text-[var(--karya-text)] px-3 py-1.5 text-xs font-semibold transition-colors inline-flex items-center gap-1.5"
                         >
-                          <KeyRound className="w-3.5 h-3.5 text-[#2563EB]" />
+                          <KeyRound className="w-3.5 h-3.5 text-[var(--karya-action)]" />
                           <span>إعادة تعيين الرمز</span>
                         </button>
                         {ag.verification_status !== 'verified' ? (
                           <button
                             type="button"
                             onClick={() => handleVerifyAgency(ag.id, 'verified')}
-                            className="rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-4 py-2 text-xs font-bold transition-colors"
+                            className="min-h-[38px] rounded-lg bg-[var(--karya-action)] hover:bg-[var(--karya-action-hover)] text-white px-4 py-2 text-xs font-bold transition-colors"
                           >
                             توثيق الوكالة
                           </button>
@@ -970,7 +978,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
                           <button
                             type="button"
                             onClick={() => handleVerifyAgency(ag.id, 'suspended')}
-                            className="rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 px-3 py-1.5 text-xs font-semibold transition-colors"
+                            className="min-h-[38px] rounded-lg border border-[var(--karya-border)] hover:bg-[var(--karya-bg)] text-[var(--karya-text-muted)] px-3 py-1.5 text-xs font-semibold transition-colors"
                           >
                             إيقاف مؤقت
                           </button>
@@ -981,9 +989,9 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
                     {resetAgencyId === ag.id && (
                       <form
                         onSubmit={(e) => handleResetAgencyPin(e, ag)}
-                        className="rounded-xl border border-blue-200 bg-blue-50/50 p-3 space-y-2.5"
+                        className="rounded-xl border border-[var(--karya-border)] bg-[var(--karya-action-soft)] p-3 space-y-2.5"
                       >
-                        <div className="text-xs font-semibold text-slate-800">
+                        <div className="text-xs font-semibold text-[var(--karya-primary)]">
                           إدخال رمز سري مؤقت جديد للوكالة ({ag.phone})
                         </div>
                         <div className="flex flex-col sm:flex-row gap-2">
@@ -995,12 +1003,12 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
                             placeholder="مثال: 4820"
                             value={resetPinValue}
                             onChange={(e) => setResetPinValue(e.target.value)}
-                            className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-mono focus:border-[#2563EB] focus:outline-none"
+                            className="flex-1 min-h-[40px] rounded-lg border border-[var(--karya-border)] bg-[var(--karya-surface)] px-3 py-2 text-sm font-mono text-[var(--karya-text)] focus:border-[var(--karya-action)] focus:outline-none"
                           />
                           <button
                             type="submit"
                             disabled={resettingPin}
-                            className="rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] disabled:opacity-60 text-white px-4 py-2 text-xs font-bold inline-flex items-center justify-center gap-1.5"
+                            className="min-h-[40px] rounded-lg bg-[var(--karya-action)] hover:bg-[var(--karya-action-hover)] disabled:opacity-60 text-white px-4 py-2 text-xs font-bold inline-flex items-center justify-center gap-1.5"
                           >
                             {resettingPin && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                             <span>حفظ الرمز المؤقت</span>
@@ -1012,7 +1020,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
                               setResetPinValue('');
                               setResetError(null);
                             }}
-                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600"
+                            className="min-h-[40px] rounded-lg border border-[var(--karya-border)] bg-[var(--karya-surface)] px-3 py-2 text-xs font-semibold text-[var(--karya-text-muted)]"
                           >
                             إلغاء
                           </button>
@@ -1036,32 +1044,32 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
 
       {receiptPreview && (
         <div
-          className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-[#173B57]/70 backdrop-blur-xs flex items-center justify-center p-4"
           dir="rtl"
           role="dialog"
           aria-modal="true"
         >
-          <div className="bg-white rounded-2xl max-w-2xl w-full overflow-hidden shadow-2xl border border-slate-200">
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100">
-              <div className="font-bold text-sm text-slate-900">
+          <div className="bg-[var(--karya-surface)] rounded-xl max-w-2xl w-full overflow-hidden shadow-2xl border border-[var(--karya-border)]">
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--karya-border)]">
+              <div className="font-extrabold text-sm text-[var(--karya-primary)]">
                 وصل التحويل البنكي — {receiptPreview.bookingCode}
               </div>
               <button
                 type="button"
                 onClick={() => setReceiptPreview(null)}
                 aria-label="إغلاق المعاينة"
-                className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                className="p-1.5 rounded-lg text-[var(--karya-text-muted)] hover:bg-[var(--karya-bg)] hover:text-[var(--karya-primary)]"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="p-4 bg-slate-50 flex flex-col items-center justify-center gap-3 max-h-[75vh] overflow-auto">
+            <div className="p-4 bg-[var(--karya-bg)] flex flex-col items-center justify-center gap-3 max-h-[75vh] overflow-auto">
               {receiptPreview.isPdf ? (
                 <a
                   href={receiptPreview.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-5 py-2.5 text-sm font-bold inline-flex items-center gap-2"
+                  className="rounded-xl bg-[var(--karya-action)] hover:bg-[var(--karya-action-hover)] text-white px-5 py-2.5 text-sm font-bold inline-flex items-center gap-2"
                 >
                   <FileText className="w-4 h-4" />
                   <span>فتح ملف الوصل (PDF)</span>
@@ -1070,14 +1078,14 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
                 <img
                   src={receiptPreview.url}
                   alt={`وصل التحويل ${receiptPreview.bookingCode}`}
-                  className="max-h-[65vh] w-auto rounded-xl object-contain border border-slate-200 bg-white"
+                  className="max-h-[65vh] w-auto rounded-xl object-contain border border-[var(--karya-border)] bg-[var(--karya-surface)]"
                 />
               )}
               <a
                 href={receiptPreview.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs font-semibold text-[#2563EB] hover:underline"
+                className="text-xs font-semibold text-[var(--karya-action)] hover:underline"
               >
                 فتح في نافذة مستقلة
               </a>
@@ -1222,30 +1230,30 @@ const AdminCatalogManager: React.FC<{
       {/* Add Catalog Model Form */}
       <form
         onSubmit={handleAddModel}
-        className="bg-white rounded-2xl border border-slate-200/80 p-5 space-y-4"
+        className="bg-[var(--karya-surface)] rounded-xl border border-[var(--karya-border)] shadow-xs p-5 space-y-4"
       >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h2 className="font-bold text-slate-900">إضافة سيارة اقتصادية للكتالوج المركزي</h2>
-            <p className="text-xs text-slate-500">
+            <h2 className="font-extrabold text-[var(--karya-primary)]">إضافة سيارة اقتصادية للكتالوج المركزي</h2>
+            <p className="text-xs text-[var(--karya-text-muted)]">
               الكتالوج يضم من 30 إلى {MAX_CATALOG_CARS} صورة عالية الجودة تختار منها الوكالات سياراتها
             </p>
           </div>
-          <span className="font-mono-tabular text-xs font-bold text-[#2563EB]">
+          <span className="font-mono-tabular text-xs font-bold text-[var(--karya-action)]">
             {catalog.length} / {MAX_CATALOG_CARS}
           </span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">الشركة (Brand)</label>
+            <label className="block text-xs font-semibold text-[var(--karya-text)] mb-1">الشركة (Brand)</label>
             <input
               required
               list="known-economic-brands"
               value={brand}
               onChange={(e) => setBrand(e.target.value)}
               placeholder="Dacia, Renault, Peugeot..."
-              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+              className="w-full min-h-[42px] rounded-lg border border-[var(--karya-border)] px-3 py-2 text-sm text-[var(--karya-text)] focus:border-[var(--karya-action)] focus:outline-none"
             />
             <datalist id="known-economic-brands">
               {KNOWN_ECONOMIC_BRANDS.map((b) => (
@@ -1255,22 +1263,22 @@ const AdminCatalogManager: React.FC<{
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">الموديل (Model)</label>
+            <label className="block text-xs font-semibold text-[var(--karya-text)] mb-1">الموديل (Model)</label>
             <input
               required
               value={model}
               onChange={(e) => setModel(e.target.value)}
               placeholder="Sandero Stepway, Clio 5..."
-              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+              className="w-full min-h-[42px] rounded-lg border border-[var(--karya-border)] px-3 py-2 text-sm text-[var(--karya-text)] focus:border-[var(--karya-action)] focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">الفئة</label>
+            <label className="block text-xs font-semibold text-[var(--karya-text)] mb-1">الفئة</label>
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white"
+              className="w-full min-h-[42px] rounded-lg border border-[var(--karya-border)] px-3 py-2 text-sm text-[var(--karya-text)] bg-[var(--karya-surface)] focus:border-[var(--karya-action)] focus:outline-none"
             >
               <option value="Économique">اقتصادية (Économique)</option>
               <option value="Citadine">مدينية صغيرة (Citadine)</option>
@@ -1280,23 +1288,23 @@ const AdminCatalogManager: React.FC<{
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">المقاعد</label>
+            <label className="block text-xs font-semibold text-[var(--karya-text)] mb-1">المقاعد</label>
             <input
               type="number"
               min={2}
               max={9}
               value={seats}
               onChange={(e) => setSeats(Number(e.target.value))}
-              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-mono-tabular"
+              className="w-full min-h-[42px] rounded-lg border border-[var(--karya-border)] px-3 py-2 text-sm font-mono-tabular text-[var(--karya-text)] focus:border-[var(--karya-action)] focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">الوقود الافتراضي</label>
+            <label className="block text-xs font-semibold text-[var(--karya-text)] mb-1">الوقود الافتراضي</label>
             <select
               value={defaultFuel}
               onChange={(e) => setDefaultFuel(e.target.value as FuelType)}
-              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white"
+              className="w-full min-h-[42px] rounded-lg border border-[var(--karya-border)] px-3 py-2 text-sm text-[var(--karya-text)] bg-[var(--karya-surface)] focus:border-[var(--karya-action)] focus:outline-none"
             >
               <option value="diesel">ديزل</option>
               <option value="essence">بنزين</option>
@@ -1305,11 +1313,11 @@ const AdminCatalogManager: React.FC<{
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">ناقل الحركة</label>
+            <label className="block text-xs font-semibold text-[var(--karya-text)] mb-1">ناقل الحركة</label>
             <select
               value={defaultTransmission}
               onChange={(e) => setDefaultTransmission(e.target.value as TransmissionType)}
-              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white"
+              className="w-full min-h-[42px] rounded-lg border border-[var(--karya-border)] px-3 py-2 text-sm text-[var(--karya-text)] bg-[var(--karya-surface)] focus:border-[var(--karya-action)] focus:outline-none"
             >
               <option value="manual">يدوي</option>
               <option value="automatic">أوتوماتيك</option>
@@ -1317,7 +1325,7 @@ const AdminCatalogManager: React.FC<{
           </div>
 
           <div className="sm:col-span-2">
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
+            <label className="block text-xs font-semibold text-[var(--karya-text)] mb-1">
               صورة الموديل (رفع صورة أو رابط URL)
             </label>
             <div className="flex items-center gap-2">
@@ -1327,7 +1335,7 @@ const AdminCatalogManager: React.FC<{
                 placeholder="https://... (اختياري إذا تم رفع ملف)"
                 value={imageUrlInput}
                 onChange={(e) => setImageUrlInput(e.target.value)}
-                className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-xs font-mono"
+                className="flex-1 min-h-[42px] rounded-lg border border-[var(--karya-border)] px-3 py-2 text-xs font-mono text-[var(--karya-text)] focus:border-[var(--karya-action)] focus:outline-none"
               />
               <input
                 ref={fileRef}
@@ -1340,9 +1348,9 @@ const AdminCatalogManager: React.FC<{
                 type="button"
                 disabled={compressing}
                 onClick={() => fileRef.current?.click()}
-                className="rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 flex items-center gap-1.5 shrink-0"
+                className="min-h-[42px] rounded-lg border border-[var(--karya-border)] bg-[var(--karya-surface-muted)] hover:bg-[var(--karya-bg)] px-3 py-2 text-xs font-bold text-[var(--karya-text)] flex items-center gap-1.5 shrink-0 transition-colors"
               >
-                <Upload className="w-3.5 h-3.5" />
+                <Upload className="w-3.5 h-3.5 text-[var(--karya-text-muted)]" />
                 <span>{imagePreview ? 'تغيير الصورة' : 'رفع صورة'}</span>
               </button>
             </div>
@@ -1364,7 +1372,7 @@ const AdminCatalogManager: React.FC<{
           <button
             type="submit"
             disabled={saving || compressing || catalog.length >= MAX_CATALOG_CARS}
-            className="rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] disabled:opacity-60 text-white px-5 py-2.5 text-xs font-bold flex items-center gap-1.5"
+            className="min-h-[42px] rounded-xl bg-[var(--karya-action)] hover:bg-[var(--karya-action-hover)] disabled:opacity-60 text-white px-5 py-2.5 text-xs font-bold flex items-center gap-1.5 transition-colors"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
             <span>إضافة للكتالوج</span>
@@ -1378,10 +1386,10 @@ const AdminCatalogManager: React.FC<{
           <button
             type="button"
             onClick={() => setBrandFilter('all')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${
               brandFilter === 'all'
-                ? 'bg-[#2563EB] text-white'
-                : 'bg-white border border-slate-200 text-slate-700'
+                ? 'bg-[var(--karya-primary)] text-white'
+                : 'bg-[var(--karya-surface)] border border-[var(--karya-border)] text-[var(--karya-text-muted)] hover:text-[var(--karya-primary)]'
             }`}
           >
             كل الشركات ({catalog.length})
@@ -1391,10 +1399,10 @@ const AdminCatalogManager: React.FC<{
               key={b}
               type="button"
               onClick={() => setBrandFilter(b)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${
                 brandFilter === b
-                  ? 'bg-[#2563EB] text-white'
-                  : 'bg-white border border-slate-200 text-slate-700'
+                  ? 'bg-[var(--karya-primary)] text-white'
+                  : 'bg-[var(--karya-surface)] border border-[var(--karya-border)] text-[var(--karya-text-muted)] hover:text-[var(--karya-primary)]'
               }`}
             >
               {b}
@@ -1406,9 +1414,9 @@ const AdminCatalogManager: React.FC<{
           {filtered.map((item) => (
             <div
               key={item.id}
-              className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden flex flex-col"
+              className="bg-[var(--karya-surface)] rounded-xl border border-[var(--karya-border)] shadow-xs overflow-hidden flex flex-col"
             >
-              <div className="aspect-[4/3] bg-slate-100">
+              <div className="aspect-[16/10] bg-[var(--karya-surface-muted)]">
                 <img
                   src={item.image_url}
                   alt={`${item.brand} ${item.model}`}
@@ -1417,10 +1425,10 @@ const AdminCatalogManager: React.FC<{
               </div>
               <div className="p-3.5 flex items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="text-xs font-bold text-slate-900 truncate">
+                  <div className="text-xs font-bold text-[var(--karya-primary)] truncate">
                     {item.brand} {item.model}
                   </div>
-                  <div className="text-[11px] text-slate-500 truncate">
+                  <div className="text-[11px] text-[var(--karya-text-muted)] truncate">
                     {item.category} · {item.seats} مقاعد
                   </div>
                 </div>
@@ -1428,7 +1436,7 @@ const AdminCatalogManager: React.FC<{
                   type="button"
                   onClick={() => handleDeleteModel(item)}
                   aria-label={`حذف ${item.brand} ${item.model}`}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors shrink-0"
+                  className="p-1.5 rounded-lg text-[var(--karya-text-muted)] hover:text-red-600 hover:bg-red-50 transition-colors shrink-0"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>

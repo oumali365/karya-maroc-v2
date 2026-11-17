@@ -62,56 +62,75 @@ interface AgencyReviewItem {
 
 const DEFAULT_AGENCY_REVIEWS: AgencyReviewItem[] = [
   {
-    id: 'rev-atlas-casa',
-    agencyName: 'أطلس كار الدار البيضاء',
+    id: 'rev-vite-casa',
+    agencyName: 'Vite Car',
     city: 'Casablanca',
     rating: 4.9,
-    ratingCount: 42,
-    reviewerName: 'يوسف م.',
+    ratingCount: 0,
+    reviewerName: 'نموذج تجربة زبون — يوسف م.',
     carLabel: 'Dacia Duster',
     comment:
-      'استلام سريع في الموعد وسيارة نظيفة جداً. أجمل ما في التجربة هو الكراء بدون شيك ضمان ووضوح السعر منذ البداية.',
+      'تم تأكيد الحجز بسهولة بدفع 10% فقط، واستلام السيارة بدون تقديم شيك ضمان أو ترك مبلغ مالي كضمانة.',
+    isLiveVerified: false,
   },
   {
-    id: 'rev-nakhil-marrakech',
-    agencyName: 'نخيل موبيليتي مراكش',
-    city: 'Marrakech',
+    id: 'rev-carspeed-casa',
+    agencyName: 'Car Speed',
+    city: 'Casablanca',
     rating: 4.9,
-    ratingCount: 58,
-    reviewerName: 'سلمى ر.',
+    ratingCount: 0,
+    reviewerName: 'نموذج تجربة زبون — سلمى ر.',
     carLabel: 'Renault Clio 5',
     comment:
-      'تعامل احترافي وشفاف؛ دفعت 10% فقط لتثبيت الحجز والباقي بعد معاينة السيارة وتوقيع العقد الرسمي عند التسليم.',
+      'تعامل احترافي، معاينة السيارة قبل دفع المبلغ المتبقي (90%)، وتوضيح جميع شروط الكراء منذ البداية مع توقيع العقد الرسمي.',
+    isLiveVerified: false,
   },
   {
-    id: 'rev-boughaz-tangier',
-    agencyName: 'البوغاز كار طنجة',
-    city: 'Tangier',
+    id: 'rev-atlas-casa',
+    agencyName: 'أطلس كار',
+    city: 'Marrakech',
     rating: 4.8,
-    ratingCount: 34,
-    reviewerName: 'أمين ب.',
+    ratingCount: 0,
+    reviewerName: 'نموذج تجربة زبون — أمين ب.',
     carLabel: 'Volkswagen Polo',
     comment:
-      'أول مرة أستأجر سيارة في المغرب بدون تجميد كفالة أو بطاقة دولية. الوكالة كانت متعاونة طوال مدة السفر.',
+      'استلام في الموعد المحدد وسيارة نظيفة. لم يُطلب مني ترك مبلغ مالي كضمانة أو حجز مبلغ من بطاقتي البنكية.',
+    isLiveVerified: false,
   },
 ];
 
 const CUSTOMER_FAQS = [
   {
-    q: 'كيف أسترجع مبلغ التسبيق (10%) إذا اعتذرت الوكالة أو تعذر التسليم؟',
-    a: 'إذا اعتذرت الوكالة أو لم تلتزم بموعد التسليم، يُفتح لك تلقائياً زر «طلب استرجاع التسبيق» في صفحة «حجوزاتي» لاسترجاع 100% من تسبيقك إلى رقم هاتفك أو حسابك البنكي خلال ساعات، كما تعمل الإدارة على توفير سيارة بديلة في مدينتك إذا رغبت.',
+    q: 'كيف أسترجع المبلغ الذي دفعته إذا اعتذرت الوكالة أو لم تتمكن من تسليم السيارة؟',
+    a: 'إذا اعتذرت الوكالة عن توفير السيارة أو لم تتمكن من تسليمها في الموعد المتفق عليه، يمكنك طلب استرجاع المبلغ الذي دفعته لتأكيد الحجز (10%) من صفحة «حجوزاتي». سيتم مراجعة طلبك وإرجاع المبلغ كاملاً وفق إجراءات الاسترجاع المعتمدة، إلى رقم هاتفك أو حسابك البنكي. ويمكن لفريق Karya مساعدتك في إيجاد سيارة بديلة في نفس المدينة إذا رغبت في ذلك.',
   },
   {
-    q: 'متى أدفع المبلغ المتبقي (90%) وهل أعاين السيارة أولاً؟',
-    a: 'تدفع عبر المنصة 10% فقط لتأكيد جدية الحجز وحماية حقك، أما 90% المتبقية فتدفعها مباشرة للوكالة عند معاينة السيارة وتوقيع عقد الكراء الرسمي واستلام المفاتيح.',
+    q: 'متى أدفع المبلغ المتبقي؟ وهل يمكنني معاينة السيارة قبل الدفع؟',
+    a: 'تدفع 10% فقط عبر Karya لتأكيد الحجز، وهي جزء من السعر الإجمالي للكراء وليست رسماً إضافياً. أما المبلغ المتبقي (90%) فتدفعه مباشرة للوكالة عند استلام السيارة، بعد معاينتها والتأكد من حالتها وتوقيع عقد الكراء.',
   },
   {
-    q: 'ما هي الوثائق المطلوبة عند الاستلام وهل أحتاج إلى شيك ضمان؟',
-    a: 'لا يُطلب منك لا شيك ضمان ولا بطاقة ائتمان دولية ولا تجميد أي كفالة (0 DH). يكفي إحضار البطاقة الوطنية (CIN) ورخصة سياقة سارية المفعول بأقدمية سنتين على الأقل.',
+    q: 'هل أحتاج إلى شيك ضمان أو ترك مبلغ مالي لدى الوكالة؟',
+    a: 'لا. في عروض Karya التي تعتمد هذه الخدمة، لا تحتاج إلى تقديم شيك ضمان أو ترك مبلغ مالي كضمانة لدى الوكالة، كما لا يتم حجز مبلغ مالي من بطاقتك البنكية كضمان. تحتاج فقط إلى: البطاقة الوطنية، ورخصة سياقة سارية المفعول، ويجب أن تكون لديك منذ سنتين على الأقل.',
   },
   {
-    q: 'كيف أتابع حالة حجزي بعد إرسال وصل التحويل؟',
-    a: 'من صفحة «حجوزاتي» يمكنك متابعة حالة طلبك لحظة بلحظة عبر رمز الحجز (KRY-...) ورقم هاتفك المسجل فقط، دون الحاجة إلى إنشاء حساب أو كلمة مرور.',
+    q: 'ما هي شروط الكراء عبر المنصة؟',
+    a: 'لإتمام الحجز، يجب توفر: البطاقة الوطنية، رخصة سياقة منذ سنتين على الأقل، ومدة كراء لا تقل عن 3 أيام، مع مطابقة الوثائق عند الاستلام للبيانات المسجلة.',
+  },
+  {
+    q: 'هل أوقّع عقد الكراء مع الوكالة؟',
+    a: 'نعم. عند استلام السيارة، توقّع عقد الكراء الرسمي مع الوكالة وتقدّم الوثائق المطلوبة بشكل عادي. عدم طلب شيك ضمان أو ضمانة مالية لا يعني الاستغناء عن العقد الرسمي أو الالتزام القانوني بشروط الكراء.',
+  },
+  {
+    q: 'كيف أتابع حالة حجزي بعد إرسال وصل الدفع؟',
+    a: 'يمكنك متابعة حالة حجزك من صفحة «حجوزاتي» باستخدام رمز الحجز ورقم الهاتف المسجل، دون الحاجة إلى إنشاء حساب أو كلمة مرور.',
+  },
+  {
+    q: 'ماذا لو وصلت إلى الوكالة وكانت السيارة غير مطابقة أو غير جاهزة؟',
+    a: 'يمكنك التواصل فوراً مع دعم Karya عبر زر المساعدة أو الواتساب، وسنساعدك في متابعة الطلب مع الوكالة، أو البحث عن بديل مناسب، أو معالجة طلب استرجاع المبلغ الذي دفعته لتأكيد الحجز وفق شروط المنصة.',
+  },
+  {
+    q: 'ماذا يحدث إذا لم أحضر في الموعد أو لم تستوفِ رخصتي الشرط المطلوب؟',
+    a: 'إذا لم تحضر في الموعد المتفق عليه أو تبيّن عند الاستلام أن رخصة السياقة لا تستوفي شرط السنتين على الأقل، قد يحق للوكالة رفض تسليم السيارة وتسجيل عدم التزام الزبون دون استرجاع مبلغ تأكيد الحجز (10%).',
   },
 ];
 
@@ -308,9 +327,9 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
               rating: Number.isFinite(ratingVal) && ratingVal > 0 ? ratingVal : 5,
               ratingCount: Number.isFinite(countVal) ? countVal : 0,
               reviewerName: 'تقييم عملاء المنصة',
-              carLabel: 'خدمة تسليم بدون ضمان 0 DH',
+              carLabel: 'كراء بدون ضمانة مالية',
               comment:
-                'وكالة موثقة في شبكة Karya ملتزمة بالتسليم في الموعد، أسعار واضحة، وكراء بدون كفالة مالية.',
+                'وكالة موثقة في شبكة Karya ملتزمة بالتسليم في الموعد، وبشروط واضحة بدون ضمانة مالية.',
               isLiveVerified: true,
             };
           });
@@ -376,12 +395,12 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
   }, [cars, brandFilter]);
 
   const fieldClasses =
-    'w-full min-h-[50px] rounded-xl bg-[#F4F6F9] border border-slate-200 px-3.5 py-2.5 text-sm font-bold text-[#0F2942] transition-colors focus:bg-white focus:border-[#0D9488] focus:outline-none focus:ring-2 focus:ring-[#0D9488]/20';
+    'w-full min-h-[50px] rounded-lg bg-[var(--karya-bg)] border border-[var(--karya-border)] px-3.5 py-2.5 text-sm font-bold text-[var(--karya-text)] transition-colors focus:bg-white focus:border-[var(--karya-action)] focus:outline-none focus:ring-2 focus:ring-[var(--karya-action)]/15';
 
   return (
-    <div dir="rtl" className="bg-[#F4F6F9] min-h-screen">
+    <div dir="rtl" className="bg-[var(--karya-bg)] min-h-screen">
       {/* ===================== SCREEN 1: HERO ===================== */}
-      <section className="relative w-full overflow-hidden bg-[#0F2942] min-h-[340px] sm:min-h-[410px] flex flex-col justify-end pb-24 sm:pb-28">
+      <section className="relative w-full overflow-hidden bg-[var(--karya-primary)] min-h-[350px] sm:min-h-[420px] flex flex-col justify-end pb-24 sm:pb-28">
         <img
           src={HERO_IMAGE_URL}
           alt="سيارة كراء في الطريق الساحلي المغربي"
@@ -389,25 +408,24 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
           className="absolute inset-0 w-full h-full object-cover"
         />
         <div
-          className="absolute inset-0 bg-gradient-to-t from-[#0F2942]/95 via-[#0F2942]/65 to-[#0F2942]/30"
+          className="absolute inset-0 bg-gradient-to-t from-[#173B57]/95 via-[#173B57]/60 to-[#173B57]/20"
           aria-hidden="true"
         />
 
         <div className="relative z-10 w-full max-w-6xl mx-auto px-4 sm:px-6 pt-10 space-y-3">
           <div className="max-w-2xl space-y-2.5">
-            <h1 className="text-2xl sm:text-4xl font-extrabold text-white leading-[1.25] [text-wrap:balance]">
-              اكري سيارتك بالمغرب بدون ضمان وبأفضل سعر
+            <h1 className="text-2xl sm:text-4xl font-extrabold text-white leading-[1.28] [text-wrap:balance]">
+              اكري سيارتك في المغرب بسهولة، بدون ضمانة مالية وبأسعار مناسبة.
             </h1>
-            <p className="text-slate-200 text-sm sm:text-base leading-relaxed font-normal">
-              سيارات اقتصادية من وكالات محلية موثوقة ·{' '}
-              <span className="font-bold text-white">0 درهم كفالة</span> · تثبيت فوري بـ{' '}
-              <span className="font-bold text-white">10% تسبيق</span> فقط.
+            <p className="text-slate-100/90 text-sm sm:text-base leading-relaxed font-normal">
+              اعثر على سيارة للكراء لدى وكالات محلية. ادفع{' '}
+              <span className="font-bold text-white">10% فقط لتأكيد الحجز</span>، والباقي عند استلام السيارة.
             </p>
           </div>
 
-          <p className="flex items-center gap-2 text-xs text-slate-200">
-            <ShieldCheck className="w-4 h-4 text-[#2DD4BF] shrink-0" aria-hidden="true" />
-            <span>يشترط أقدمية رخصة السياقة سنتين على الأقل · الحد الأدنى للكراء 3 أيام</span>
+          <p className="flex items-center gap-2 text-xs text-slate-100">
+            <ShieldCheck className="w-4 h-4 text-[var(--karya-accent)] shrink-0" aria-hidden="true" />
+            <span>رخصة سياقة منذ سنتين على الأقل · كراء ابتداءً من 3 أيام</span>
           </p>
         </div>
       </section>
@@ -416,19 +434,19 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
       <div className="relative z-20 max-w-5xl mx-auto px-4 sm:px-6 -mt-16 sm:-mt-20">
         <form
           onSubmit={handleDiscoverClick}
-          className="bg-white rounded-2xl shadow-xl shadow-[#0F2942]/10 border border-slate-100 p-4 sm:p-6 space-y-4"
+          className="bg-[var(--karya-surface)] rounded-xl shadow-[0_12px_32px_-8px_rgba(23,59,87,0.14)] border border-[var(--karya-border)] p-4 sm:p-6 space-y-4"
           aria-label="بحث عن سيارة للإيجار"
         >
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
             <div>
               <label
                 htmlFor="hero-city-select"
-                className="block text-xs font-bold text-[#0F2942] mb-1.5"
+                className="block text-xs font-bold text-[var(--karya-primary)] mb-1.5"
               >
-                مدينة الاستلام
+                مدينة استلام السيارة
               </label>
               <div className="relative">
-                <MapPin className="w-4 h-4 text-[#0D9488] absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <MapPin className="w-4 h-4 text-[var(--karya-action)] absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <select
                   id="hero-city-select"
                   value={selectedCity}
@@ -441,19 +459,19 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
                     </option>
                   ))}
                 </select>
-                <ChevronDown className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <ChevronDown className="w-4 h-4 text-[var(--karya-text-muted)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
             </div>
 
             <div>
               <label
                 htmlFor="hero-pickup-date"
-                className="block text-xs font-bold text-[#0F2942] mb-1.5"
+                className="block text-xs font-bold text-[var(--karya-primary)] mb-1.5"
               >
-                تاريخ الاستلام
+                تاريخ استلام السيارة
               </label>
               <div className="relative">
-                <Calendar className="w-4 h-4 text-[#0F2942]/60 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <Calendar className="w-4 h-4 text-[var(--karya-text-muted)] absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   id="hero-pickup-date"
                   type="date"
@@ -468,12 +486,12 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
             <div>
               <label
                 htmlFor="hero-days"
-                className="block text-xs font-bold text-[#0F2942] mb-1.5"
+                className="block text-xs font-bold text-[var(--karya-primary)] mb-1.5"
               >
-                مدة الكراء (الأيام)
+                مدة الكراء
               </label>
               <div className="relative">
-                <Clock className="w-4 h-4 text-[#0F2942]/60 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <Clock className="w-4 h-4 text-[var(--karya-text-muted)] absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <select
                   id="hero-days"
                   value={searchDays}
@@ -486,18 +504,22 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
                     </option>
                   ))}
                 </select>
-                <ChevronDown className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <ChevronDown className="w-4 h-4 text-[var(--karya-text-muted)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
             </div>
           </div>
 
           <button
             type="submit"
-            className="w-full min-h-[50px] rounded-xl bg-[#0D9488] hover:bg-[#0F766E] active:scale-[0.99] text-white px-6 py-3 font-extrabold text-sm sm:text-base shadow-md shadow-teal-600/20 transition-all flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] focus-visible:ring-offset-2"
+            className="w-full min-h-[50px] rounded-lg bg-[var(--karya-action)] hover:bg-[var(--karya-action-hover)] active:scale-[0.99] text-white px-6 py-3 font-extrabold text-sm sm:text-base shadow-sm transition-all flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--karya-action)] focus-visible:ring-offset-2"
           >
             <Search className="w-4 h-4" aria-hidden="true" />
-            <span>ابحث عن السيارات</span>
+            <span>ابحث عن سيارة</span>
           </button>
+
+          <p className="text-[11px] sm:text-xs text-[var(--karya-text-muted)] text-center leading-relaxed">
+            جميع السيارات متاحة بدون ضمانة مالية، مع احترام شروط الكراء الخاصة بكل عرض.
+          </p>
         </form>
       </div>
 
@@ -510,22 +532,22 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
       {/* ===================== SCREEN 5: FLEET LISTING ===================== */}
       <section
         id="fleet-offers"
-        className="max-w-6xl mx-auto px-4 sm:px-6 py-7 sm:py-9 space-y-6 scroll-mt-4"
+        className="max-w-6xl mx-auto px-4 sm:px-6 py-7 sm:py-10 space-y-6 scroll-mt-16"
       >
         <div className="space-y-4">
-          <div className="space-y-1">
-            <h2 className="text-xl sm:text-2xl font-extrabold text-[#0F2942]">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-xl sm:text-2xl font-extrabold text-[var(--karya-primary)]">
               السيارات المتاحة في {getCityLabelAr(selectedCity)}
             </h2>
             {!dbConnected && !loadingCars && cars.length > 0 && (
-              <p className="text-xs sm:text-sm text-slate-600">
-                <span className="text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-1.5 py-0.5 text-xs">
+              <p className="text-xs sm:text-sm text-[var(--karya-text-muted)] flex items-center gap-2">
+                <span className="text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-2 py-0.5 text-xs font-semibold">
                   عروض توضيحية
-                </span>{' '}
+                </span>
                 <button
                   type="button"
                   onClick={onGoToAgency}
-                  className="font-bold text-[#0D9488] hover:underline"
+                  className="font-bold text-[var(--karya-action)] hover:underline"
                 >
                   سجل وكالتك الآن
                 </button>
@@ -562,28 +584,32 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
                         prev.toLowerCase() === brand.toLowerCase() ? 'all' : brand,
                       )
                     }
-                    className={`snap-start shrink-0 min-w-[152px] text-right rounded-2xl border p-3 transition-all duration-150 flex items-center justify-between gap-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] ${
+                    className={`snap-start shrink-0 min-w-[148px] min-h-[54px] text-right rounded-xl border px-3 py-2.5 transition-all duration-150 flex items-center justify-between gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--karya-action)] ${
                       isSelected
-                        ? 'bg-teal-50/75 border-[#0D9488] ring-1 ring-[#0D9488]/25 shadow-sm'
-                        : 'bg-white border-slate-200/90 hover:border-[#0F2942]/30 shadow-xs'
+                        ? 'bg-[var(--karya-action-soft)] border-[var(--karya-action)] shadow-xs'
+                        : 'bg-[var(--karya-surface)] border-[var(--karya-border)] hover:border-[var(--karya-action)]/45'
                     }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       <span
-                        className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
                           isSelected
-                            ? 'bg-[#0D9488] text-white'
-                            : 'bg-[#F4F6F9] text-[#0F2942]'
+                            ? 'bg-[var(--karya-primary)] text-white'
+                            : 'bg-[var(--karya-bg)] text-[var(--karya-text-muted)]'
                         }`}
                         aria-hidden="true"
                       >
                         <CarFront className="w-4 h-4" />
                       </span>
                       <div className="min-w-0">
-                        <div className="text-xs font-extrabold text-[#0F2942] truncate">
+                        <div
+                          className={`text-xs font-extrabold truncate ${
+                            isSelected ? 'text-[var(--karya-primary)]' : 'text-[var(--karya-text)]'
+                          }`}
+                        >
                           {brand}
                         </div>
-                        <div className="text-[10px] font-medium text-slate-500 truncate">
+                        <div className="text-[11px] font-medium text-[var(--karya-text-muted)] truncate">
                           {subtitle}
                         </div>
                       </div>
@@ -591,7 +617,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
 
                     {isSelected && (
                       <span
-                        className="w-5 h-5 rounded-full bg-[#0D9488] text-white flex items-center justify-center shrink-0"
+                        className="w-5 h-5 rounded-md bg-[var(--karya-action)] text-white flex items-center justify-center shrink-0"
                         aria-hidden="true"
                       >
                         <Check className="w-3 h-3 stroke-[3]" />
@@ -609,31 +635,29 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
             {[1, 2, 3].map((n) => (
               <div
                 key={n}
-                className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden animate-pulse shadow-sm"
+                className="bg-[var(--karya-surface)] rounded-xl border border-[var(--karya-border)] overflow-hidden animate-pulse"
                 aria-hidden="true"
               >
-                <div className="aspect-[4/3] bg-slate-200" />
+                <div className="aspect-[16/10] bg-slate-200" />
                 <div className="p-5 space-y-3">
                   <div className="h-5 bg-slate-200 rounded w-1/2" />
                   <div className="h-4 bg-slate-100 rounded w-2/3" />
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="h-8 bg-slate-100 rounded-xl" />
-                    <div className="h-8 bg-slate-100 rounded-xl" />
-                    <div className="h-8 bg-slate-100 rounded-xl" />
-                  </div>
-                  <div className="flex justify-between items-center pt-3 border-t border-slate-100">
+                  <div className="h-9 bg-slate-100 rounded-lg" />
+                  <div className="flex justify-between items-center pt-3 border-t border-[var(--karya-border)]">
                     <div className="h-6 bg-slate-200 rounded w-1/3" />
-                    <div className="h-10 bg-slate-200 rounded-xl w-1/3" />
+                    <div className="h-10 bg-slate-200 rounded-lg w-1/3" />
                   </div>
                 </div>
               </div>
             ))}
           </div>
         ) : filteredCars.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-12 text-center space-y-3">
+          <div className="bg-[var(--karya-surface)] rounded-xl border border-[var(--karya-border)] p-12 text-center space-y-3">
             <CarFront className="w-10 h-10 text-slate-300 mx-auto" aria-hidden="true" />
-            <h3 className="font-bold text-lg text-[#0F2942]">لا توجد سيارات مطابقة حالياً</h3>
-            <p className="text-sm text-slate-500">
+            <h3 className="font-bold text-lg text-[var(--karya-primary)]">
+              لا توجد سيارات مطابقة حالياً
+            </h3>
+            <p className="text-sm text-[var(--karya-text-muted)]">
               جرّب إزالة أحد الفلاتر أو اختيار مدينة أخرى.
             </p>
             <button
@@ -641,7 +665,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
               onClick={() => {
                 setBrandFilter('all');
               }}
-              className="inline-flex items-center gap-1.5 mt-2 px-5 py-2.5 rounded-xl bg-[#0F2942] text-white text-sm font-bold hover:bg-[#173B5E] transition-colors"
+              className="inline-flex items-center gap-1.5 mt-2 px-5 py-2.5 rounded-lg bg-[var(--karya-primary)] text-white text-sm font-bold hover:bg-[var(--karya-primary-hover)] transition-colors"
             >
               إعادة تعيين الفلاتر
             </button>
@@ -663,26 +687,24 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
       {/* ===================== CUSTOMER CARE FAQ SECTION ===================== */}
       <section
         aria-label="أسئلة شائعة تهمّ عملاء Karya"
-        className="max-w-6xl mx-auto px-4 sm:px-6 pb-6 pt-2"
+        className="max-w-6xl mx-auto px-4 sm:px-6 pb-8 pt-2"
       >
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-          {/* Refined Header Band */}
-          <div className="bg-gradient-to-l from-[#0F2942] to-[#173B5E] px-5 py-5 sm:px-7 sm:py-6 flex items-center gap-3.5 text-white">
-            <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/15 text-[#2DD4BF] flex items-center justify-center shrink-0">
+        <div className="bg-[var(--karya-surface)] rounded-xl border border-[var(--karya-border)] overflow-hidden">
+          <div className="bg-[var(--karya-primary)] px-5 py-5 sm:px-7 sm:py-6 flex items-center gap-3.5 text-white">
+            <div className="w-10 h-10 rounded-lg bg-white/10 border border-white/15 text-[var(--karya-accent)] flex items-center justify-center shrink-0">
               <HelpCircle className="w-5 h-5" aria-hidden="true" />
             </div>
             <div className="space-y-0.5 min-w-0">
               <h2 className="text-base sm:text-lg font-extrabold tracking-tight">
-                أسئلة شائعة تهمّ عملاء Karya
+                الأسئلة الشائعة – الزبائن
               </h2>
               <p className="text-xs text-slate-200">
-                كل ما تحتاج معرفته لحجز سيارتك بدون ضمان وبأمان تام
+                كل ما تحتاج معرفته للكراء بدون ضمانة مالية، وبشروط واضحة
               </p>
             </div>
           </div>
 
-          {/* Interactive Numbered FAQ Cards */}
-          <div className="p-4 sm:p-6 space-y-2.5">
+          <div className="divide-y divide-[var(--karya-border)]">
             {CUSTOMER_FAQS.map((item, idx) => {
               const isOpen = openFaqIndex === idx;
               const numLabel = String(idx + 1).padStart(2, '0');
@@ -690,45 +712,43 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
               return (
                 <div
                   key={item.q}
-                  className={`rounded-xl border transition-all duration-150 ${
-                    isOpen
-                      ? 'border-[#0D9488]/60 bg-teal-50/40 shadow-xs'
-                      : 'border-slate-200/80 bg-[#F8FAFC] hover:bg-white hover:border-[#0F2942]/25'
+                  className={`transition-colors ${
+                    isOpen ? 'bg-[var(--karya-action-soft)]/50' : 'bg-[var(--karya-surface)]'
                   }`}
                 >
                   <button
                     type="button"
                     aria-expanded={isOpen}
                     onClick={() => setOpenFaqIndex((prev) => (prev === idx ? null : idx))}
-                    className="w-full flex items-center justify-between gap-3 text-right p-3.5 sm:px-4 sm:py-3.5"
+                    className="w-full flex items-center justify-between gap-3 text-right px-4 py-4 sm:px-6 hover:bg-[var(--karya-surface-muted)] transition-colors"
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <span
-                        className={`w-7 h-7 rounded-lg font-mono-tabular text-xs font-bold flex items-center justify-center shrink-0 transition-colors ${
+                        className={`w-7 h-7 rounded-md font-mono-tabular text-xs font-bold flex items-center justify-center shrink-0 transition-colors ${
                           isOpen
-                            ? 'bg-[#0D9488] text-white'
-                            : 'bg-white text-[#0F2942] border border-slate-200'
+                            ? 'bg-[var(--karya-action)] text-white'
+                            : 'bg-[var(--karya-bg)] text-[var(--karya-primary)] border border-[var(--karya-border)]'
                         }`}
                         aria-hidden="true"
                       >
                         {numLabel}
                       </span>
-                      <span className="text-xs sm:text-sm font-extrabold text-[#0F2942] leading-snug">
+                      <span className="text-xs sm:text-sm font-extrabold text-[var(--karya-text)] leading-snug">
                         {item.q}
                       </span>
                     </div>
 
                     <ChevronDown
                       className={`w-4 h-4 shrink-0 transition-transform duration-200 ${
-                        isOpen ? 'rotate-180 text-[#0D9488]' : 'text-slate-400'
+                        isOpen ? 'rotate-180 text-[var(--karya-action)]' : 'text-[var(--karya-text-muted)]'
                       }`}
                       aria-hidden="true"
                     />
                   </button>
 
                   {isOpen && (
-                    <div className="px-4 pb-3.5 sm:pr-14 sm:pl-6">
-                      <p className="text-xs sm:text-[13px] text-slate-600 leading-relaxed">
+                    <div className="px-4 pb-4 sm:pr-16 sm:pl-6">
+                      <p className="text-xs sm:text-[13px] text-[var(--karya-text-muted)] leading-relaxed">
                         {item.a}
                       </p>
                     </div>
@@ -745,95 +765,109 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
         aria-label="تقييمات الوكالات"
         className="max-w-6xl mx-auto px-4 sm:px-6 pb-12"
       >
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-          {/* Refined Header Band matching FAQ */}
-          <div className="bg-gradient-to-l from-[#0F2942] to-[#173B5E] px-5 py-5 sm:px-7 sm:py-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-white">
+        <div className="bg-[var(--karya-surface)] rounded-xl border border-[var(--karya-border)] overflow-hidden">
+          <div className="bg-[var(--karya-primary)] px-5 py-5 sm:px-7 sm:py-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-white">
             <div className="flex items-center gap-3.5 min-w-0">
-              <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/15 text-amber-300 flex items-center justify-center shrink-0">
-                <Star className="w-5 h-5 fill-amber-300 text-amber-300" aria-hidden="true" />
+              <div className="w-10 h-10 rounded-lg bg-white/10 border border-white/15 text-[var(--karya-accent)] flex items-center justify-center shrink-0">
+                <Star className="w-5 h-5 fill-[#D49A42] text-[#D49A42]" aria-hidden="true" />
               </div>
               <div className="space-y-0.5 min-w-0">
                 <h2 className="text-base sm:text-lg font-extrabold tracking-tight">
-                  تقييمات الوكالات
+                  تقييمات الوكالات وثقة الزبائن
                 </h2>
                 <p className="text-xs text-slate-200">
-                  آراء وتقييمات موثوقة تعكس التزام وكالاتنا الشريكة بالتسليم بدون ضمان وجودة الخدمة
+                  تجارب تعكس التزام الوكالات الشريكة بالتسليم في الموعد وبدون ضمانة مالية
                 </p>
               </div>
             </div>
 
-            <div className="inline-flex items-center gap-2 self-start sm:self-auto rounded-xl bg-white/10 border border-white/15 px-3.5 py-2 shrink-0">
-              <div className="flex items-center gap-0.5" aria-hidden="true">
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <Star key={n} className="w-3.5 h-3.5 fill-amber-300 text-amber-300" />
-                ))}
+            {agencyReviews.some((r) => r.isLiveVerified) ? (
+              <div className="inline-flex items-center gap-2 self-start sm:self-auto rounded-lg bg-white/10 border border-white/15 px-3.5 py-2 shrink-0">
+                <div className="flex items-center gap-0.5" aria-hidden="true">
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <Star key={n} className="w-3.5 h-3.5 fill-[#D49A42] text-[#D49A42]" />
+                  ))}
+                </div>
+                <span className="text-xs font-extrabold text-white font-mono-tabular">
+                  4.9 / 5
+                </span>
+                <span className="text-[11px] font-semibold text-slate-200">
+                  وكالات معتمدة
+                </span>
               </div>
-              <span className="text-xs font-extrabold text-white font-mono-tabular">
-                4.9 / 5
-              </span>
-              <span className="text-[11px] font-semibold text-slate-200">
-                ثقة العملاء
-              </span>
-            </div>
+            ) : (
+              <div className="inline-flex items-center gap-2 self-start sm:self-auto rounded-lg bg-white/10 border border-white/15 px-3.5 py-2 shrink-0">
+                <ShieldCheck className="w-4 h-4 text-[var(--karya-accent)]" aria-hidden="true" />
+                <span className="text-[11px] font-semibold text-slate-100">
+                  نماذج لتجربة الكراء عبر Karya
+                </span>
+              </div>
+            )}
           </div>
 
-          {/* Review Cards & Partner CTA Body */}
-          <div className="p-4 sm:p-6 space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="p-4 sm:p-6 space-y-5">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {agencyReviews.map((review, idx) => {
                 const numLabel = String(idx + 1).padStart(2, '0');
                 return (
                   <article
                     key={review.id}
-                    className="rounded-xl border border-slate-200/80 bg-[#F8FAFC] hover:bg-white hover:border-[#0D9488]/60 hover:shadow-xs transition-all duration-150 p-4 flex flex-col justify-between gap-3.5"
+                    className="rounded-xl border border-[var(--karya-border)] bg-[var(--karya-surface-muted)] p-4 flex flex-col justify-between gap-3.5"
                   >
                     <div className="space-y-3">
-                      {/* Top Row: Number Badge + Agency Name & City + Rating */}
                       <div className="flex items-start justify-between gap-2.5">
                         <div className="flex items-center gap-2.5 min-w-0">
                           <span
-                            className="w-7 h-7 rounded-lg bg-[#0D9488] text-white font-mono-tabular text-xs font-bold flex items-center justify-center shrink-0"
+                            className="w-7 h-7 rounded-md bg-[var(--karya-primary)] text-white font-mono-tabular text-xs font-bold flex items-center justify-center shrink-0"
                             aria-hidden="true"
                           >
                             {numLabel}
                           </span>
                           <div className="min-w-0">
-                            <h3 className="text-xs sm:text-sm font-extrabold text-[#0F2942] truncate">
+                            <h3 className="text-xs sm:text-sm font-extrabold text-[var(--karya-primary)] truncate">
                               {review.agencyName}
                             </h3>
-                            <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5">
-                              <MapPin className="w-3 h-3 text-[#0D9488] shrink-0" aria-hidden="true" />
+                            <div className="flex items-center gap-1.5 text-[11px] text-[var(--karya-text-muted)] mt-0.5">
+                              <MapPin className="w-3 h-3 text-[var(--karya-text-muted)] shrink-0" aria-hidden="true" />
                               <span>{getCityLabelAr(review.city)}</span>
                               <span aria-hidden="true">·</span>
-                              <span className="text-[#0F766E] font-bold">وكالة معتمدة</span>
+                              <span
+                                className={
+                                  review.isLiveVerified
+                                    ? 'text-[var(--karya-action)] font-bold'
+                                    : 'text-[var(--karya-text-muted)] font-semibold'
+                                }
+                              >
+                                {review.isLiveVerified ? 'وكالة معتمدة' : 'عرض توضيحي'}
+                              </span>
                             </div>
                           </div>
                         </div>
 
-                        <div className="inline-flex items-center gap-1 rounded-lg bg-white border border-slate-200/90 px-2 py-1 text-xs font-extrabold text-[#0F2942] shrink-0">
-                          <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" aria-hidden="true" />
-                          <span className="font-mono-tabular">{review.rating.toFixed(1)}</span>
-                        </div>
+                        {review.isLiveVerified && (
+                          <div className="inline-flex items-center gap-1 text-xs font-extrabold text-[var(--karya-primary)] shrink-0">
+                            <Star className="w-3.5 h-3.5 fill-[#D49A42] text-[#D49A42]" aria-hidden="true" />
+                            <span className="font-mono-tabular">{review.rating.toFixed(1)}</span>
+                          </div>
+                        )}
                       </div>
 
-                      {/* Positive Comment */}
-                      <div className="text-xs text-slate-600 leading-relaxed bg-white rounded-xl border border-slate-200/70 p-3.5">
+                      <div className="text-xs text-[var(--karya-text)] leading-relaxed pt-2 border-t border-[var(--karya-border)]/70">
                         <Quote
-                          className="w-4 h-4 text-[#0D9488]/35 mb-1"
+                          className="w-4 h-4 text-[var(--karya-accent)]/60 mb-1"
                           aria-hidden="true"
                         />
                         <p>{review.comment}</p>
                       </div>
                     </div>
 
-                    {/* Reviewer Footer */}
-                    <div className="flex items-center justify-between gap-2 pt-2.5 border-t border-slate-200/70 text-[11px]">
-                      <span className="font-bold text-[#0F2942] truncate">
+                    <div className="flex items-center justify-between gap-2 pt-2.5 border-t border-[var(--karya-border)] text-[11px]">
+                      <span className="font-bold text-[var(--karya-primary)] truncate">
                         {review.reviewerName}
                       </span>
-                      <span className="text-slate-500 font-medium truncate">
+                      <span className="text-[var(--karya-text-muted)] font-medium truncate">
                         {review.carLabel}
-                        {review.ratingCount > 0 ? ` · ${review.ratingCount} تقييم` : ''}
+                        {review.isLiveVerified && review.ratingCount > 0 ? ` · ${review.ratingCount} تقييم` : ''}
                       </span>
                     </div>
                   </article>
@@ -841,20 +875,20 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
               })}
             </div>
 
-            {/* Encouraging Agency Partner Strip matching active FAQ accent */}
-            <div className="rounded-xl border border-[#0D9488]/45 bg-teal-50/45 p-3.5 sm:px-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-start sm:items-center gap-2.5 text-xs sm:text-sm text-[#0F2942]">
-                <span className="w-7 h-7 rounded-lg bg-[#0D9488] text-white flex items-center justify-center shrink-0">
+            {/* Partner Agency Strip */}
+            <div className="rounded-xl border border-[var(--karya-border)] bg-[var(--karya-primary-soft)] p-4 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-start sm:items-center gap-3 text-xs sm:text-sm text-[var(--karya-text)]">
+                <span className="w-8 h-8 rounded-lg bg-[var(--karya-primary)] text-[var(--karya-accent)] flex items-center justify-center shrink-0">
                   <Building2 className="w-4 h-4" aria-hidden="true" />
                 </span>
                 <span>
-                  <strong>تملك وكالة كراء سيارات؟</strong> انضم لشبكة الوكالات الموثوقة، احصل على تقييمات إيجابية، واستقبل حجوزات جادة بتسبيق مضمون.
+                  <strong className="text-[var(--karya-primary)]">هل تملك وكالة لكراء السيارات؟</strong> انضم إلى شبكة Karya، واعرض سياراتك لزبائن في مدن المغرب، مع نظام واضح لتأكيد الحجز وحفظ حقوق الطرفين.
                 </span>
               </div>
               <button
                 type="button"
                 onClick={onGoToAgency}
-                className="self-start sm:self-auto shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-[#0F2942] hover:bg-[#173B5E] text-white px-4 py-2 text-xs font-extrabold transition-colors"
+                className="self-start sm:self-auto shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-[var(--karya-primary)] hover:bg-[var(--karya-primary-hover)] text-white px-4 py-2.5 min-h-[42px] text-xs font-extrabold transition-colors"
               >
                 <span>سجّل وكالتك الآن</span>
                 <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" />

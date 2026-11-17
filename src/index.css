@@ -4,12 +4,40 @@
   :root {
     --font-sans: 'Cairo', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
     --font-mono: 'IBM Plex Mono', monospace;
-    --surface-canvas: #f4f6f9;
-    --surface-card: #ffffff;
-    --brand-navy: #0f2942;
-    --brand-navy-hover: #173b5e;
-    --brand-teal: #0d9488;
-    --brand-teal-hover: #0f766e;
+
+    /* Karya Unified Brand Tokens */
+    --karya-primary: #173B57;
+    --karya-primary-hover: #102B40;
+    --karya-primary-soft: #EEF3F7;
+
+    --karya-action: #256A9A;
+    --karya-action-hover: #1D567E;
+    --karya-action-soft: #EFF6FB;
+
+    --karya-accent: #D49A42;
+    --karya-accent-hover: #B98332;
+    --karya-accent-soft: #FBF5EB;
+
+    /* Neutral Surfaces & Typography */
+    --karya-bg: #F4F6F9;
+    --karya-surface: #FFFFFF;
+    --karya-surface-muted: #F8FAFC;
+    --karya-text: #243746;
+    --karya-text-muted: #64748B;
+    --karya-border: #E2E8F0;
+
+    /* Semantic State Tokens (Reserved strictly for status feedback) */
+    --karya-success: #15803D;
+    --karya-success-soft: #F0FDF4;
+    --karya-success-border: #BBF7D0;
+
+    --karya-warning: #B45309;
+    --karya-warning-soft: #FFFBEB;
+    --karya-warning-border: #FDE68A;
+
+    --karya-danger: #DC2626;
+    --karya-danger-soft: #FEF2F2;
+    --karya-danger-border: #FECACA;
   }
 
   html {
@@ -18,8 +46,8 @@
   }
 
   body {
-    background-color: var(--surface-canvas);
-    color: var(--brand-navy);
+    background-color: var(--karya-bg);
+    color: var(--karya-text);
   }
 }
 

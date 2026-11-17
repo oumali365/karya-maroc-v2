@@ -177,28 +177,31 @@ export function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F4F6F9] text-[#0F2942] pb-[60px] md:pb-0" dir="rtl">
+    <div
+      className="min-h-screen flex flex-col bg-[var(--karya-bg)] text-[var(--karya-text)] pb-[64px] md:pb-0"
+      dir="rtl"
+    >
       {/* Clean 3-Zone Top Bar */}
-      <header className="bg-white/95 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-30">
+      <header className="bg-[var(--karya-surface)]/95 backdrop-blur-md border-b border-[var(--karya-border)] sticky top-0 z-30">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 md:h-16 flex items-center justify-between gap-8">
           {/* Zone 1: Single-line Brand Wordmark */}
           <button
             type="button"
             onClick={() => navigate('discover')}
-            className="text-xl font-extrabold tracking-tight text-[#0F2942] whitespace-nowrap shrink-0 flex items-center gap-0.5"
+            className="text-xl font-extrabold tracking-tight text-[var(--karya-primary)] whitespace-nowrap shrink-0 flex items-center gap-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--karya-action)] rounded-md px-1 -mx-1"
           >
             <span>Karya</span>
-            <span className="text-[#0D9488]">.</span>
+            <span className="text-[var(--karya-accent)]">.</span>
           </button>
 
           {/* Zone 2: Concise single-line desktop navigation links */}
-          <nav className="hidden md:flex items-center gap-7 text-sm font-semibold text-slate-600">
+          <nav className="hidden md:flex items-center gap-7 text-sm font-semibold text-[var(--karya-text-muted)]">
             <button
               type="button"
               onClick={() => navigate('discover')}
-              className={`whitespace-nowrap shrink-0 transition-colors hover:text-[#0F2942] ${
+              className={`whitespace-nowrap shrink-0 transition-colors hover:text-[var(--karya-primary)] py-1 ${
                 route === 'discover'
-                  ? 'text-[#0F2942] font-bold underline underline-offset-8 decoration-2 decoration-[#0D9488]'
+                  ? 'text-[var(--karya-primary)] font-bold underline underline-offset-8 decoration-2 decoration-[var(--karya-action)]'
                   : ''
               }`}
             >
@@ -207,9 +210,9 @@ export function App() {
             <button
               type="button"
               onClick={() => navigate('bookings')}
-              className={`whitespace-nowrap shrink-0 transition-colors hover:text-[#0F2942] ${
+              className={`whitespace-nowrap shrink-0 transition-colors hover:text-[var(--karya-primary)] py-1 ${
                 route === 'bookings'
-                  ? 'text-[#0F2942] font-bold underline underline-offset-8 decoration-2 decoration-[#0D9488]'
+                  ? 'text-[var(--karya-primary)] font-bold underline underline-offset-8 decoration-2 decoration-[var(--karya-action)]'
                   : ''
               }`}
             >
@@ -219,9 +222,9 @@ export function App() {
               <button
                 type="button"
                 onClick={() => navigate('admin')}
-                className={`whitespace-nowrap shrink-0 transition-colors hover:text-[#0F2942] ${
+                className={`whitespace-nowrap shrink-0 transition-colors hover:text-[var(--karya-primary)] py-1 ${
                   route === 'admin'
-                    ? 'text-[#0F2942] font-bold underline underline-offset-8 decoration-2 decoration-[#0D9488]'
+                    ? 'text-[var(--karya-primary)] font-bold underline underline-offset-8 decoration-2 decoration-[var(--karya-action)]'
                     : ''
                 }`}
               >
@@ -235,7 +238,7 @@ export function App() {
             <button
               type="button"
               onClick={() => navigate(route === 'agency' ? 'discover' : 'agency')}
-              className="rounded-xl bg-[#0F2942] hover:bg-[#173B5E] text-white px-3.5 sm:px-4 py-2 text-xs sm:text-sm font-bold transition-colors whitespace-nowrap shrink-0"
+              className="rounded-lg bg-[var(--karya-primary)] hover:bg-[var(--karya-primary-hover)] text-white px-3.5 sm:px-4 py-2 text-xs sm:text-sm font-bold transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--karya-action)] focus-visible:ring-offset-2"
             >
               {route === 'agency' ? 'تصفح السيارات' : 'بوابة الوكالات'}
             </button>
@@ -264,7 +267,7 @@ export function App() {
 
         {route === 'admin' && !adminChecked && (
           <div className="min-h-[60vh] flex items-center justify-center">
-            <Loader2 className="w-8 h-8 animate-spin text-[#0D9488]" />
+            <Loader2 className="w-8 h-8 animate-spin text-[var(--karya-action)]" />
           </div>
         )}
 
@@ -277,10 +280,10 @@ export function App() {
       </main>
 
       {/* Quiet Footer */}
-      <footer className="bg-white border-t border-slate-200/80 py-6 mt-auto">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+      <footer className="bg-[var(--karya-surface)] border-t border-[var(--karya-border)] py-6 mt-auto">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[var(--karya-text-muted)]">
           <div onClick={handleCopyrightClick} className="select-none cursor-default">
-            © Karya — منصة كراء السيارات بالمغرب بدون ضمان
+            © Karya — كراء السيارات في المغرب بدون ضمانة مالية
           </div>
           {route === 'discover' && (
             <div className="flex items-center">
@@ -289,7 +292,7 @@ export function App() {
                 onClick={handleOpenAdminEntry}
                 aria-label="دخول الإدارة"
                 title=""
-                className="text-slate-300/60 hover:text-slate-400 transition-colors p-1 -me-1"
+                className="text-slate-300/70 hover:text-[var(--karya-text-muted)] transition-colors p-1 -me-1"
               >
                 <Lock className="w-3 h-3" />
               </button>
@@ -298,58 +301,96 @@ export function App() {
         </div>
       </footer>
 
-      {/* Clean Mobile Bottom Navigation Bar (Home, My Bookings, Profile, Help) */}
+      {/* Clean Mobile Bottom Navigation Bar (Home, My Bookings, Agency, Help) */}
       <nav
         aria-label="التنقل السفلي"
-        className="md:hidden fixed bottom-0 inset-x-0 z-40 h-[60px] pb-safe bg-white/95 backdrop-blur-md border-t border-slate-200/90 shadow-[0_-4px_20px_rgba(15,41,66,0.06)] grid grid-cols-4 items-center"
+        className="md:hidden fixed bottom-0 inset-x-0 z-40 h-[62px] pb-safe bg-[var(--karya-surface)]/95 backdrop-blur-md border-t border-[var(--karya-border)] shadow-[0_-4px_16px_rgba(23,59,87,0.06)] grid grid-cols-4 items-center"
       >
         <button
           type="button"
           onClick={() => navigate('discover')}
-          className={`h-full flex flex-col items-center justify-center gap-0.5 transition-colors ${
+          className={`relative h-full flex flex-col items-center justify-center gap-0.5 transition-colors ${
             route === 'discover' && !showMobileHelpSheet
-              ? 'text-[#0D9488] font-bold'
-              : 'text-slate-500 font-medium'
+              ? 'text-[var(--karya-primary)] font-extrabold'
+              : 'text-[var(--karya-text-muted)] font-medium'
           }`}
         >
-          <Home className="w-5 h-5" strokeWidth={route === 'discover' ? 2.25 : 1.75} />
+          {route === 'discover' && !showMobileHelpSheet && (
+            <span
+              className="absolute top-0 inset-x-auto w-8 h-0.5 rounded-b-full bg-[var(--karya-action)]"
+              aria-hidden="true"
+            />
+          )}
+          <Home
+            className="w-5 h-5"
+            strokeWidth={route === 'discover' && !showMobileHelpSheet ? 2.25 : 1.75}
+          />
           <span className="text-[11px] whitespace-nowrap">الرئيسية</span>
         </button>
 
         <button
           type="button"
           onClick={() => navigate('bookings')}
-          className={`h-full flex flex-col items-center justify-center gap-0.5 transition-colors ${
+          className={`relative h-full flex flex-col items-center justify-center gap-0.5 transition-colors ${
             route === 'bookings' && !showMobileHelpSheet
-              ? 'text-[#0D9488] font-bold'
-              : 'text-slate-500 font-medium'
+              ? 'text-[var(--karya-primary)] font-extrabold'
+              : 'text-[var(--karya-text-muted)] font-medium'
           }`}
         >
-          <CalendarCheck2 className="w-5 h-5" strokeWidth={route === 'bookings' ? 2.25 : 1.75} />
+          {route === 'bookings' && !showMobileHelpSheet && (
+            <span
+              className="absolute top-0 inset-x-auto w-8 h-0.5 rounded-b-full bg-[var(--karya-action)]"
+              aria-hidden="true"
+            />
+          )}
+          <CalendarCheck2
+            className="w-5 h-5"
+            strokeWidth={route === 'bookings' && !showMobileHelpSheet ? 2.25 : 1.75}
+          />
           <span className="text-[11px] whitespace-nowrap">حجوزاتي</span>
         </button>
 
         <button
           type="button"
           onClick={() => navigate('agency')}
-          className={`h-full flex flex-col items-center justify-center gap-0.5 transition-colors ${
+          className={`relative h-full flex flex-col items-center justify-center gap-0.5 transition-colors ${
             route === 'agency' && !showMobileHelpSheet
-              ? 'text-[#0D9488] font-bold'
-              : 'text-slate-500 font-medium'
+              ? 'text-[var(--karya-primary)] font-extrabold'
+              : 'text-[var(--karya-text-muted)] font-medium'
           }`}
         >
-          <UserCircle2 className="w-5 h-5" strokeWidth={route === 'agency' ? 2.25 : 1.75} />
+          {route === 'agency' && !showMobileHelpSheet && (
+            <span
+              className="absolute top-0 inset-x-auto w-8 h-0.5 rounded-b-full bg-[var(--karya-action)]"
+              aria-hidden="true"
+            />
+          )}
+          <UserCircle2
+            className="w-5 h-5"
+            strokeWidth={route === 'agency' && !showMobileHelpSheet ? 2.25 : 1.75}
+          />
           <span className="text-[11px] whitespace-nowrap">حسابي</span>
         </button>
 
         <button
           type="button"
           onClick={() => setShowMobileHelpSheet((v) => !v)}
-          className={`h-full flex flex-col items-center justify-center gap-0.5 transition-colors ${
-            showMobileHelpSheet ? 'text-[#0D9488] font-bold' : 'text-slate-500 font-medium'
+          className={`relative h-full flex flex-col items-center justify-center gap-0.5 transition-colors ${
+            showMobileHelpSheet
+              ? 'text-[var(--karya-primary)] font-extrabold'
+              : 'text-[var(--karya-text-muted)] font-medium'
           }`}
         >
-          <HelpCircle className="w-5 h-5" strokeWidth={showMobileHelpSheet ? 2.25 : 1.75} />
+          {showMobileHelpSheet && (
+            <span
+              className="absolute top-0 inset-x-auto w-8 h-0.5 rounded-b-full bg-[var(--karya-action)]"
+              aria-hidden="true"
+            />
+          )}
+          <HelpCircle
+            className="w-5 h-5"
+            strokeWidth={showMobileHelpSheet ? 2.25 : 1.75}
+          />
           <span className="text-[11px] whitespace-nowrap">مساعدة</span>
         </button>
       </nav>
@@ -357,53 +398,53 @@ export function App() {
       {/* Mobile Help Bottom Sheet */}
       {showMobileHelpSheet && (
         <div
-          className="md:hidden fixed inset-0 z-50 bg-[#0F2942]/50 backdrop-blur-xs flex items-end justify-center"
+          className="md:hidden fixed inset-0 z-50 bg-[#173B57]/55 backdrop-blur-xs flex items-end justify-center"
           onClick={() => setShowMobileHelpSheet(false)}
           dir="rtl"
         >
           <div
-            className="w-full rounded-t-3xl bg-white p-5 pb-8 space-y-4 shadow-2xl border-t border-slate-200"
+            className="w-full rounded-t-2xl bg-[var(--karya-surface)] p-5 pb-8 space-y-4 shadow-xl border-t border-[var(--karya-border)]"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="w-10 h-1 rounded-full bg-slate-300 mx-auto" aria-hidden="true" />
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 font-extrabold text-base text-[#0F2942]">
-                <ShieldCheck className="w-5 h-5 text-[#0D9488]" />
+              <div className="flex items-center gap-2 font-extrabold text-base text-[var(--karya-primary)]">
+                <ShieldCheck className="w-5 h-5 text-[var(--karya-action)]" />
                 <span>المساعدة وقواعد Karya</span>
               </div>
               <button
                 type="button"
                 onClick={() => setShowMobileHelpSheet(false)}
                 aria-label="إغلاق"
-                className="min-h-[40px] min-w-[40px] rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100"
+                className="min-h-[44px] min-w-[44px] rounded-lg flex items-center justify-center text-[var(--karya-text-muted)] hover:bg-[var(--karya-bg)]"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <ul className="space-y-2.5 text-xs text-slate-700 leading-relaxed">
+            <ul className="space-y-2.5 text-xs text-[var(--karya-text)] leading-relaxed">
               <li className="flex items-start gap-2">
-                <CheckCircle2 className="w-4 h-4 text-[#0D9488] shrink-0 mt-0.5" />
+                <CheckCircle2 className="w-4 h-4 text-[var(--karya-action)] shrink-0 mt-0.5" />
                 <span>
-                  <strong>0 درهم ضمان:</strong> كراء بدون شيك ضمان أو كفالة وبحد أدنى 3 أيام.
+                  <strong>بدون ضمانة مالية:</strong> لا تحتاج إلى تقديم شيك ضمان أو ترك مبلغ مالي كضمانة، ومدة الكراء لا تقل عن 3 أيام.
                 </span>
               </li>
               <li className="flex items-start gap-2">
-                <CheckCircle2 className="w-4 h-4 text-[#0D9488] shrink-0 mt-0.5" />
+                <CheckCircle2 className="w-4 h-4 text-[var(--karya-action)] shrink-0 mt-0.5" />
                 <span>
-                  <strong>رخصة السياقة:</strong> يشترط توفر أقدمية سنتين على الأقل عند التسليم.
+                  <strong>رخصة السياقة والعقد:</strong> يجب أن تكون لديك رخصة سياقة منذ سنتين على الأقل مع تقديم البطاقة الوطنية وتوقيع عقد الكراء عند الاستلام.
                 </span>
               </li>
               <li className="flex items-start gap-2">
-                <CheckCircle2 className="w-4 h-4 text-[#0D9488] shrink-0 mt-0.5" />
+                <CheckCircle2 className="w-4 h-4 text-[var(--karya-action)] shrink-0 mt-0.5" />
                 <span>
-                  <strong>دفع مرن:</strong> 10% تسبيق لتثبيت الحجز و90% مباشرة عند استلام السيارة.
+                  <strong>طريقة الدفع:</strong> تدفع 10% لتأكيد الحجز والمبلغ المتبقي (90%) مباشرة للوكالة عند استلام السيارة.
                 </span>
               </li>
               <li className="flex items-start gap-2">
-                <CheckCircle2 className="w-4 h-4 text-[#0D9488] shrink-0 mt-0.5" />
+                <CheckCircle2 className="w-4 h-4 text-[var(--karya-action)] shrink-0 mt-0.5" />
                 <span>
-                  <strong>حماية التسبيق 100%:</strong> استرجاع فوري من صفحة «حجوزاتي» إذا اعتذرت الوكالة.
+                  <strong>استرجاع مبلغ الحجز:</strong> إذا لم تتمكن الوكالة من تسليم السيارة، يمكنك طلب استرجاع المبلغ من صفحة «حجوزاتي» وفق الإجراءات المعتمدة.
                 </span>
               </li>
             </ul>
@@ -413,7 +454,7 @@ export function App() {
                 href={`https://wa.me/${CONFIGURED_WHATSAPP}?text=${DEFAULT_SUPPORT_MESSAGE}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full min-h-[46px] rounded-xl bg-[#0D9488] hover:bg-[#0F766E] text-white font-bold text-sm flex items-center justify-center gap-2 transition-colors"
+                className="w-full min-h-[48px] rounded-lg bg-[var(--karya-action)] hover:bg-[var(--karya-action-hover)] text-white font-bold text-sm flex items-center justify-center gap-2 transition-colors"
               >
                 <MessageCircle className="w-4 h-4" />
                 <span>تواصل عبر واتساب</span>

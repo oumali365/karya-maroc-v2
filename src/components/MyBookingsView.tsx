@@ -31,15 +31,15 @@ function getStatusBadge(status: BookingStatus): {
     case 'payment_verified':
       return {
         label: 'مؤكد',
-        badgeClasses: 'bg-teal-50 text-[#0F766E] border border-teal-200',
-        icon: <CheckCircle2 className="w-3.5 h-3.5 text-[#0D9488] shrink-0" />,
+        badgeClasses: 'bg-emerald-50 text-emerald-800 border border-emerald-200',
+        icon: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700 shrink-0" />,
       };
     case 'car_delivered':
     case 'completed':
       return {
         label: 'تم الاستلام',
-        badgeClasses: 'bg-slate-100 text-[#0F2942] border border-slate-200',
-        icon: <CarFront className="w-3.5 h-3.5 text-[#0F2942] shrink-0" />,
+        badgeClasses: 'bg-[var(--karya-primary-soft)] text-[var(--karya-primary)] border border-[var(--karya-border)]',
+        icon: <CarFront className="w-3.5 h-3.5 text-[var(--karya-primary)] shrink-0" />,
       };
     case 'refund_requested':
       return {
@@ -49,15 +49,15 @@ function getStatusBadge(status: BookingStatus): {
       };
     case 'refunded':
       return {
-        label: 'تم استرجاع التسبيق',
-        badgeClasses: 'bg-teal-50 text-[#0F766E] border border-teal-200',
-        icon: <CheckCircle2 className="w-3.5 h-3.5 text-[#0D9488] shrink-0" />,
+        label: 'تم إرجاع مبلغ التأكيد',
+        badgeClasses: 'bg-emerald-50 text-emerald-800 border border-emerald-200',
+        icon: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700 shrink-0" />,
       };
     case 'cancelled':
       return {
         label: 'ملغى',
-        badgeClasses: 'bg-slate-100 text-slate-600 border border-slate-200',
-        icon: <XCircle className="w-3.5 h-3.5 text-slate-500 shrink-0" />,
+        badgeClasses: 'bg-slate-100 text-[var(--karya-text-muted)] border border-[var(--karya-border)]',
+        icon: <XCircle className="w-3.5 h-3.5 text-[var(--karya-text-muted)] shrink-0" />,
       };
     case 'pending_payment':
       return {
@@ -87,7 +87,7 @@ function validateRefundDestination(raw: string): {
     return {
       valid: false,
       value: trimmed,
-      error: 'يرجى إدخال رقم الحساب أو رقم الهاتف لاسترجاع التسبيق.',
+      error: 'يرجى إدخال رقم الحساب أو رقم الهاتف لاسترجاع مبلغ تأكيد الحجز.',
     };
   }
 
@@ -130,7 +130,7 @@ function getRefundEligibility(booking: CreatedBooking): {
     return {
       eligible: false,
       blockedMessage:
-        'تم تسجيل مخالفة على الحجز من طرف الوكالة (عدم تطابق الرخصة أو عدم الحضور) — تواصل مع الإدارة.',
+        'تم تسجيل عدم التزام الزبون على الحجز من طرف الوكالة (عدم تطابق الرخصة أو عدم الحضور) — تواصل مع الإدارة.',
     };
   }
 
@@ -151,14 +151,14 @@ function getRefundEligibility(booking: CreatedBooking): {
     return {
       eligible: false,
       blockedMessage:
-        'الوكالة أكدت توفر السيارة والتزامها بالتسليم في الموعد — الاسترجاع متاح فقط إذا تعذر التسليم.',
+        'الوكالة أكدت توفر السيارة والتزامها بالتسليم في الموعد — الاسترجاع متاح فقط إذا لم تتمكن الوكالة من تسليم السيارة.',
     };
   }
 
   return {
     eligible: false,
     blockedMessage:
-      'يُفتح خيار الاسترجاع تلقائياً إذا أعلنت الوكالة عدم توفر السيارة أو تعذر التسليم في الموعد.',
+      'يُفتح خيار الاسترجاع تلقائياً إذا أعلنت الوكالة عدم توفر السيارة أو لم تتمكن من تسليمها في الموعد.',
   };
 }
 
@@ -365,7 +365,7 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
       if (!eligibility.eligible) {
         throw new Error(
           eligibility.blockedMessage ||
-            'لا يمكن طلب استرجاع التسبيق ما دامت الوكالة ملتزمة بتوفير السيارة في الموعد المحدد.',
+            'لا يمكن طلب استرجاع مبلغ تأكيد الحجز ما دامت الوكالة ملتزمة بتوفير السيارة في الموعد.',
         );
       }
 
@@ -393,7 +393,7 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
       );
 
       setRefundFeedback(
-        'تم تسجيل طلب الاسترجاع بنجاح. سيتم تحويل تسبيقك كاملاً لرقم هاتفك أو حسابك البنكي خلال ساعات من المراجعة.',
+        'تم تسجيل طلب الاسترجاع بنجاح. سيتم مراجعة طلبك وإرجاع المبلغ كاملاً وفق إجراءات الاسترجاع المعتمدة، إلى رقم هاتفك أو حسابك البنكي.',
       );
       setRefundRib('');
       setRefundPhone('');
@@ -410,15 +410,15 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
       {/* Page Title */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
         <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0F2942]">حجوزاتي</h1>
-          <p className="text-xs sm:text-sm text-slate-600">
-            تابع حالة طلبك برمز الحجز ورقم الهاتف، مع تفاصيل التسبيق والمبلغ عند الاستلام.
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-[var(--karya-primary)]">حجوزاتي</h1>
+          <p className="text-xs sm:text-sm text-[var(--karya-text-muted)]">
+            تابع حالة طلبك برمز الحجز ورقم الهاتف، مع تفاصيل مبلغ تأكيد الحجز والمبلغ المتبقي عند الاستلام.
           </p>
         </div>
         <button
           type="button"
           onClick={onBrowseCars}
-          className="self-start sm:self-auto inline-flex items-center justify-center rounded-xl bg-[#0D9488] hover:bg-[#0F766E] text-white px-4 py-2.5 text-xs sm:text-sm font-extrabold transition-colors shadow-sm shadow-teal-600/20"
+          className="self-start sm:self-auto inline-flex items-center justify-center rounded-lg bg-[var(--karya-action)] hover:bg-[var(--karya-action-hover)] text-white px-4 py-2.5 min-h-[44px] text-xs sm:text-sm font-extrabold transition-colors shadow-xs"
         >
           حجز سيارة جديدة
         </button>
@@ -427,36 +427,36 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
       {/* Track Booking Search Card */}
       <form
         onSubmit={handleLookupByPhone}
-        className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 sm:p-5 space-y-3"
+        className="bg-[var(--karya-surface)] rounded-xl border border-[var(--karya-border)] p-4 sm:p-5 space-y-3"
       >
-        <div className="text-xs font-extrabold text-[#0F2942]">تتبع حجز برمز الطلب</div>
+        <div className="text-xs font-extrabold text-[var(--karya-primary)]">تتبع حجز برمز الطلب</div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="relative">
-            <Hash className="w-4 h-4 text-slate-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <Hash className="w-4 h-4 text-[var(--karya-text-muted)] absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               dir="ltr"
               placeholder="KRY-XXXXXX"
               value={trackCode}
               onChange={(e) => setTrackCode(e.target.value)}
-              className="w-full min-h-[46px] rounded-xl border border-slate-200 bg-[#F4F6F9] pr-9 pl-3.5 py-2 text-sm font-mono uppercase focus:bg-white focus:border-[#0D9488] focus:outline-none"
+              className="w-full min-h-[46px] rounded-lg border border-[var(--karya-border)] bg-[var(--karya-bg)] pr-9 pl-3.5 py-2 text-sm font-mono uppercase focus:bg-white focus:border-[var(--karya-action)] focus:outline-none"
             />
           </div>
           <div className="relative">
-            <Phone className="w-4 h-4 text-slate-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <Phone className="w-4 h-4 text-[var(--karya-text-muted)] absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="tel"
               dir="ltr"
               placeholder="06XXXXXXXX"
               value={trackPhone}
               onChange={(e) => setTrackPhone(e.target.value)}
-              className="w-full min-h-[46px] rounded-xl border border-slate-200 bg-[#F4F6F9] pr-9 pl-3.5 py-2 text-sm font-mono focus:bg-white focus:border-[#0D9488] focus:outline-none"
+              className="w-full min-h-[46px] rounded-lg border border-[var(--karya-border)] bg-[var(--karya-bg)] pr-9 pl-3.5 py-2 text-sm font-mono focus:bg-white focus:border-[var(--karya-action)] focus:outline-none"
             />
           </div>
           <button
             type="submit"
             disabled={lookupLoading}
-            className="min-h-[46px] rounded-xl bg-[#0F2942] hover:bg-[#173B5E] text-white px-5 py-2 text-xs sm:text-sm font-bold transition-colors flex items-center justify-center gap-2"
+            className="min-h-[46px] rounded-lg bg-[var(--karya-primary)] hover:bg-[var(--karya-primary-hover)] text-white px-5 py-2 text-xs sm:text-sm font-bold transition-colors flex items-center justify-center gap-2"
           >
             {lookupLoading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -472,25 +472,25 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
       {refundFeedback && (
         <div
           role="status"
-          className="rounded-2xl bg-teal-50 border border-teal-200 px-5 py-3.5 text-xs sm:text-sm text-[#0F766E] flex items-center gap-2.5"
+          className="rounded-xl bg-emerald-50 border border-emerald-200 px-5 py-3.5 text-xs sm:text-sm text-emerald-800 flex items-center gap-2.5"
         >
-          <CheckCircle2 className="w-5 h-5 shrink-0 text-[#0D9488]" />
+          <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-700" />
           <span>{refundFeedback}</span>
         </div>
       )}
 
-      {/* ===================== SCREEN 3: BOOKING CARDS ===================== */}
+      {/* BOOKING CARDS */}
       {displayedBookings.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-10 text-center space-y-3">
+        <div className="bg-[var(--karya-surface)] rounded-xl border border-[var(--karya-border)] p-10 text-center space-y-3">
           <CarFront className="w-10 h-10 text-slate-300 mx-auto" aria-hidden="true" />
-          <h2 className="font-bold text-lg text-[#0F2942]">لا توجد حجوزات مسجلة حالياً</h2>
-          <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
+          <h2 className="font-bold text-lg text-[var(--karya-primary)]">لا توجد حجوزات مسجلة حالياً</h2>
+          <p className="text-xs sm:text-sm text-[var(--karya-text-muted)] max-w-md mx-auto">
             يمكنك تتبع أي حجز عبر إدخال رمز الطلب ورقم الهاتف أعلاه، أو تصفح السيارات المتاحة لإجراء حجز جديد.
           </p>
           <button
             type="button"
             onClick={onBrowseCars}
-            className="inline-flex items-center justify-center mt-2 px-5 py-2.5 rounded-xl bg-[#0D9488] hover:bg-[#0F766E] text-white text-xs sm:text-sm font-extrabold transition-colors"
+            className="inline-flex items-center justify-center mt-2 px-5 py-2.5 min-h-[44px] rounded-lg bg-[var(--karya-action)] hover:bg-[var(--karya-action-hover)] text-white text-xs sm:text-sm font-extrabold transition-colors"
           >
             تصفح السيارات المتاحة
           </button>
@@ -498,154 +498,148 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
       ) : (
         <div className="space-y-4">
           {displayedBookings.map((booking) => {
-          const badge = getStatusBadge(booking.status);
-          const refundEligibility = getRefundEligibility(booking);
-          const formattedDate = (() => {
-            const dt = new Date(booking.delivery_at);
-            return Number.isNaN(dt.getTime())
-              ? booking.delivery_at
-              : dt.toLocaleDateString('ar-MA', {
-                  year: 'numeric',
-                  month: 'short',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                });
-          })();
+            const badge = getStatusBadge(booking.status);
+            const refundEligibility = getRefundEligibility(booking);
+            const formattedDate = (() => {
+              const dt = new Date(booking.delivery_at);
+              return Number.isNaN(dt.getTime())
+                ? booking.delivery_at
+                : dt.toLocaleDateString('ar-MA', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  });
+            })();
 
-          return (
-            <article
-              key={booking.booking_code}
-              className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden flex flex-col sm:flex-row"
-            >
-              {/* Car Image on the RIGHT side (first child in RTL) */}
-              <div className="w-full sm:w-52 md:w-60 h-44 sm:h-auto bg-slate-100 shrink-0 relative overflow-hidden">
-                {booking.car_image ? (
-                  <img
-                    src={booking.car_image}
-                    alt={booking.car_label}
-                    referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-slate-400">
-                    <CarFront className="w-10 h-10" />
-                  </div>
-                )}
-              </div>
-
-              {/* Card Details */}
-              <div className="flex-1 p-4 sm:p-5 flex flex-col justify-between gap-4 min-w-0">
-                {/* Top Row: Prominent Car Name (Right) + Clear Status Badge (Top Left) */}
-                <div className="space-y-2.5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h2 className="text-lg sm:text-xl font-extrabold text-[#0F2942] truncate">
-                        {booking.car_label}
-                      </h2>
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 mt-0.5">
-                        <span className="font-mono-tabular font-bold text-[#0F2942]">
-                          {booking.booking_code}
-                        </span>
-                        <span aria-hidden="true">·</span>
-                        <span>{booking.agency_name}</span>
-                      </div>
-                    </div>
-
-                    {/* Clear Status Badge at Top Left */}
-                    <span
-                      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-extrabold whitespace-nowrap shrink-0 ${badge.badgeClasses}`}
-                    >
-                      {badge.icon}
-                      <span>{badge.label}</span>
-                    </span>
-                  </div>
-
-                  {/* Metadata */}
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
-                    <span className="inline-flex items-center gap-1">
-                      <MapPin className="w-3.5 h-3.5 text-[#0D9488]" />
-                      <span>{getCityLabelAr(booking.city)}</span>
-                    </span>
-                    <span className="text-slate-300" aria-hidden="true">·</span>
-                    <span>{booking.days} أيام</span>
-                    <span className="text-slate-300" aria-hidden="true">·</span>
-                    <span className="inline-flex items-center gap-1">
-                      <CalendarClock className="w-3.5 h-3.5 text-slate-400" />
-                      <span>{formattedDate}</span>
-                    </span>
-                  </div>
-
-                  {booking.pickup_location && (
-                    <div className="text-xs text-slate-500 truncate">
-                      مكان التسليم: <strong className="text-[#0F2942]">{booking.pickup_location}</strong>
+            return (
+              <article
+                key={booking.booking_code}
+                className="bg-[var(--karya-surface)] rounded-xl border border-[var(--karya-border)] overflow-hidden flex flex-col sm:flex-row"
+              >
+                <div className="w-full sm:w-52 md:w-60 h-44 sm:h-auto bg-slate-100 shrink-0 relative overflow-hidden">
+                  {booking.car_image ? (
+                    <img
+                      src={booking.car_image}
+                      alt={booking.car_label}
+                      referrerPolicy="no-referrer"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-slate-400">
+                      <CarFront className="w-10 h-10" />
                     </div>
                   )}
                 </div>
 
-                {/* Bold Price Breakdown (Deposit vs Total upon pickup) */}
-                <div className="rounded-xl bg-[#F4F6F9] p-3.5 grid grid-cols-2 sm:grid-cols-3 gap-3 items-center">
-                  <div>
-                    <div className="text-[11px] font-semibold text-slate-500">
-                      مبلغ التسبيق (10%)
-                    </div>
-                    <div className="text-base sm:text-lg font-extrabold text-[#0D9488] font-mono-tabular mt-0.5">
-                      {formatDH(booking.commission_amount)}
-                    </div>
-                  </div>
+                <div className="flex-1 p-4 sm:p-5 flex flex-col justify-between gap-4 min-w-0">
+                  <div className="space-y-2.5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h2 className="text-lg sm:text-xl font-extrabold text-[var(--karya-primary)] truncate">
+                          {booking.car_label}
+                        </h2>
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--karya-text-muted)] mt-0.5">
+                          <span className="font-mono-tabular font-bold text-[var(--karya-primary)]">
+                            {booking.booking_code}
+                          </span>
+                          <span aria-hidden="true">·</span>
+                          <span>{booking.agency_name}</span>
+                        </div>
+                      </div>
 
-                  <div>
-                    <div className="text-[11px] font-semibold text-slate-500">
-                      المبلغ عند الاستلام (90%)
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-extrabold whitespace-nowrap shrink-0 ${badge.badgeClasses}`}
+                      >
+                        {badge.icon}
+                        <span>{badge.label}</span>
+                      </span>
                     </div>
-                    <div className="text-base sm:text-lg font-extrabold text-[#0F2942] font-mono-tabular mt-0.5">
-                      {formatDH(booking.agency_payout_amount)}
+
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--karya-text-muted)]">
+                      <span className="inline-flex items-center gap-1">
+                        <MapPin className="w-3.5 h-3.5 text-[var(--karya-text-muted)]" />
+                        <span>{getCityLabelAr(booking.city)}</span>
+                      </span>
+                      <span className="text-slate-300" aria-hidden="true">·</span>
+                      <span>{booking.days} أيام</span>
+                      <span className="text-slate-300" aria-hidden="true">·</span>
+                      <span className="inline-flex items-center gap-1">
+                        <CalendarClock className="w-3.5 h-3.5 text-[var(--karya-text-muted)]" />
+                        <span>{formattedDate}</span>
+                      </span>
                     </div>
-                  </div>
 
-                  <div className="col-span-2 sm:col-span-1 flex sm:justify-end">
-                    <div className="inline-flex items-center gap-1.5 text-xs font-extrabold text-[#0F766E]">
-                      <ShieldCheck className="w-4 h-4 text-[#0D9488]" />
-                      <span>كفالة: 0 DH</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Refund Eligibility / Action Row */}
-                <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-                  <span className="text-[11px] text-slate-400">
-                    أي تمديد خارج المنصة لا تشمله حماية التسبيق.
-                  </span>
-
-                  {booking.agency_ack_status === 'unavailable' &&
-                    (booking.status === 'payment_uploaded' ||
-                      booking.status === 'payment_verified') && (
-                      <div className="w-full rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-xs font-semibold text-red-800">
-                        اعتذرت الوكالة عن توفر السيارة — يمكنك استرجاع تسبيقك كاملاً الآن.
+                    {booking.pickup_location && (
+                      <div className="text-xs text-[var(--karya-text-muted)] truncate">
+                        مكان التسليم: <strong className="text-[var(--karya-text)]">{booking.pickup_location}</strong>
                       </div>
                     )}
+                  </div>
 
-                  {refundEligibility.eligible ? (
-                    <button
-                      type="button"
-                      onClick={() => openRefundForBooking(booking)}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 px-4 py-2 text-xs font-extrabold transition-colors whitespace-nowrap"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      <span>طلب استرجاع التسبيق</span>
-                    </button>
-                  ) : (
-                    refundEligibility.blockedMessage && (
-                      <div className="text-[11px] text-slate-500 leading-relaxed">
-                        {refundEligibility.blockedMessage}
+                  {/* Price Breakdown */}
+                  <div className="rounded-lg bg-[var(--karya-bg)] border border-[var(--karya-border)]/70 p-3.5 grid grid-cols-2 sm:grid-cols-3 gap-3 items-center">
+                    <div>
+                      <div className="text-[11px] font-semibold text-[var(--karya-text-muted)]">
+                        مبلغ تأكيد الحجز (10%)
                       </div>
-                    )
-                  )}
+                      <div className="text-base sm:text-lg font-extrabold text-[var(--karya-action)] font-mono-tabular mt-0.5">
+                        {formatDH(booking.commission_amount)}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-[11px] font-semibold text-[var(--karya-text-muted)]">
+                        المبلغ المتبقي عند الاستلام (90%)
+                      </div>
+                      <div className="text-base sm:text-lg font-extrabold text-[var(--karya-primary)] font-mono-tabular mt-0.5">
+                        {formatDH(booking.agency_payout_amount)}
+                      </div>
+                    </div>
+
+                    <div className="col-span-2 sm:col-span-1 flex sm:justify-end">
+                      <div className="inline-flex items-center gap-1.5 text-xs font-extrabold text-[var(--karya-action)]">
+                        <ShieldCheck className="w-4 h-4" />
+                        <span>بدون ضمانة مالية</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                    <span className="text-[11px] text-[var(--karya-text-muted)]">
+                      أي تمديد خارج المنصة لا يشمله مسار حماية مبلغ تأكيد الحجز.
+                    </span>
+
+                    {booking.agency_ack_status === 'unavailable' &&
+                      (booking.status === 'payment_uploaded' ||
+                        booking.status === 'payment_verified') && (
+                        <div className="w-full rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs font-semibold text-red-800">
+                          اعتذرت الوكالة عن توفير السيارة — يمكنك الآن طلب استرجاع مبلغ تأكيد الحجز كاملاً.
+                        </div>
+                      )}
+
+                    {refundEligibility.eligible ? (
+                      <button
+                        type="button"
+                        onClick={() => openRefundForBooking(booking)}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 px-4 py-2 text-xs font-extrabold transition-colors whitespace-nowrap"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>طلب استرجاع مبلغ التأكيد</span>
+                      </button>
+                    ) : (
+                      refundEligibility.blockedMessage && (
+                        <div className="text-[11px] text-[var(--karya-text-muted)] leading-relaxed">
+                          {refundEligibility.blockedMessage}
+                        </div>
+                      )
+                    )}
+                  </div>
                 </div>
-              </div>
-            </article>
-          );
-        })}
+              </article>
+            );
+          })}
         </div>
       )}
 
@@ -654,22 +648,22 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
         <form
           id="refund-request-panel"
           onSubmit={handleSubmitRefund}
-          className="bg-white rounded-2xl border border-slate-200/90 shadow-md p-5 sm:p-6 space-y-4"
+          className="bg-[var(--karya-surface)] rounded-xl border border-[var(--karya-border)] shadow-sm p-5 sm:p-6 space-y-4"
         >
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-0.5">
-              <h2 className="text-base sm:text-lg font-extrabold text-[#0F2942] flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-[#0D9488]" />
-                <span>طلب استرجاع التسبيق ({refundTarget.booking_code})</span>
+              <h2 className="text-base sm:text-lg font-extrabold text-[var(--karya-primary)] flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-[var(--karya-action)]" />
+                <span>طلب استرجاع مبلغ تأكيد الحجز ({refundTarget.booking_code})</span>
               </h2>
-              <p className="text-xs text-slate-500">
-                تحويل فوري عبر رقم الهاتف أو الحساب البنكي — متاح فقط عند عدم توفر السيارة أو تعذر التسليم.
+              <p className="text-xs text-[var(--karya-text-muted)]">
+                سيتم مراجعة طلبك وإرجاع المبلغ كاملاً وفق إجراءات الاسترجاع المعتمدة إلى رقم هاتفك أو حسابك البنكي — متاح عند عدم توفر السيارة أو عدم تمكن الوكالة من التسليم.
               </p>
             </div>
             <button
               type="button"
               onClick={() => setRefundTarget(null)}
-              className="text-xs font-bold text-slate-500 hover:text-[#0F2942]"
+              className="text-xs font-bold text-[var(--karya-text-muted)] hover:text-[var(--karya-primary)]"
             >
               إلغاء
             </button>
@@ -677,7 +671,7 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-[#0F2942] mb-1.5">
+              <label className="block text-xs font-bold text-[var(--karya-primary)] mb-1.5">
                 رقم الهاتف المرتبط بالحجز (للتحقق)
               </label>
               <input
@@ -687,14 +681,14 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
                 placeholder="06XXXXXXXX"
                 value={refundPhone}
                 onChange={(e) => setRefundPhone(e.target.value)}
-                className="w-full min-h-[44px] rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-mono bg-white focus:border-[#0D9488] focus:outline-none"
+                className="w-full min-h-[44px] rounded-lg border border-[var(--karya-border)] px-3.5 py-2 text-sm font-mono bg-white focus:border-[var(--karya-action)] focus:outline-none"
               />
             </div>
 
             <div>
               <label
                 htmlFor="refund-destination-input"
-                className="block text-xs font-bold text-[#0F2942] mb-1.5"
+                className="block text-xs font-bold text-[var(--karya-primary)] mb-1.5"
               >
                 رقم الهاتف (06/07) أو الحساب البنكي (RIB) للاسترجاع
               </label>
@@ -706,17 +700,17 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
                 placeholder="06XXXXXXXX أو رقم الحساب"
                 value={refundRib}
                 onChange={(e) => setRefundRib(e.target.value)}
-                className="w-full min-h-[44px] rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-mono focus:border-[#0D9488] focus:outline-none placeholder:font-sans placeholder:text-xs"
+                className="w-full min-h-[44px] rounded-lg border border-[var(--karya-border)] px-3.5 py-2 text-sm font-mono focus:border-[var(--karya-action)] focus:outline-none placeholder:font-sans placeholder:text-xs"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-[#0F2942] mb-1.5">السبب</label>
+            <label className="block text-xs font-bold text-[var(--karya-primary)] mb-1.5">السبب</label>
             <select
               value={refundReason}
               onChange={(e) => setRefundReason(e.target.value)}
-              className="w-full min-h-[44px] rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm focus:border-[#0D9488] focus:outline-none"
+              className="w-full min-h-[44px] rounded-lg border border-[var(--karya-border)] bg-white px-3.5 py-2 text-sm focus:border-[var(--karya-action)] focus:outline-none"
             >
               <option value="عدم توفر السيارة لدى الوكالة">عدم توفر السيارة لدى الوكالة</option>
               <option value="تأخر تسليم السيارة عن الموعد المحدد">تأخر تسليم السيارة عن الموعد المحدد</option>
@@ -725,7 +719,7 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
           </div>
 
           {refundError && (
-            <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-2.5 text-xs sm:text-sm text-red-700">
+            <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-2.5 text-xs sm:text-sm text-red-700">
               {refundError}
             </div>
           )}
@@ -733,7 +727,7 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
           <button
             type="submit"
             disabled={refundSubmitting}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0D9488] hover:bg-[#0F766E] disabled:opacity-65 text-white px-5 py-2.5 text-sm font-extrabold transition-colors"
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--karya-action)] hover:bg-[var(--karya-action-hover)] disabled:opacity-65 text-white px-5 py-2.5 min-h-[44px] text-sm font-extrabold transition-colors"
           >
             {refundSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
             <span>إرسال طلب الاسترجاع</span>
