@@ -65,6 +65,8 @@ export interface CarOffer {
   city: string;
   status: CarAvailability;
   distance_km: number | null;
+  is_booked?: boolean;
+  booked_until?: string | null;
   is_demo?: boolean;
 }
 
@@ -100,6 +102,10 @@ export interface CreatedBooking {
   status: BookingStatus;
   selected_bank_code?: string;
   receipt_url?: string;
+  customer_phone?: string;
+  agency_ack_status?: AgencyAckStatus;
+  dispute_flag?: string | null;
+  refund_allowed_by_admin?: boolean;
   is_demo?: boolean;
 }
 
@@ -158,6 +164,7 @@ export interface AgencyBookingRecord {
   agency_ack_note?: string | null;
   reassigned_at?: string | null;
   dispute_flag?: string | null;
+  refund_allowed_by_admin?: boolean;
 }
 
 export interface AdminReassignCarOption {

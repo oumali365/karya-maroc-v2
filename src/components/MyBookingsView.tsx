@@ -46,13 +46,23 @@ function getStatusBadge(status: BookingStatus): {
         icon: <RotateCcw className="w-3.5 h-3.5 text-red-600 shrink-0" />,
       };
     case 'refunded':
+      return {
+        label: 'تم استرجاع التسبيق',
+        classes: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+        icon: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />,
+      };
     case 'cancelled':
       return {
-        label: 'ملغى / تم استرجاع التسبيق',
-        classes: 'bg-red-50 text-red-800 border-red-200',
-        icon: <XCircle className="w-3.5 h-3.5 text-red-600 shrink-0" />,
+        label: 'ملغى',
+        classes: 'bg-slate-100 text-slate-700 border-slate-200',
+        icon: <XCircle className="w-3.5 h-3.5 text-slate-500 shrink-0" />,
       };
     case 'pending_payment':
+      return {
+        label: 'بانتظار إرفاق وصل التحويل',
+        classes: 'bg-amber-50 text-amber-900 border-amber-200',
+        icon: <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />,
+      };
     case 'payment_uploaded':
     default:
       return {
@@ -109,6 +119,50 @@ function validateRefundDestination(raw: string): {
   };
 }
 
+function getRefundEligibility(booking: CreatedBooking): {
+  eligible: boolean;
+  blockedMessage: string | null;
+} {
+  if (booking.status !== 'payment_uploaded' && booking.status !== 'payment_verified') {
+    return { eligible: false, blockedMessage: null };
+  }
+
+  if (booking.dispute_flag) {
+    return {
+      eligible: false,
+      blockedMessage:
+        'تم تسجيل مخالفة على الحجز من طرف الوكالة (عدم تطابق الرخصة أو عدم الحضور) — تواصل مع الإدارة.',
+    };
+  }
+
+  if (booking.agency_ack_status === 'unavailable' || booking.refund_allowed_by_admin) {
+    return { eligible: true, blockedMessage: null };
+  }
+
+  const deliveryTime = new Date(booking.delivery_at).getTime();
+  if (
+    booking.status === 'payment_verified' &&
+    !Number.isNaN(deliveryTime) &&
+    Date.now() > deliveryTime
+  ) {
+    return { eligible: true, blockedMessage: null };
+  }
+
+  if (booking.agency_ack_status === 'available') {
+    return {
+      eligible: false,
+      blockedMessage:
+        'الوكالة أكدت توفر السيارة والتزامها بالتسليم في الموعد — الاسترجاع متاح فقط إذا تعذر التسليم.',
+    };
+  }
+
+  return {
+    eligible: false,
+    blockedMessage:
+      'التسبيق يضمن حجز السيارة لك؛ يُفتح الاسترجاع فقط إذا أعلنت الوكالة عدم توفرها أو تعذر التسليم في الموعد.',
+  };
+}
+
 export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
   recentBookings,
   onUpdateBookingStatus,
@@ -124,11 +178,9 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
 
   // Active booking selected for refund request
   const [refundTarget, setRefundTarget] = useState<CreatedBooking | null>(null);
-  const [manualRefundMode, setManualRefundMode] = useState(false);
-  const [manualCode, setManualCode] = useState('');
   const [refundPhone, setRefundPhone] = useState('');
   const [refundRib, setRefundRib] = useState('');
-  const [refundReason, setRefundReason] = useState('عدم توفر السيارة أو إلغاء الحجز وفق الشروط');
+  const [refundReason, setRefundReason] = useState('عدم توفر السيارة لدى الوكالة');
   const [refundSubmitting, setRefundSubmitting] = useState(false);
   const [refundFeedback, setRefundFeedback] = useState<string | null>(null);
   const [refundError, setRefundError] = useState<string | null>(null);
@@ -163,9 +215,12 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
               total_amount: Number(row.total_amount),
               commission_amount: Number(row.commission_amount),
               agency_payout_amount: Number(row.agency_payout_amount),
-              delivery_at: String(row.delivery_at),
-              status: row.status,
-              is_demo: false,
+                delivery_at: String(row.delivery_at),
+                status: row.status,
+                agency_ack_status: row.agency_ack_status ?? 'pending',
+                dispute_flag: row.dispute_flag ?? null,
+                refund_allowed_by_admin: Boolean(row.refund_allowed_by_admin),
+                is_demo: false,
             })),
           );
         }
@@ -174,11 +229,50 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
       }
     };
 
+    const refreshRecentDeviceBookings = async () => {
+      const toRefresh = recentBookings.filter((b) => !b.is_demo && b.customer_phone);
+      if (toRefresh.length === 0) return;
+
+      const refreshed: CreatedBooking[] = [];
+      for (const item of toRefresh) {
+        try {
+          const { data, error } = await supabase.rpc('get_customer_booking_by_phone', {
+            p_booking_code: item.booking_code,
+            p_customer_phone: item.customer_phone,
+          });
+          if (!error && Array.isArray(data) && data.length > 0) {
+            const r = data[0];
+            refreshed.push({
+              ...item,
+              booking_id: String(r.booking_id),
+              status: r.status,
+              agency_ack_status: r.agency_ack_status ?? 'pending',
+              dispute_flag: r.dispute_flag ?? null,
+              refund_allowed_by_admin: Boolean(r.refund_allowed_by_admin),
+            });
+          }
+        } catch {
+          // Ignore single refresh failure
+        }
+      }
+
+      if (active && refreshed.length > 0) {
+        setLookupBookings((prev) => {
+          const nextMap = new Map(prev.map((x) => [x.booking_code, x]));
+          for (const r of refreshed) {
+            nextMap.set(r.booking_code, r);
+          }
+          return Array.from(nextMap.values());
+        });
+      }
+    };
+
     loadAuthenticatedCustomerBookings();
+    refreshRecentDeviceBookings();
     return () => {
       active = false;
     };
-  }, []);
+  }, [recentBookings]);
 
   const handleLookupByPhone = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -202,7 +296,7 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
           booking_id: String(r.booking_id),
           booking_code: String(r.booking_code),
           car_label: String(r.car_label),
-          car_image: '',
+          car_image: String(r.car_image || ''),
           agency_name: String(r.agency_name),
           city: String(r.city),
           days: Number(r.days),
@@ -212,6 +306,10 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
           agency_payout_amount: Number(r.agency_payout_amount),
           delivery_at: String(r.delivery_at),
           status: r.status,
+          customer_phone: trackPhone.trim(),
+          agency_ack_status: r.agency_ack_status ?? 'pending',
+          dispute_flag: r.dispute_flag ?? null,
+          refund_allowed_by_admin: Boolean(r.refund_allowed_by_admin),
           is_demo: false,
         };
         setLookupBookings((prev) => [
@@ -236,8 +334,8 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
   const allBookings = Array.from(mergedMap.values());
 
   const openRefundForBooking = (booking: CreatedBooking) => {
-    setManualRefundMode(false);
     setRefundTarget(booking);
+    setRefundPhone(booking.customer_phone || trackPhone.trim() || '');
     setRefundError(null);
     setRefundFeedback(null);
     window.setTimeout(() => {
@@ -250,14 +348,12 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
     setRefundError(null);
     setRefundFeedback(null);
 
-    const activeCode = (refundTarget?.booking_code || manualCode).trim().toUpperCase();
-    const matchedBooking =
-      refundTarget || allBookings.find((b) => b.booking_code.toUpperCase() === activeCode) || null;
-
-    if (!activeCode) {
-      setRefundError('يرجى تحديد الحجز أو إدخال رمز الحجز (KRY-XXXXXX).');
+    if (!refundTarget) {
+      setRefundError('يرجى تحديد الحجز المؤهل للاسترجاع أولاً.');
       return;
     }
+
+    const activeCode = refundTarget.booking_code.trim().toUpperCase();
 
     const accountValidation = validateRefundDestination(refundRib);
     if (!accountValidation.valid) {
@@ -267,10 +363,18 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
 
     setRefundSubmitting(true);
     try {
-      if (matchedBooking && !matchedBooking.is_demo) {
+      const eligibility = getRefundEligibility(refundTarget);
+      if (!eligibility.eligible) {
+        throw new Error(
+          eligibility.blockedMessage ||
+            'لا يمكن طلب استرجاع التسبيق ما دامت الوكالة ملتزمة بتوفير السيارة في الموعد المحدد.',
+        );
+      }
+
+      if (!refundTarget.is_demo) {
         const { error } = await supabase.rpc('request_full_refund', {
-          p_booking_id: matchedBooking.booking_id,
-          p_booking_code: matchedBooking.booking_code,
+          p_booking_id: refundTarget.booking_id,
+          p_booking_code: refundTarget.booking_code,
           p_customer_rib: accountValidation.value,
           p_reason: refundReason,
           p_customer_phone: refundPhone.trim() || trackPhone.trim() || null,
@@ -291,12 +395,11 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
       );
 
       setRefundFeedback(
-        'تم تسجيل طلب الاسترجاع بنجاح. استرجع تسبيقك كاملاً عبر التحويل الفوري لرقم هاتفك أو حسابك البنكي (مثل Cash Plus أو التطبيقات البنكية) خلال ساعات من التحقق.',
+        'تم تسجيل طلب الاسترجاع بنجاح. سيتم تحويل تسبيقك كاملاً لرقم هاتفك أو حسابك البنكي خلال ساعات من المراجعة.',
       );
       setRefundRib('');
       setRefundPhone('');
       setRefundTarget(null);
-      setManualRefundMode(false);
     } catch (err) {
       setRefundError(err instanceof Error ? err.message : 'تعذر تسجيل طلب الاسترجاع.');
     } finally {
@@ -307,26 +410,11 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
   return (
     <section className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-10 space-y-6" dir="rtl">
       {/* Page Title */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-extrabold text-slate-900">حجوزاتي</h1>
-          <p className="text-xs sm:text-sm text-slate-500">
-            تابع حالة طلباتك أو اطلب استرجاع التسبيق فورياً عند تعذر التسليم.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => {
-            setRefundTarget(null);
-            setManualRefundMode((v) => !v);
-            setRefundError(null);
-          }}
-          className="self-start sm:self-auto inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 px-4 py-2.5 text-xs font-bold transition-colors whitespace-nowrap"
-        >
-          <RotateCcw className="w-3.5 h-3.5 text-[#2563EB]" />
-          <span>استرجاع برمز الحجز</span>
-        </button>
+      <div className="space-y-1">
+        <h1 className="text-2xl font-extrabold text-slate-900">حجوزاتي</h1>
+        <p className="text-xs sm:text-sm text-slate-500">
+          تابع حالة طلبك برمز الحجز ورقم الهاتف، ويظهر خيار استرجاع التسبيق تلقائياً عند تعذر توفر السيارة.
+        </p>
       </div>
 
       {/* Secure Lookup Form */}
@@ -400,8 +488,7 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
         <div className="space-y-3.5">
           {allBookings.map((booking) => {
             const badge = getStatusBadge(booking.status);
-            const canRequestRefund =
-              booking.status === 'payment_uploaded' || booking.status === 'payment_verified';
+            const refundEligibility = getRefundEligibility(booking);
             const formattedDate = (() => {
               const dt = new Date(booking.delivery_at);
               return Number.isNaN(dt.getTime())
@@ -502,7 +589,14 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
                     </div>
                   </div>
 
-                  {canRequestRefund && (
+                  {booking.agency_ack_status === 'unavailable' &&
+                    (booking.status === 'payment_uploaded' || booking.status === 'payment_verified') && (
+                      <div className="rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-[11px] font-semibold text-red-800 max-w-xs">
+                        اعتذرت الوكالة عن توفر السيارة — يمكنك استرجاع تسبيقك كاملاً أو انتظار التحويل لوكالة بديلة.
+                      </div>
+                    )}
+
+                  {refundEligibility.eligible ? (
                     <button
                       type="button"
                       onClick={() => openRefundForBooking(booking)}
@@ -511,6 +605,12 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
                       <RotateCcw className="w-3.5 h-3.5" />
                       <span>طلب استرجاع</span>
                     </button>
+                  ) : (
+                    refundEligibility.blockedMessage && (
+                      <div className="text-[11px] text-slate-500 bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2 max-w-[260px] text-right leading-relaxed">
+                        {refundEligibility.blockedMessage}
+                      </div>
+                    )
                   )}
                 </div>
               </article>
@@ -520,7 +620,7 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
       )}
 
       {/* Refund Request Panel */}
-      {(refundTarget || manualRefundMode) && (
+      {refundTarget && (
         <form
           id="refund-request-panel"
           onSubmit={handleSubmitRefund}
@@ -530,17 +630,16 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
             <div className="space-y-0.5">
               <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
                 <ShieldCheck className="w-5 h-5 text-[#2563EB]" />
-                <span>طلب استرجاع التسبيق</span>
+                <span>طلب استرجاع التسبيق ({refundTarget.booking_code})</span>
               </h2>
               <p className="text-xs text-slate-500">
-                تحويل فوري عبر رقم الهاتف (Cash Plus) أو الحساب البنكي.
+                تحويل فوري عبر رقم الهاتف أو الحساب البنكي — متاح فقط عند عدم توفر السيارة أو تعذر التسليم.
               </p>
             </div>
             <button
               type="button"
               onClick={() => {
                 setRefundTarget(null);
-                setManualRefundMode(false);
               }}
               className="text-xs font-semibold text-slate-500 hover:text-slate-900"
             >
@@ -551,25 +650,7 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                رمز الحجز
-              </label>
-              <input
-                required
-                type="text"
-                dir="ltr"
-                readOnly={Boolean(refundTarget)}
-                placeholder="KRY-XXXXXX"
-                value={refundTarget ? refundTarget.booking_code : manualCode}
-                onChange={(e) => setManualCode(e.target.value)}
-                className={`w-full min-h-[44px] rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-mono uppercase focus:border-[#2563EB] focus:outline-none ${
-                  refundTarget ? 'bg-slate-50 text-slate-700' : 'bg-white'
-                }`}
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                رقم الهاتف المرتبط بالحجز (للتحقق الأمني)
+                رقم الهاتف المرتبط بالحجز (للتحقق)
               </label>
               <input
                 required
@@ -604,12 +685,15 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1.5">السبب</label>
-            <input
-              type="text"
+            <select
               value={refundReason}
               onChange={(e) => setRefundReason(e.target.value)}
-              className="w-full min-h-[44px] rounded-xl border border-slate-200 px-3.5 py-2 text-sm focus:border-[#2563EB] focus:outline-none"
-            />
+              className="w-full min-h-[44px] rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm focus:border-[#2563EB] focus:outline-none"
+            >
+              <option value="عدم توفر السيارة لدى الوكالة">عدم توفر السيارة لدى الوكالة</option>
+              <option value="تأخر تسليم السيارة عن الموعد المحدد">تأخر تسليم السيارة عن الموعد المحدد</option>
+              <option value="إلغاء بتوجيه من إدارة المنصة">إلغاء بتوجيه من إدارة المنصة</option>
+            </select>
           </div>
 
           {refundError && (

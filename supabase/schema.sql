@@ -360,7 +360,8 @@ ALTER TABLE public.bookings
     ADD COLUMN IF NOT EXISTS reassigned_from_agency_id UUID REFERENCES public.agencies(id) ON DELETE SET NULL,
     ADD COLUMN IF NOT EXISTS reassigned_at TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ,
-    ADD COLUMN IF NOT EXISTS dispute_flag TEXT;
+    ADD COLUMN IF NOT EXISTS dispute_flag TEXT,
+    ADD COLUMN IF NOT EXISTS refund_allowed_by_admin BOOLEAN NOT NULL DEFAULT false;
 
 ALTER TABLE public.bookings DROP CONSTRAINT IF EXISTS bookings_agency_ack_status_check;
 ALTER TABLE public.bookings
@@ -647,12 +648,16 @@ CREATE POLICY "payouts_admin_all" ON public.payouts
 -- 11. RPC FUNCTIONS (عمليات العملاء + الوكالات برقم الهاتف والرمز السري + الإدارة)
 -- ============================================================================
 
--- (أ) البحث عن السيارات المتاحة حسب المدينة (بدون ضمان)
+-- (أ) البحث عن السيارات المتاحة حسب المدينة والتواريخ (بدون ضمان — مع إظهار السيارات المحجوزة)
+DROP FUNCTION IF EXISTS public.get_nearby_cars(TEXT, DOUBLE PRECISION, DOUBLE PRECISION, DOUBLE PRECISION);
+DROP FUNCTION IF EXISTS public.get_nearby_cars(TEXT, DOUBLE PRECISION, DOUBLE PRECISION, DOUBLE PRECISION, TIMESTAMPTZ, INTEGER);
 CREATE OR REPLACE FUNCTION public.get_nearby_cars(
     p_city TEXT DEFAULT NULL,
     p_lat DOUBLE PRECISION DEFAULT NULL,
     p_lng DOUBLE PRECISION DEFAULT NULL,
-    p_radius_km DOUBLE PRECISION DEFAULT 50
+    p_radius_km DOUBLE PRECISION DEFAULT 50,
+    p_pickup_at TIMESTAMPTZ DEFAULT NULL,
+    p_days INTEGER DEFAULT 3
 )
 RETURNS TABLE (
     car_id UUID,
@@ -671,7 +676,9 @@ RETURNS TABLE (
     agency_name TEXT,
     agency_rating NUMERIC,
     agency_rating_count INTEGER,
-    distance_km DOUBLE PRECISION
+    distance_km DOUBLE PRECISION,
+    is_booked BOOLEAN,
+    booked_until TIMESTAMPTZ
 )
 LANGUAGE sql
 STABLE
@@ -709,13 +716,28 @@ AS $$
                 )
             )
             ELSE NULL
-        END AS distance_km
+        END AS distance_km,
+        COALESCE(bk.is_booked, false) AS is_booked,
+        bk.booked_until
     FROM public.agency_cars c
     JOIN public.agencies a ON a.id = c.agency_id
+    LEFT JOIN LATERAL (
+        SELECT
+            true AS is_booked,
+            MAX(b.delivery_at + (b.days * INTERVAL '1 day')) AS booked_until
+        FROM public.bookings b
+        WHERE b.agency_car_id = c.id
+          AND b.status IN ('payment_uploaded', 'payment_verified', 'car_delivered')
+          AND b.delivery_at < (
+              COALESCE(p_pickup_at, NOW()) + (GREATEST(COALESCE(p_days, 3), 3) * INTERVAL '1 day')
+          )
+          AND (b.delivery_at + (b.days * INTERVAL '1 day')) > COALESCE(p_pickup_at, NOW())
+        GROUP BY b.agency_car_id
+    ) bk ON true
     WHERE c.status = 'available'
       AND a.verification_status = 'verified'
       AND (p_city IS NULL OR LOWER(c.city) = LOWER(p_city))
-    ORDER BY distance_km ASC NULLS LAST, c.created_at DESC;
+    ORDER BY COALESCE(bk.is_booked, false) ASC, distance_km ASC NULLS LAST, c.created_at DESC;
 $$;
 
 -- (ب) إنشاء حجز جديد (الحد الأدنى 3 أيام + أقدمية رخصة سنتين + تسبيق 10%)
@@ -1484,27 +1506,27 @@ BEGIN
         b.id,
         b.booking_code,
         CASE
-            WHEN b.status = 'payment_uploaded' THEN 'عميل قيد التحقق المالي'
+            WHEN b.status NOT IN ('payment_verified', 'car_delivered', 'completed') THEN 'عميل قيد المعالجة'
             ELSE b.customer_name
         END AS customer_name,
         CASE
-            WHEN b.status = 'payment_uploaded' THEN '••••••••'
+            WHEN b.status NOT IN ('payment_verified', 'car_delivered', 'completed') THEN '••••••••'
             ELSE b.customer_cin
         END AS customer_cin,
         CASE
-            WHEN b.status = 'payment_uploaded' THEN 'محجوب حتى تأكيد الإدارة'
+            WHEN b.status NOT IN ('payment_verified', 'car_delivered', 'completed') THEN 'محجوب لحماية الخصوصية'
             ELSE b.customer_phone
         END AS customer_phone,
         CASE
-            WHEN b.status = 'payment_uploaded' THEN NULL::TEXT
+            WHEN b.status NOT IN ('payment_verified', 'car_delivered', 'completed') THEN NULL::TEXT
             ELSE b.customer_license_number
         END AS customer_license_number,
         CASE
-            WHEN b.status = 'payment_uploaded' THEN NULL::DATE
+            WHEN b.status NOT IN ('payment_verified', 'car_delivered', 'completed') THEN NULL::DATE
             ELSE b.customer_license_issue_date
         END AS customer_license_issue_date,
         CASE
-            WHEN b.status = 'payment_uploaded' THEN COALESCE(c.city, v_agency.city)
+            WHEN b.status NOT IN ('payment_verified', 'car_delivered', 'completed') THEN COALESCE(c.city, v_agency.city)
             ELSE b.pickup_location
         END AS pickup_location,
         b.days,
@@ -1883,9 +1905,38 @@ BEGIN
         agency_ack_at = NULL,
         agency_ack_note = 'تم تحويل الحجز إليكم من الإدارة لتلبية طلب العميل.',
         dispute_flag = NULL,
+        refund_allowed_by_admin = false,
         status = CASE WHEN status = 'refund_requested' THEN 'payment_verified' ELSE status END,
         updated_at = NOW()
     WHERE id = p_booking_id;
+
+    RETURN true;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.admin_allow_refund(
+    p_booking_id UUID,
+    p_admin_pin TEXT DEFAULT NULL
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+BEGIN
+    IF NOT public.is_admin_or_pin(p_admin_pin) THEN
+        RAISE EXCEPTION 'غير مصرح لك بهذه العملية';
+    END IF;
+
+    UPDATE public.bookings
+    SET refund_allowed_by_admin = true,
+        updated_at = NOW()
+    WHERE id = p_booking_id
+      AND status IN ('payment_uploaded', 'payment_verified');
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'الحجز غير موجود أو لا يقبل فتح الاسترجاع في هذه المرحلة.';
+    END IF;
 
     RETURN true;
 END;
@@ -2044,6 +2095,7 @@ END;
 $$;
 
 DROP FUNCTION IF EXISTS public.request_full_refund(UUID, TEXT, TEXT, TEXT);
+DROP FUNCTION IF EXISTS public.request_full_refund(UUID, TEXT, TEXT, TEXT, TEXT);
 CREATE OR REPLACE FUNCTION public.request_full_refund(
     p_booking_id UUID,
     p_booking_code TEXT,
@@ -2061,6 +2113,7 @@ DECLARE
     v_payout_id UUID;
     v_norm_input_phone TEXT := REGEXP_REPLACE(COALESCE(p_customer_phone, ''), '[^0-9]', '', 'g');
     v_norm_db_phone TEXT;
+    v_is_refund_eligible BOOLEAN := false;
 BEGIN
     SELECT * INTO v_booking
     FROM public.bookings
@@ -2077,6 +2130,19 @@ BEGIN
 
     IF v_booking.status NOT IN ('payment_uploaded', 'payment_verified') THEN
         RAISE EXCEPTION 'لا يمكن طلب الاسترجاع في هذه الحالة';
+    END IF;
+
+    IF v_booking.dispute_flag IS NOT NULL THEN
+        RAISE EXCEPTION 'تم تسجيل مخالفة على الحجز من طرف الوكالة (عدم تطابق الرخصة أو عدم الحضور)، ولا يحق استرجاع التسبيق تلقائياً.';
+    END IF;
+
+    v_is_refund_eligible :=
+        v_booking.agency_ack_status = 'unavailable'
+        OR COALESCE(v_booking.refund_allowed_by_admin, false) = true
+        OR (v_booking.status = 'payment_verified' AND NOW() > v_booking.delivery_at);
+
+    IF NOT v_is_refund_eligible THEN
+        RAISE EXCEPTION 'لا يمكن طلب استرجاع التسبيق ما دامت الوكالة ملتزمة بتوفير السيارة في الموعد المحدد. يُفتح الاسترجاع فقط إذا أعلنت الوكالة عدم توفر السيارة، أو تعذر التسليم بعد الموعد المحدد، أو بقرار من الإدارة.';
     END IF;
 
     UPDATE public.bookings
@@ -2113,6 +2179,28 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS public.cancel_pending_booking(UUID, TEXT);
+CREATE OR REPLACE FUNCTION public.cancel_pending_booking(
+    p_booking_id UUID,
+    p_booking_code TEXT
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+    UPDATE public.bookings
+    SET status = 'cancelled',
+        updated_at = NOW()
+    WHERE id = p_booking_id
+      AND UPPER(TRIM(booking_code)) = UPPER(TRIM(p_booking_code))
+      AND status = 'pending_payment';
+
+    RETURN FOUND;
+END;
+$$;
+
 DROP FUNCTION IF EXISTS public.get_customer_booking_by_phone(TEXT, TEXT);
 CREATE OR REPLACE FUNCTION public.get_customer_booking_by_phone(
     p_booking_code TEXT,
@@ -2122,6 +2210,7 @@ RETURNS TABLE (
     booking_id UUID,
     booking_code TEXT,
     car_label TEXT,
+    car_image TEXT,
     agency_name TEXT,
     city TEXT,
     days INTEGER,
@@ -2129,7 +2218,10 @@ RETURNS TABLE (
     commission_amount NUMERIC,
     agency_payout_amount NUMERIC,
     delivery_at TIMESTAMPTZ,
-    status TEXT
+    status TEXT,
+    agency_ack_status TEXT,
+    dispute_flag TEXT,
+    refund_allowed_by_admin BOOLEAN
 )
 LANGUAGE sql
 STABLE
@@ -2140,6 +2232,7 @@ AS $$
         b.id AS booking_id,
         b.booking_code,
         COALESCE(c.brand || ' ' || c.model, 'سيارة اقتصادية') AS car_label,
+        COALESCE(c.primary_image_url, '') AS car_image,
         COALESCE(a.name, 'وكالة معتمدة') AS agency_name,
         COALESCE(c.city, a.city, 'Casablanca') AS city,
         b.days,
@@ -2147,17 +2240,21 @@ AS $$
         b.commission_amount,
         b.agency_payout_amount,
         b.delivery_at,
-        b.status
+        b.status,
+        b.agency_ack_status,
+        b.dispute_flag,
+        COALESCE(b.refund_allowed_by_admin, false) AS refund_allowed_by_admin
     FROM public.bookings b
     LEFT JOIN public.agency_cars c ON c.id = b.agency_car_id
     LEFT JOIN public.agencies a ON a.id = b.agency_id
     WHERE UPPER(TRIM(b.booking_code)) = UPPER(TRIM(p_booking_code))
-      AND REGEXP_REPLACE(b.customer_phone, '\s+', '', 'g') = REGEXP_REPLACE(p_customer_phone, '\s+', '', 'g');
+      AND REGEXP_REPLACE(b.customer_phone, '[^0-9]', '', 'g') = REGEXP_REPLACE(p_customer_phone, '[^0-9]', '', 'g');
 $$;
 
 -- منح صلاحيات الاستدعاء
-GRANT EXECUTE ON FUNCTION public.get_nearby_cars(TEXT, DOUBLE PRECISION, DOUBLE PRECISION, DOUBLE PRECISION) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.get_nearby_cars(TEXT, DOUBLE PRECISION, DOUBLE PRECISION, DOUBLE PRECISION, TIMESTAMPTZ, INTEGER) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.create_booking(UUID, TEXT, TEXT, TEXT, INTEGER, TIMESTAMPTZ, UUID, TEXT, TEXT, TEXT, DATE, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.cancel_pending_booking(UUID, TEXT) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.submit_payment_receipt(UUID, TEXT, UUID, TEXT) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.request_full_refund(UUID, TEXT, TEXT, TEXT, TEXT) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.get_customer_booking_by_phone(TEXT, TEXT) TO anon, authenticated;
@@ -2179,6 +2276,7 @@ GRANT EXECUTE ON FUNCTION public.admin_get_dashboard_data(TEXT) TO anon, authent
 GRANT EXECUTE ON FUNCTION public.admin_verify_payment(UUID, TEXT) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.admin_verify_agency(UUID, TEXT, TEXT) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.admin_reassign_booking(UUID, UUID, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_allow_refund(UUID, TEXT) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.admin_reset_agency_pin(UUID, TEXT, TEXT) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.admin_mark_payout_sent(UUID, TEXT) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.admin_upsert_catalog_car(TEXT, TEXT, TEXT, INTEGER, TEXT, TEXT, TEXT, TEXT) TO anon, authenticated;
@@ -2191,8 +2289,8 @@ GRANT EXECUTE ON FUNCTION public.confirm_car_delivery(UUID) TO authenticated;
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES
     ('car-photos', 'car-photos', true, 5242880, ARRAY['image/jpeg', 'image/png', 'image/webp']),
-    ('payment-receipts', 'payment-receipts', false, 5242880, ARRAY['image/jpeg', 'image/png', 'application/pdf'])
-ON CONFLICT (id) DO NOTHING;
+    ('payment-receipts', 'payment-receipts', true, 5242880, ARRAY['image/jpeg', 'image/png', 'application/pdf'])
+ON CONFLICT (id) DO UPDATE SET public = EXCLUDED.public;
 
 DROP POLICY IF EXISTS "car_photos_public_read" ON storage.objects;
 CREATE POLICY "car_photos_public_read"
@@ -2220,5 +2318,5 @@ WITH CHECK (bucket_id = 'payment-receipts');
 DROP POLICY IF EXISTS "receipts_admin_read" ON storage.objects;
 CREATE POLICY "receipts_admin_read"
 ON storage.objects FOR SELECT
-TO authenticated
-USING (bucket_id = 'payment-receipts' AND public.is_admin());
+TO anon, authenticated
+USING (bucket_id = 'payment-receipts');

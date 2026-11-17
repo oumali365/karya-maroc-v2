@@ -16,6 +16,8 @@ import {
   MessageCircle,
   ArrowRightLeft,
   AlertTriangle,
+  FileText,
+  X,
 } from 'lucide-react';
 import { supabase, formatDH, getCityLabelAr } from '../lib/supabase';
 import {
@@ -79,6 +81,12 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
   const [resettingPin, setResettingPin] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
   const [resetFeedback, setResetFeedback] = useState<string | null>(null);
+  const [bookingFilter, setBookingFilter] = useState<'all' | 'pending' | 'unavailable' | 'verified'>('all');
+  const [receiptPreview, setReceiptPreview] = useState<{
+    bookingCode: string;
+    url: string;
+    isPdf: boolean;
+  } | null>(null);
 
   const loadAdminData = async () => {
     setLoading(true);
@@ -167,6 +175,21 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
       return;
     }
     loadAdminData();
+  };
+
+  const handleAllowRefund = async (bookingId: string) => {
+    setErrorMsg(null);
+    const adminPin = getAdminSessionPin();
+    const { error } = await supabase.rpc('admin_allow_refund', {
+      p_booking_id: bookingId,
+      p_admin_pin: adminPin,
+    });
+    if (error) {
+      setErrorMsg(error.message);
+      return;
+    }
+    setReassignFeedback('تم فتح خيار طلب الاسترجاع للعميل في صفحة "حجوزاتي".');
+    await loadAdminData();
   };
 
   const handleMarkPayoutSent = async (payoutId: string) => {
@@ -303,6 +326,21 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
     setTimeout(() => setCopiedId(null), 1800);
   };
 
+  const openReceiptPreview = (bookingCode: string, receiptPath?: string | null) => {
+    if (!receiptPath || receiptPath.startsWith('local://')) return;
+    const isPdf = receiptPath.toLowerCase().endsWith('.pdf');
+    let resolvedUrl = receiptPath;
+    if (!/^https?:\/\//i.test(receiptPath)) {
+      const { data } = supabase.storage.from('payment-receipts').getPublicUrl(receiptPath);
+      resolvedUrl = data.publicUrl;
+    }
+    setReceiptPreview({
+      bookingCode,
+      url: resolvedUrl,
+      isPdf,
+    });
+  };
+
   if (loading) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
@@ -409,7 +447,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
           }`}
         >
           <Shield className="w-3.5 h-3.5" />
-          <span>الوصولات ({bookings.length})</span>
+          <span>الوصولات ({pendingReceiptsCount})</span>
         </button>
 
         <button
@@ -461,6 +499,38 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
             </div>
           )}
 
+          {bookings.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {(
+                [
+                  { key: 'all', label: `الكل (${bookings.length})` },
+                  { key: 'pending', label: `وصولات للمراجعة (${pendingReceiptsCount})` },
+                  {
+                    key: 'unavailable',
+                    label: `تحتاج تحويل (${bookings.filter((b) => b.agency_ack_status === 'unavailable').length})`,
+                  },
+                  {
+                    key: 'verified',
+                    label: `مؤكدة (${bookings.filter((b) => b.status === 'payment_verified').length})`,
+                  },
+                ] as const
+              ).map((f) => (
+                <button
+                  key={f.key}
+                  type="button"
+                  onClick={() => setBookingFilter(f.key)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                    bookingFilter === f.key
+                      ? 'bg-slate-900 text-white'
+                      : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          )}
+
           <div className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden">
             {bookings.length === 0 ? (
               <div className="p-10 text-center text-sm text-slate-500">
@@ -468,7 +538,14 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
               </div>
             ) : (
               <div className="divide-y divide-slate-100">
-                {bookings.map((b) => {
+                {bookings
+                  .filter((b) => {
+                    if (bookingFilter === 'pending') return b.status === 'payment_uploaded';
+                    if (bookingFilter === 'unavailable') return b.agency_ack_status === 'unavailable';
+                    if (bookingFilter === 'verified') return b.status === 'payment_verified';
+                    return true;
+                  })
+                  .map((b) => {
                   const statusMeta = getBookingStatusMeta(b.status);
                   const waUrl = buildAgencyWhatsAppUrl(b);
                   const candidateCars = availableCars
@@ -567,6 +644,12 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
                                   : 'تغيب العميل'}
                               </span>
                             )}
+
+                            {b.refund_allowed_by_admin && (
+                              <span className="bg-amber-100 text-amber-900 border border-amber-200 px-2 py-0.5 rounded-md font-bold">
+                                الاسترجاع مفتوح للعميل
+                              </span>
+                            )}
                           </div>
                         </div>
 
@@ -574,6 +657,17 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
                           <span className={`text-xs font-bold ${statusMeta.cls}`}>
                             {statusMeta.label}
                           </span>
+
+                          {b.receipt_url && !b.receipt_url.startsWith('local://') && (
+                            <button
+                              type="button"
+                              onClick={() => openReceiptPreview(b.booking_code, b.receipt_url)}
+                              className="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 px-3 py-2 text-xs font-bold transition-colors inline-flex items-center gap-1.5"
+                            >
+                              <FileText className="w-3.5 h-3.5 text-[#2563EB]" />
+                              <span>عرض الوصل</span>
+                            </button>
+                          )}
 
                           {b.status === 'payment_uploaded' && (
                             <button
@@ -619,6 +713,17 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
                               <span>تحويل لوكالة أخرى</span>
                             </button>
                           )}
+
+                          {(b.status === 'payment_uploaded' || b.status === 'payment_verified') &&
+                            !b.refund_allowed_by_admin && (
+                              <button
+                                type="button"
+                                onClick={() => handleAllowRefund(b.id)}
+                                className="rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-900 px-3 py-2 text-xs font-bold transition-colors"
+                              >
+                                فتح الاسترجاع للعميل
+                              </button>
+                            )}
                         </div>
                       </div>
 
@@ -642,11 +747,44 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
                                 onChange={(e) => setReassignTargetCarId(e.target.value)}
                                 className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold focus:border-[#2563EB] focus:outline-none"
                               >
-                                {candidateCars.map((c) => (
-                                  <option key={c.car_id} value={c.car_id}>
-                                    {c.agency_name} ({getCityLabelAr(c.city)}) — {c.brand} {c.model} ({c.daily_price} DH/يوم) · {c.agency_phone}
-                                  </option>
-                                ))}
+                                {candidateCars.some(
+                                  (c) =>
+                                    b.car_city &&
+                                    c.city.toLowerCase() === b.car_city.toLowerCase(),
+                                ) && (
+                                  <optgroup label={`في نفس المدينة (${getCityLabelAr(b.car_city || '')})`}>
+                                    {candidateCars
+                                      .filter(
+                                        (c) =>
+                                          b.car_city &&
+                                          c.city.toLowerCase() === b.car_city.toLowerCase(),
+                                      )
+                                      .map((c) => (
+                                        <option key={c.car_id} value={c.car_id}>
+                                          {c.agency_name} — {c.brand} {c.model} ({c.daily_price} DH/يوم) · {c.agency_phone}
+                                        </option>
+                                      ))}
+                                  </optgroup>
+                                )}
+                                {candidateCars.some(
+                                  (c) =>
+                                    !b.car_city ||
+                                    c.city.toLowerCase() !== b.car_city.toLowerCase(),
+                                ) && (
+                                  <optgroup label="مدن أخرى">
+                                    {candidateCars
+                                      .filter(
+                                        (c) =>
+                                          !b.car_city ||
+                                          c.city.toLowerCase() !== b.car_city.toLowerCase(),
+                                      )
+                                      .map((c) => (
+                                        <option key={c.car_id} value={c.car_id}>
+                                          {c.agency_name} ({getCityLabelAr(c.city)}) — {c.brand} {c.model} ({c.daily_price} DH/يوم) · {c.agency_phone}
+                                        </option>
+                                      ))}
+                                  </optgroup>
+                                )}
                               </select>
                               <button
                                 type="submit"
@@ -907,6 +1045,58 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
 
       {tab === 'catalog' && (
         <AdminCatalogManager catalog={catalog} onRefresh={loadAdminData} />
+      )}
+
+      {receiptPreview && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4"
+          dir="rtl"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="bg-white rounded-2xl max-w-2xl w-full overflow-hidden shadow-2xl border border-slate-200">
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100">
+              <div className="font-bold text-sm text-slate-900">
+                وصل التحويل البنكي — {receiptPreview.bookingCode}
+              </div>
+              <button
+                type="button"
+                onClick={() => setReceiptPreview(null)}
+                aria-label="إغلاق المعاينة"
+                className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-4 bg-slate-50 flex flex-col items-center justify-center gap-3 max-h-[75vh] overflow-auto">
+              {receiptPreview.isPdf ? (
+                <a
+                  href={receiptPreview.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-5 py-2.5 text-sm font-bold inline-flex items-center gap-2"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>فتح ملف الوصل (PDF)</span>
+                </a>
+              ) : (
+                <img
+                  src={receiptPreview.url}
+                  alt={`وصل التحويل ${receiptPreview.bookingCode}`}
+                  className="max-h-[65vh] w-auto rounded-xl object-contain border border-slate-200 bg-white"
+                />
+              )}
+              <a
+                href={receiptPreview.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-semibold text-[#2563EB] hover:underline"
+              >
+                فتح في نافذة مستقلة
+              </a>
+            </div>
+          </div>
+        </div>
       )}
     </section>
   );

@@ -35,6 +35,12 @@ const POPULAR_CITIES = [
   { cityFr: 'Agadir', cityAr: 'أكادير', subtitle: 'التسليم داخل المدينة' },
 ];
 
+function getTodayLocalDate(): string {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
 function getDefaultPickupDate(): string {
   const dt = new Date(Date.now() + 24 * 60 * 60 * 1000);
   const pad = (n: number) => String(n).padStart(2, '0');
@@ -51,6 +57,16 @@ function getFuelLabel(fuel: CarOffer['fuel_type']): string {
 function formatDays(d: number): string {
   if (d <= 10) return `${d} أيام`;
   return `${d} يومًا`;
+}
+
+function formatBookedUntil(iso?: string | null): string | null {
+  if (!iso) return null;
+  const dt = new Date(iso);
+  if (Number.isNaN(dt.getTime())) return null;
+  return dt.toLocaleDateString('ar-MA', {
+    day: 'numeric',
+    month: 'short',
+  });
 }
 
 export const CustomerPortal: React.FC<CustomerPortalProps> = ({
@@ -70,18 +86,41 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
     useState<'all' | 'automatic' | 'manual'>('all');
   const [selectedCar, setSelectedCar] = useState<CarOffer | null>(null);
 
-  const loadCars = async (cityToLoad: string) => {
+  const loadCars = async (
+    cityToLoad: string,
+    pickupDateStr: string = searchPickupDate,
+    daysCount: number = searchDays,
+  ) => {
     setLoadingCars(true);
     try {
-      const { data, error } = await supabase.rpc('get_nearby_cars', {
+      const pickupIso = pickupDateStr
+        ? new Date(`${pickupDateStr}T10:00:00`).toISOString()
+        : null;
+
+      let rpcRes = await supabase.rpc('get_nearby_cars', {
         p_city: cityToLoad,
         p_lat: null,
         p_lng: null,
         p_radius_km: 80,
+        p_pickup_at: pickupIso,
+        p_days: daysCount,
       });
 
-      if (!error && Array.isArray(data)) {
-        const mapped: CarOffer[] = data.map((row: Record<string, unknown>) => {
+      if (
+        rpcRes.error &&
+        (rpcRes.error.message.includes('Could not find the function') ||
+          rpcRes.error.message.includes('p_pickup_at'))
+      ) {
+        rpcRes = await supabase.rpc('get_nearby_cars', {
+          p_city: cityToLoad,
+          p_lat: null,
+          p_lng: null,
+          p_radius_km: 80,
+        });
+      }
+
+      if (!rpcRes.error && Array.isArray(rpcRes.data)) {
+        const mapped: CarOffer[] = rpcRes.data.map((row: Record<string, unknown>) => {
           const brand = String(row.brand);
           const model = String(row.model);
           const img = resolveCatalogImage(brand, model, String(row.primary_image_url || ''));
@@ -107,6 +146,8 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
             city: String(row.city),
             status: 'available',
             distance_km: row.distance_km != null ? Number(row.distance_km) : null,
+            is_booked: Boolean(row.is_booked),
+            booked_until: row.booked_until ? String(row.booked_until) : null,
             is_demo: false,
           };
         });
@@ -151,6 +192,8 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
             city: String(row.city),
             status: 'available',
             distance_km: null,
+            is_booked: false,
+            booked_until: null,
             is_demo: false,
           };
         });
@@ -173,12 +216,15 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
 
   useEffect(() => {
     setBrandFilter('all');
-    loadCars(selectedCity);
   }, [selectedCity]);
+
+  useEffect(() => {
+    loadCars(selectedCity, searchPickupDate, searchDays);
+  }, [selectedCity, searchPickupDate, searchDays]);
 
   const handleDiscoverClick = (e: React.FormEvent) => {
     e.preventDefault();
-    loadCars(selectedCity);
+    loadCars(selectedCity, searchPickupDate, searchDays);
     document.getElementById('fleet-offers')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
@@ -200,6 +246,12 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
       return matchTransmission && matchBrand;
     });
   }, [cars, transmissionFilter, brandFilter]);
+
+  const availableFilteredCount = useMemo(
+    () => filteredCars.filter((c) => !c.is_booked).length,
+    [filteredCars],
+  );
+  const bookedFilteredCount = filteredCars.length - availableFilteredCount;
 
   const inputBase =
     'w-full min-h-[48px] rounded-xl bg-white px-3 py-2.5 text-sm font-semibold text-slate-900 shadow-lg ring-1 ring-black/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB] focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900';
@@ -277,7 +329,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
                   id="hero-pickup-date"
                   type="date"
                   value={searchPickupDate}
-                  min={new Date().toISOString().slice(0, 10)}
+                  min={getTodayLocalDate()}
                   onChange={(e) => setSearchPickupDate(e.target.value)}
                   className={`${inputBase} text-xs sm:text-sm font-mono-tabular sm:pr-9`}
                 />
@@ -374,7 +426,9 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
                 'جارٍ تحميل العروض...'
               ) : (
                 <span aria-live="polite">
-                  {filteredCars.length} سيارة متاحة · {formatDays(searchDays)} · استلام{' '}
+                  {availableFilteredCount} سيارة متاحة
+                  {bookedFilteredCount > 0 ? ` · ${bookedFilteredCount} محجوزة` : ''} ·{' '}
+                  {formatDays(searchDays)} · استلام{' '}
                   <span className="font-mono-tabular">{searchPickupDate}</span>
                 </span>
               )}
@@ -511,29 +565,59 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredCars.map((car) => {
               const total = car.daily_price * searchDays;
+              const isBooked = Boolean(car.is_booked);
+              const bookedUntilText = formatBookedUntil(car.booked_until);
+
               return (
                 <article
                   key={car.id}
-                  className="group bg-white rounded-2xl border border-slate-200/80 hover:border-slate-300 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 overflow-hidden flex flex-col"
+                  className={`group bg-white rounded-2xl border overflow-hidden flex flex-col transition-all duration-200 ${
+                    isBooked
+                      ? 'border-slate-200/80 opacity-90'
+                      : 'border-slate-200/80 hover:border-slate-300 hover:shadow-lg hover:-translate-y-0.5'
+                  }`}
                 >
                   {/* Image */}
                   <button
                     type="button"
-                    onClick={() => setSelectedCar(car)}
-                    className="aspect-[4/3] bg-slate-100 overflow-hidden block w-full text-right cursor-pointer relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#2563EB]"
-                    aria-label={`عرض تفاصيل ${car.brand} ${car.model}`}
+                    disabled={isBooked}
+                    onClick={() => {
+                      if (!isBooked) setSelectedCar(car);
+                    }}
+                    className={`aspect-[4/3] bg-slate-100 overflow-hidden block w-full text-right relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#2563EB] ${
+                      isBooked ? 'cursor-not-allowed' : 'cursor-pointer'
+                    }`}
+                    aria-label={
+                      isBooked
+                        ? `${car.brand} ${car.model} — محجوزة حالياً`
+                        : `عرض تفاصيل ${car.brand} ${car.model}`
+                    }
                   >
                     <img
                       src={car.primary_image_url}
                       alt={`${car.brand} ${car.model}`}
                       referrerPolicy="no-referrer"
                       loading="lazy"
-                      className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500 ease-out"
+                      className={`w-full h-full object-cover transition-transform duration-500 ease-out ${
+                        isBooked ? 'opacity-70 grayscale-[25%]' : 'group-hover:scale-[1.03]'
+                      }`}
                     />
                     {car.model_year && (
                       <span className="absolute top-3 right-3 inline-flex items-center rounded-full bg-white/95 backdrop-blur-sm text-slate-800 text-[11px] font-bold px-2.5 py-1 shadow-sm">
                         {car.model_year}
                       </span>
+                    )}
+                    {isBooked && (
+                      <div className="absolute inset-0 bg-slate-950/45 backdrop-blur-[1px] flex flex-col items-center justify-center gap-1.5 p-3 text-center">
+                        <span className="inline-flex items-center rounded-xl bg-red-600 text-white px-4 py-1.5 text-xs font-extrabold shadow-lg">
+                          محجوزة حالياً
+                        </span>
+                        {bookedUntilText && (
+                          <span className="rounded-lg bg-slate-900/90 text-white px-2.5 py-1 text-[11px] font-semibold">
+                            تتوفر بعد {bookedUntilText}
+                          </span>
+                        )}
+                      </div>
                     )}
                   </button>
 
@@ -603,11 +687,24 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
                       </div>
                       <button
                         type="button"
-                        onClick={() => setSelectedCar(car)}
-                        className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] active:bg-[#1E40AF] text-white text-sm font-bold shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB] focus-visible:ring-offset-2"
+                        disabled={isBooked}
+                        onClick={() => {
+                          if (!isBooked) setSelectedCar(car);
+                        }}
+                        className={`shrink-0 inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB] focus-visible:ring-offset-2 ${
+                          isBooked
+                            ? 'bg-slate-200 text-slate-500 cursor-not-allowed'
+                            : 'bg-[#2563EB] hover:bg-[#1D4ED8] active:bg-[#1E40AF] text-white shadow-sm'
+                        }`}
                       >
-                        احجز
-                        <ArrowLeft className="w-4 h-4" aria-hidden="true" />
+                        {isBooked ? (
+                          <span>محجوزة</span>
+                        ) : (
+                          <>
+                            احجز
+                            <ArrowLeft className="w-4 h-4" aria-hidden="true" />
+                          </>
+                        )}
                       </button>
                     </div>
                   </div>
@@ -627,7 +724,13 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
           onClose={() => setSelectedCar(null)}
           onBookingCompleted={(booking) => {
             onBookingCreated(booking);
+            setCars((prev) =>
+              prev.map((item) =>
+                item.id === selectedCar.id ? { ...item, is_booked: true } : item,
+              ),
+            );
             setSelectedCar(null);
+            loadCars(selectedCity, searchPickupDate, searchDays);
           }}
         />
       )}

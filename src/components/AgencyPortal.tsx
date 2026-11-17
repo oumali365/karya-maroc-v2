@@ -23,6 +23,7 @@ import {
   KeyRound,
   Clock,
   Ban,
+  RefreshCw,
 } from 'lucide-react';
 import { supabase, MOROCCAN_CITIES, formatDH, getCityLabelAr } from '../lib/supabase';
 import {
@@ -81,6 +82,7 @@ export const AgencyPortal: React.FC<AgencyPortalProps> = ({ onGoToCustomer }) =>
   );
   const [agency, setAgency] = useState<AgencyProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(() => Boolean(loadAgencySession()));
+  const [refreshing, setRefreshing] = useState(false);
   const [view, setView] = useState<'dashboard' | 'cars' | 'bookings' | 'profile'>('dashboard');
 
   const [cars, setCars] = useState<CarOffer[]>([]);
@@ -214,12 +216,43 @@ export const AgencyPortal: React.FC<AgencyPortalProps> = ({ onGoToCustomer }) =>
     }
   };
 
+  const refreshAgencyData = async (creds: StoredAgencySession) => {
+    setRefreshing(true);
+    try {
+      const { data, error } = await supabase.rpc('login_agency_by_phone', {
+        p_phone: creds.phone,
+        p_pin: creds.pin,
+      });
+      if (!error && Array.isArray(data) && data[0]) {
+        const latest = data[0] as AgencyProfile;
+        setAgency(latest);
+        await Promise.all([
+          fetchCars(creds, latest.name),
+          fetchBookings(creds),
+        ]);
+      } else {
+        await Promise.all([
+          fetchCars(creds, agency?.name || ''),
+          fetchBookings(creds),
+        ]);
+      }
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   useEffect(() => {
     loadCatalog();
     if (sessionCreds) {
       hydrateAgencyFromCreds(sessionCreds);
     }
   }, []);
+
+  useEffect(() => {
+    if (sessionCreds && agency) {
+      refreshAgencyData(sessionCreds);
+    }
+  }, [view]);
 
   const handleAuthSuccess = async (profile: AgencyProfile, creds: StoredAgencySession) => {
     saveAgencySession(creds);
@@ -406,14 +439,25 @@ export const AgencyPortal: React.FC<AgencyPortalProps> = ({ onGoToCustomer }) =>
                   {getCityLabelAr(agency.city)} · <span dir="ltr">{agency.phone}</span> · بدون ضمان (0 DH)
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setView('cars')}
-                className="rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-4 py-2 text-xs font-bold transition-colors flex items-center gap-1.5"
-              >
-                <Plus className="w-4 h-4" />
-                <span>إدارة الأسطول</span>
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  disabled={refreshing}
+                  onClick={() => refreshAgencyData(sessionCreds)}
+                  className="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 px-3 py-2 text-xs font-bold transition-colors flex items-center gap-1.5"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+                  <span>تحديث</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setView('cars')}
+                  className="rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-4 py-2 text-xs font-bold transition-colors flex items-center gap-1.5"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>إدارة الأسطول</span>
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -509,13 +553,25 @@ const AgencyPhoneAuthView: React.FC<{
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [gpsNote, setGpsNote] = useState<string | null>(null);
   const [showForgotPin, setShowForgotPin] = useState(false);
 
   const captureGps = () => {
-    if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition((pos) => {
-      setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-    });
+    if (!navigator.geolocation) {
+      setGpsNote('المتصفح لا يدعم GPS — المدينة المختارة كافية.');
+      return;
+    }
+    setGpsNote('جاري تحديد الموقع...');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setGpsNote('تم حفظ موقع الوكالة بنجاح.');
+      },
+      () => {
+        setGpsNote('تعذر الوصول للموقع — يمكنك المتابعة باختيار المدينة.');
+      },
+      { enableHighAccuracy: true, timeout: 8000 },
+    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -715,6 +771,9 @@ const AgencyPhoneAuthView: React.FC<{
                   <Navigation className="w-4 h-4" />
                   <span>{coords ? 'تم حفظ موقع الوكالة' : 'تحديد موقع GPS (اختياري)'}</span>
                 </button>
+                {gpsNote && (
+                  <p className="text-[11px] text-slate-500 mt-1 text-center">{gpsNote}</p>
+                )}
               </div>
             </div>
           )}
@@ -1352,9 +1411,25 @@ const AgencyBookingsManager: React.FC<{
   onRefresh: () => void;
   title?: string;
 }> = ({ creds, bookings, onRefresh, title = 'الحجوزات والطلبات الواردة' }) => {
+  const [statusFilter, setStatusFilter] = useState<'all' | 'prealert' | 'verified' | 'closed'>('all');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [disputeOpenId, setDisputeOpenId] = useState<string | null>(null);
   const [actionErr, setActionErr] = useState<string | null>(null);
+
+  const filteredBookings = useMemo(() => {
+    if (statusFilter === 'prealert') {
+      return bookings.filter((b) => b.status === 'payment_uploaded');
+    }
+    if (statusFilter === 'verified') {
+      return bookings.filter((b) => b.status === 'payment_verified');
+    }
+    if (statusFilter === 'closed') {
+      return bookings.filter((b) =>
+        ['car_delivered', 'completed', 'refund_requested', 'refunded', 'cancelled'].includes(b.status),
+      );
+    }
+    return bookings;
+  }, [bookings, statusFilter]);
 
   const handlePrecheck = async (bookingId: string, ackStatus: 'available' | 'unavailable') => {
     setBusyId(bookingId);
@@ -1418,12 +1493,58 @@ const AgencyBookingsManager: React.FC<{
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-xl font-bold text-slate-900">{title}</h2>
-        <p className="text-xs text-slate-500 mt-0.5">
-          تُحجب بيانات العميل أثناء مراجعة الوصل وتُكشف فور تأكيد الدفع · تحصّل 90% عند التسليم (بدون ضمان)
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-bold text-slate-900">{title}</h2>
+          <p className="text-xs text-slate-500 mt-0.5">
+            تُحجب بيانات العميل أثناء مراجعة الوصل وتُكشف فور تأكيد الدفع · تحصّل 90% عند التسليم (بدون ضمان)
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={onRefresh}
+          className="self-start sm:self-auto rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 px-3 py-1.5 text-xs font-bold inline-flex items-center gap-1.5"
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+          <span>تحديث الطلبات</span>
+        </button>
       </div>
+
+      {bookings.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {(
+            [
+              { key: 'all', label: `الكل (${bookings.length})` },
+              {
+                key: 'prealert',
+                label: `بانتظار التأكيد (${bookings.filter((b) => b.status === 'payment_uploaded').length})`,
+              },
+              {
+                key: 'verified',
+                label: `جاهز للتسليم (${bookings.filter((b) => b.status === 'payment_verified').length})`,
+              },
+              {
+                key: 'closed',
+                label: `مكتمل / ملغى (${bookings.filter((b) => ['car_delivered', 'completed', 'refund_requested', 'refunded', 'cancelled'].includes(b.status)).length})`,
+              },
+            ] as const
+          ).map((f) => (
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => setStatusFilter(f.key)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                statusFilter === f.key
+                  ? 'bg-[#2563EB] text-white'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {actionErr && (
         <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-2.5 text-xs sm:text-sm text-red-700">
@@ -1431,14 +1552,16 @@ const AgencyBookingsManager: React.FC<{
         </div>
       )}
 
-      {bookings.length === 0 ? (
+      {filteredBookings.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200/80 p-10 text-center text-sm text-slate-500">
           لا توجد طلبات أو حجوزات في هذه القائمة حالياً.
         </div>
       ) : (
         <div className="space-y-3">
-          {bookings.map((b) => {
+          {filteredBookings.map((b) => {
             const isMaskedPreAlert = b.status === 'payment_uploaded';
+            const isMaskedClosed = ['refund_requested', 'refunded', 'cancelled'].includes(b.status);
+            const hidePii = isMaskedPreAlert || isMaskedClosed;
             const formattedDelivery = (() => {
               const dt = new Date(b.delivery_at);
               return Number.isNaN(dt.getTime())
@@ -1482,7 +1605,20 @@ const AgencyBookingsManager: React.FC<{
                           <CheckCircle2 className="w-3 h-3" />
                           <span>دفع مؤكد — جاهز للتسليم</span>
                         </span>
-                      ) : null}
+                      ) : b.status === 'car_delivered' || b.status === 'completed' ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 text-slate-800 px-2.5 py-0.5 text-[11px] font-bold">
+                          <CheckCircle2 className="w-3 h-3" />
+                          <span>تم تسليم السيارة</span>
+                        </span>
+                      ) : b.status === 'refund_requested' ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-red-100 text-red-800 px-2.5 py-0.5 text-[11px] font-bold">
+                          <span>طلب استرجاع</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 text-slate-600 px-2.5 py-0.5 text-[11px] font-bold">
+                          <span>ملغى / مسترجع</span>
+                        </span>
+                      )}
 
                       {b.reassigned_at && (
                         <span className="rounded-full bg-blue-100 text-[#2563EB] px-2.5 py-0.5 text-[11px] font-bold">
@@ -1491,11 +1627,13 @@ const AgencyBookingsManager: React.FC<{
                       )}
                     </div>
 
-                    {isMaskedPreAlert ? (
+                    {hidePii ? (
                       <div className="rounded-xl bg-white border border-amber-200/80 px-3 py-2 text-xs text-slate-700 flex items-center gap-2">
                         <Lock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                         <span>
-                          هاتف العميل ووثائقه محجوبة مؤقتاً لحماية العمولة، وستظهر فور تأكيد الإدارة لوصل التسبيق. يرجى تأكيد توفر السيارة الآن.
+                          {isMaskedPreAlert
+                            ? 'هاتف العميل ووثائقه محجوبة مؤقتاً لحماية العمولة، وستظهر فور تأكيد الإدارة لوصل التسبيق. يرجى تأكيد توفر السيارة الآن.'
+                            : 'تم إغلاق أو إلغاء هذا الطلب ولا تظهر بيانات العميل الشخصية.'}
                         </span>
                       </div>
                     ) : (
@@ -1522,7 +1660,7 @@ const AgencyBookingsManager: React.FC<{
                       <span>الاستلام: {formattedDelivery}</span>
                       {b.pickup_location && (
                         <span>
-                          · {isMaskedPreAlert ? 'المدينة' : 'مكان التسليم'}:{' '}
+                          · {hidePii ? 'المدينة' : 'مكان التسليم'}:{' '}
                           <strong className="text-slate-800">{b.pickup_location}</strong>
                         </span>
                       )}
@@ -1687,12 +1825,24 @@ const AgencyProfileSettings: React.FC<{
   const [deletePin, setDeletePin] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [deleteErr, setDeleteErr] = useState<string | null>(null);
+  const [gpsFeedback, setGpsFeedback] = useState<string | null>(null);
 
   const captureGps = () => {
-    if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition((pos) => {
-      setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-    });
+    if (!navigator.geolocation) {
+      setGpsFeedback('المتصفح لا يدعم تحديد الموقع تلقائياً.');
+      return;
+    }
+    setGpsFeedback('جاري تحديد الموقع...');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setGpsFeedback('تم التقاط الإحداثيات بنجاح — اضغط «حفظ التغييرات» لتأكيدها.');
+      },
+      () => {
+        setGpsFeedback('تعذر الوصول للموقع الحالي، يمكنك الاعتماد على المدينة المختارة.');
+      },
+      { enableHighAccuracy: true, timeout: 8000 },
+    );
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -1847,6 +1997,9 @@ const AgencyProfileSettings: React.FC<{
                 <Navigation className="w-4 h-4" />
                 <span>{coords ? 'تحديث إحداثيات GPS' : 'تحديد موقع الوكالة GPS'}</span>
               </button>
+              {gpsFeedback && (
+                <p className="text-[11px] text-slate-500 mt-1">{gpsFeedback}</p>
+              )}
             </div>
           </div>
         </div>

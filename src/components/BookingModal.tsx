@@ -254,6 +254,21 @@ export const BookingModal: React.FC<BookingModalProps> = ({
 
     try {
       if (!car.is_demo) {
+        if (
+          createdBooking &&
+          !createdBooking.is_demo &&
+          createdBooking.status === 'pending_payment'
+        ) {
+          try {
+            await supabase.rpc('cancel_pending_booking', {
+              p_booking_id: createdBooking.booking_id,
+              p_booking_code: createdBooking.booking_code,
+            });
+          } catch {
+            // Proceed even if old DB schema doesn't have cancel_pending_booking yet
+          }
+        }
+
         let defaultBankId: string | null = null;
         try {
           const { data: bankRows } = await supabase
@@ -323,6 +338,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({
             agency_payout_amount: Number(row.agency_payout_amount),
             delivery_at: deliveryAtLocal,
             status: 'pending_payment',
+            customer_phone: customerPhone.trim(),
+            agency_ack_status: 'pending',
             is_demo: false,
           };
           setCreatedBooking(bookingObj);
@@ -349,6 +366,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         agency_payout_amount: agencyPayoutAmount,
         delivery_at: deliveryAtLocal,
         status: 'pending_payment',
+        customer_phone: customerPhone.trim(),
+        agency_ack_status: 'pending',
         is_demo: true,
       };
       setCreatedBooking(demoBooking);
