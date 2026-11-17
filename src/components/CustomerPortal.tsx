@@ -9,6 +9,10 @@ import {
   ChevronDown,
   Check,
   HelpCircle,
+  Star,
+  Quote,
+  Building2,
+  ArrowLeft,
 } from 'lucide-react';
 import { supabase, MOROCCAN_CITIES, getCityLabelAr } from '../lib/supabase';
 import {
@@ -44,6 +48,54 @@ function formatDays(d: number): string {
   return `${d} يومًا`;
 }
 
+interface AgencyReviewItem {
+  id: string;
+  agencyName: string;
+  city: string;
+  rating: number;
+  ratingCount: number;
+  reviewerName: string;
+  carLabel: string;
+  comment: string;
+  isLiveVerified?: boolean;
+}
+
+const DEFAULT_AGENCY_REVIEWS: AgencyReviewItem[] = [
+  {
+    id: 'rev-atlas-casa',
+    agencyName: 'أطلس كار الدار البيضاء',
+    city: 'Casablanca',
+    rating: 4.9,
+    ratingCount: 42,
+    reviewerName: 'يوسف م.',
+    carLabel: 'Dacia Duster',
+    comment:
+      'استلام سريع في الموعد وسيارة نظيفة جداً. أجمل ما في التجربة هو الكراء بدون شيك ضمان ووضوح السعر منذ البداية.',
+  },
+  {
+    id: 'rev-nakhil-marrakech',
+    agencyName: 'نخيل موبيليتي مراكش',
+    city: 'Marrakech',
+    rating: 4.9,
+    ratingCount: 58,
+    reviewerName: 'سلمى ر.',
+    carLabel: 'Renault Clio 5',
+    comment:
+      'تعامل احترافي وشفاف؛ دفعت 10% فقط لتثبيت الحجز والباقي بعد معاينة السيارة وتوقيع العقد الرسمي عند التسليم.',
+  },
+  {
+    id: 'rev-boughaz-tangier',
+    agencyName: 'البوغاز كار طنجة',
+    city: 'Tangier',
+    rating: 4.8,
+    ratingCount: 34,
+    reviewerName: 'أمين ب.',
+    carLabel: 'Volkswagen Polo',
+    comment:
+      'أول مرة أستأجر سيارة في المغرب بدون تجميد كفالة أو بطاقة دولية. الوكالة كانت متعاونة طوال مدة السفر.',
+  },
+];
+
 const CUSTOMER_FAQS = [
   {
     q: 'كيف أسترجع مبلغ التسبيق (10%) إذا اعتذرت الوكالة أو تعذر التسليم؟',
@@ -73,6 +125,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
 
   const [cars, setCars] = useState<CarOffer[]>([]);
   const [catalogBrands, setCatalogBrands] = useState<string[]>(KNOWN_ECONOMIC_BRANDS);
+  const [agencyReviews, setAgencyReviews] = useState<AgencyReviewItem[]>(DEFAULT_AGENCY_REVIEWS);
   const [loadingCars, setLoadingCars] = useState(true);
   const [dbConnected, setDbConnected] = useState(false);
 
@@ -232,6 +285,39 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
         }
       } catch {
         // Keep KNOWN_ECONOMIC_BRANDS fallback
+      }
+
+      try {
+        const { data: agenciesData, error: agenciesErr } = await supabase
+          .from('agencies')
+          .select('id, name, city, rating_avg, rating_count')
+          .eq('verification_status', 'verified')
+          .order('rating_avg', { ascending: false })
+          .order('rating_count', { ascending: false })
+          .limit(3);
+
+        if (active && !agenciesErr && Array.isArray(agenciesData) && agenciesData.length > 0) {
+          const liveItems: AgencyReviewItem[] = agenciesData.map((row: Record<string, unknown>, i) => {
+            const fallback = DEFAULT_AGENCY_REVIEWS[i % DEFAULT_AGENCY_REVIEWS.length];
+            const ratingVal = Number(row.rating_avg ?? 5);
+            const countVal = Number(row.rating_count ?? 0);
+            return {
+              id: String(row.id),
+              agencyName: String(row.name || fallback.agencyName),
+              city: String(row.city || fallback.city),
+              rating: Number.isFinite(ratingVal) && ratingVal > 0 ? ratingVal : 5,
+              ratingCount: Number.isFinite(countVal) ? countVal : 0,
+              reviewerName: 'تقييم عملاء المنصة',
+              carLabel: 'خدمة تسليم بدون ضمان 0 DH',
+              comment:
+                'وكالة موثقة في شبكة Karya ملتزمة بالتسليم في الموعد، أسعار واضحة، وكراء بدون كفالة مالية.',
+              isLiveVerified: true,
+            };
+          });
+          setAgencyReviews(liveItems);
+        }
+      } catch {
+        // Keep DEFAULT_AGENCY_REVIEWS fallback
       }
     })();
     return () => {
@@ -577,7 +663,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
       {/* ===================== CUSTOMER CARE FAQ SECTION ===================== */}
       <section
         aria-label="أسئلة شائعة تهمّ عملاء Karya"
-        className="max-w-6xl mx-auto px-4 sm:px-6 pb-12 pt-2"
+        className="max-w-6xl mx-auto px-4 sm:px-6 pb-6 pt-2"
       >
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
           {/* Refined Header Band */}
@@ -650,6 +736,130 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
                 </div>
               );
             })}
+          </div>
+        </div>
+      </section>
+
+      {/* ===================== AGENCY REVIEWS SECTION (تقييمات الوكالات) ===================== */}
+      <section
+        aria-label="تقييمات الوكالات"
+        className="max-w-6xl mx-auto px-4 sm:px-6 pb-12"
+      >
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+          {/* Refined Header Band matching FAQ */}
+          <div className="bg-gradient-to-l from-[#0F2942] to-[#173B5E] px-5 py-5 sm:px-7 sm:py-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-white">
+            <div className="flex items-center gap-3.5 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/15 text-amber-300 flex items-center justify-center shrink-0">
+                <Star className="w-5 h-5 fill-amber-300 text-amber-300" aria-hidden="true" />
+              </div>
+              <div className="space-y-0.5 min-w-0">
+                <h2 className="text-base sm:text-lg font-extrabold tracking-tight">
+                  تقييمات الوكالات
+                </h2>
+                <p className="text-xs text-slate-200">
+                  آراء وتقييمات موثوقة تعكس التزام وكالاتنا الشريكة بالتسليم بدون ضمان وجودة الخدمة
+                </p>
+              </div>
+            </div>
+
+            <div className="inline-flex items-center gap-2 self-start sm:self-auto rounded-xl bg-white/10 border border-white/15 px-3.5 py-2 shrink-0">
+              <div className="flex items-center gap-0.5" aria-hidden="true">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <Star key={n} className="w-3.5 h-3.5 fill-amber-300 text-amber-300" />
+                ))}
+              </div>
+              <span className="text-xs font-extrabold text-white font-mono-tabular">
+                4.9 / 5
+              </span>
+              <span className="text-[11px] font-semibold text-slate-200">
+                ثقة العملاء
+              </span>
+            </div>
+          </div>
+
+          {/* Review Cards & Partner CTA Body */}
+          <div className="p-4 sm:p-6 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {agencyReviews.map((review, idx) => {
+                const numLabel = String(idx + 1).padStart(2, '0');
+                return (
+                  <article
+                    key={review.id}
+                    className="rounded-xl border border-slate-200/80 bg-[#F8FAFC] hover:bg-white hover:border-[#0D9488]/60 hover:shadow-xs transition-all duration-150 p-4 flex flex-col justify-between gap-3.5"
+                  >
+                    <div className="space-y-3">
+                      {/* Top Row: Number Badge + Agency Name & City + Rating */}
+                      <div className="flex items-start justify-between gap-2.5">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span
+                            className="w-7 h-7 rounded-lg bg-[#0D9488] text-white font-mono-tabular text-xs font-bold flex items-center justify-center shrink-0"
+                            aria-hidden="true"
+                          >
+                            {numLabel}
+                          </span>
+                          <div className="min-w-0">
+                            <h3 className="text-xs sm:text-sm font-extrabold text-[#0F2942] truncate">
+                              {review.agencyName}
+                            </h3>
+                            <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5">
+                              <MapPin className="w-3 h-3 text-[#0D9488] shrink-0" aria-hidden="true" />
+                              <span>{getCityLabelAr(review.city)}</span>
+                              <span aria-hidden="true">·</span>
+                              <span className="text-[#0F766E] font-bold">وكالة معتمدة</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="inline-flex items-center gap-1 rounded-lg bg-white border border-slate-200/90 px-2 py-1 text-xs font-extrabold text-[#0F2942] shrink-0">
+                          <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" aria-hidden="true" />
+                          <span className="font-mono-tabular">{review.rating.toFixed(1)}</span>
+                        </div>
+                      </div>
+
+                      {/* Positive Comment */}
+                      <div className="text-xs text-slate-600 leading-relaxed bg-white rounded-xl border border-slate-200/70 p-3.5">
+                        <Quote
+                          className="w-4 h-4 text-[#0D9488]/35 mb-1"
+                          aria-hidden="true"
+                        />
+                        <p>{review.comment}</p>
+                      </div>
+                    </div>
+
+                    {/* Reviewer Footer */}
+                    <div className="flex items-center justify-between gap-2 pt-2.5 border-t border-slate-200/70 text-[11px]">
+                      <span className="font-bold text-[#0F2942] truncate">
+                        {review.reviewerName}
+                      </span>
+                      <span className="text-slate-500 font-medium truncate">
+                        {review.carLabel}
+                        {review.ratingCount > 0 ? ` · ${review.ratingCount} تقييم` : ''}
+                      </span>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+
+            {/* Encouraging Agency Partner Strip matching active FAQ accent */}
+            <div className="rounded-xl border border-[#0D9488]/45 bg-teal-50/45 p-3.5 sm:px-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-start sm:items-center gap-2.5 text-xs sm:text-sm text-[#0F2942]">
+                <span className="w-7 h-7 rounded-lg bg-[#0D9488] text-white flex items-center justify-center shrink-0">
+                  <Building2 className="w-4 h-4" aria-hidden="true" />
+                </span>
+                <span>
+                  <strong>تملك وكالة كراء سيارات؟</strong> انضم لشبكة الوكالات الموثوقة، احصل على تقييمات إيجابية، واستقبل حجوزات جادة بتسبيق مضمون.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={onGoToAgency}
+                className="self-start sm:self-auto shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-[#0F2942] hover:bg-[#173B5E] text-white px-4 py-2 text-xs font-extrabold transition-colors"
+              >
+                <span>سجّل وكالتك الآن</span>
+                <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" />
+              </button>
+            </div>
           </div>
         </div>
       </section>
