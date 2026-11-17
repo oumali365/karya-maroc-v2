@@ -9,12 +9,15 @@ import {
   Gauge,
   Calendar,
   ArrowLeft,
-  Plane,
   ShieldCheck,
   ChevronDown,
 } from 'lucide-react';
 import { supabase, MOROCCAN_CITIES, getCityLabelAr } from '../lib/supabase';
-import { DEFAULT_CAR_IMAGE_URL, HERO_IMAGE_URL, STARTER_CARS } from '../data/starterData';
+import {
+  HERO_IMAGE_URL,
+  STARTER_CARS,
+  resolveCatalogImage,
+} from '../data/starterData';
 import { BookingModal } from './BookingModal';
 import type { CarOffer, CreatedBooking } from '../types/karya';
 
@@ -23,11 +26,13 @@ interface CustomerPortalProps {
   onGoToAgency: () => void;
 }
 
-const POPULAR_AIRPORTS = [
-  { cityFr: 'Casablanca', cityAr: 'الدار البيضاء', airport: 'مطار محمد الخامس', code: 'CMN' },
-  { cityFr: 'Marrakech', cityAr: 'مراكش', airport: 'مطار المنارة', code: 'RAK' },
-  { cityFr: 'Agadir', cityAr: 'أكادير', airport: 'مطار المسيرة', code: 'AGA' },
-  { cityFr: 'Tangier', cityAr: 'طنجة', airport: 'مطار ابن بطوطة', code: 'TNG' },
+const POPULAR_CITIES = [
+  { cityFr: 'Casablanca', cityAr: 'الدار البيضاء', subtitle: 'التسليم داخل المدينة' },
+  { cityFr: 'Rabat', cityAr: 'الرباط', subtitle: 'التسليم داخل المدينة' },
+  { cityFr: 'Marrakech', cityAr: 'مراكش', subtitle: 'التسليم داخل المدينة' },
+  { cityFr: 'Tangier', cityAr: 'طنجة', subtitle: 'التسليم داخل المدينة' },
+  { cityFr: 'Fès', cityAr: 'فاس', subtitle: 'التسليم داخل المدينة' },
+  { cityFr: 'Agadir', cityAr: 'أكادير', subtitle: 'التسليم داخل المدينة' },
 ];
 
 function getDefaultPickupDate(): string {
@@ -44,8 +49,6 @@ function getFuelLabel(fuel: CarOffer['fuel_type']): string {
 }
 
 function formatDays(d: number): string {
-  if (d === 1) return 'يوم واحد';
-  if (d === 2) return 'يومان';
   if (d <= 10) return `${d} أيام`;
   return `${d} يومًا`;
 }
@@ -56,7 +59,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
 }) => {
   const [selectedCity, setSelectedCity] = useState<string>('Casablanca');
   const [searchPickupDate, setSearchPickupDate] = useState<string>(getDefaultPickupDate);
-  const [searchDays, setSearchDays] = useState<number>(2);
+  const [searchDays, setSearchDays] = useState<number>(3);
 
   const [cars, setCars] = useState<CarOffer[]>([]);
   const [loadingCars, setLoadingCars] = useState(true);
@@ -78,29 +81,35 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
       });
 
       if (!error && Array.isArray(data)) {
-        const mapped: CarOffer[] = data.map((row: Record<string, unknown>) => ({
-          id: String(row.car_id),
-          agency_id: String(row.agency_id),
-          agency_name: String(row.agency_name || 'وكالة معتمدة'),
-          agency_rating: Number(row.agency_rating ?? 5),
-          agency_rating_count: Number(row.agency_rating_count ?? 0),
-          brand: String(row.brand),
-          model: String(row.model),
-          model_year: row.model_year ? Number(row.model_year) : null,
-          fuel_type: (row.fuel_type as CarOffer['fuel_type']) || 'diesel',
-          transmission: (row.transmission as CarOffer['transmission']) || 'manual',
-          seats: Number(row.seats ?? 5),
-          primary_image_url: String(row.primary_image_url),
-          gallery_images: Array.isArray(row.gallery_images)
-            ? (row.gallery_images as string[])
-            : [String(row.primary_image_url)],
-          daily_price: Number(row.daily_price),
-          deposit_amount: Number(row.deposit_amount ?? 0),
-          city: String(row.city),
-          status: 'available',
-          distance_km: row.distance_km != null ? Number(row.distance_km) : null,
-          is_demo: false,
-        }));
+        const mapped: CarOffer[] = data.map((row: Record<string, unknown>) => {
+          const brand = String(row.brand);
+          const model = String(row.model);
+          const img = resolveCatalogImage(brand, model, String(row.primary_image_url || ''));
+          return {
+            id: String(row.car_id),
+            agency_id: String(row.agency_id),
+            agency_name: String(row.agency_name || 'وكالة معتمدة'),
+            agency_rating: Number(row.agency_rating ?? 5),
+            agency_rating_count: Number(row.agency_rating_count ?? 0),
+            brand,
+            model,
+            model_year: row.model_year ? Number(row.model_year) : null,
+            fuel_type: (row.fuel_type as CarOffer['fuel_type']) || 'diesel',
+            transmission: (row.transmission as CarOffer['transmission']) || 'manual',
+            seats: Number(row.seats ?? 5),
+            primary_image_url: img,
+            gallery_images:
+              Array.isArray(row.gallery_images) && row.gallery_images.length > 0
+                ? (row.gallery_images as string[])
+                : [img],
+            daily_price: Number(row.daily_price),
+            deposit_amount: 0,
+            city: String(row.city),
+            status: 'available',
+            distance_km: row.distance_km != null ? Number(row.distance_km) : null,
+            is_demo: false,
+          };
+        });
         setCars(mapped);
         setDbConnected(true);
         setLoadingCars(false);
@@ -114,31 +123,37 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
         .eq('status', 'available');
 
       if (!tableErr && Array.isArray(tableData)) {
-        const mapped: CarOffer[] = tableData.map((row: Record<string, any>) => ({
-          id: String(row.id),
-          agency_id: String(row.agency_id),
-          agency_name: String(row.agencies?.name || 'وكالة معتمدة'),
-          agency_rating: Number(row.agencies?.rating_avg ?? 5),
-          agency_rating_count: Number(row.agencies?.rating_count ?? 0),
-          brand: String(row.brand || row.car_catalog?.brand || 'سيارة'),
-          model: String(row.model || row.car_catalog?.model || ''),
-          model_year: row.model_year ? Number(row.model_year) : null,
-          fuel_type: row.fuel_type || 'diesel',
-          transmission: row.transmission || 'manual',
-          seats: Number(row.seats ?? 5),
-          primary_image_url: String(
-            row.primary_image_url || row.car_catalog?.image_url || DEFAULT_CAR_IMAGE_URL,
-          ),
-          gallery_images: [
-            String(row.primary_image_url || row.car_catalog?.image_url || DEFAULT_CAR_IMAGE_URL),
-          ],
-          daily_price: Number(row.daily_price),
-          deposit_amount: Number(row.deposit_amount ?? 0),
-          city: String(row.city),
-          status: 'available',
-          distance_km: null,
-          is_demo: false,
-        }));
+        const mapped: CarOffer[] = tableData.map((row: Record<string, any>) => {
+          const brand = String(row.brand || row.car_catalog?.brand || 'سيارة');
+          const model = String(row.model || row.car_catalog?.model || '');
+          const img = resolveCatalogImage(
+            brand,
+            model,
+            row.primary_image_url || row.car_catalog?.image_url,
+          );
+          return {
+            id: String(row.id),
+            agency_id: String(row.agency_id),
+            agency_name: String(row.agencies?.name || 'وكالة معتمدة'),
+            agency_rating: Number(row.agencies?.rating_avg ?? 5),
+            agency_rating_count: Number(row.agencies?.rating_count ?? 0),
+            brand,
+            model,
+            model_year: row.model_year ? Number(row.model_year) : null,
+            color: row.color ?? null,
+            fuel_type: row.fuel_type || 'diesel',
+            transmission: row.transmission || 'manual',
+            seats: Number(row.seats ?? 5),
+            primary_image_url: img,
+            gallery_images: [img],
+            daily_price: Number(row.daily_price),
+            deposit_amount: 0,
+            city: String(row.city),
+            status: 'available',
+            distance_km: null,
+            is_demo: false,
+          };
+        });
         setCars(mapped);
         setDbConnected(true);
         setLoadingCars(false);
@@ -167,7 +182,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
     document.getElementById('fleet-offers')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  const handleSelectAirportCity = (cityFr: string) => {
+  const handleSelectQuickCity = (cityFr: string) => {
     setSelectedCity(cityFr);
     document.getElementById('fleet-offers')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
@@ -195,7 +210,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
       <section className="relative w-full overflow-hidden bg-slate-900 min-h-[420px] sm:min-h-[460px] flex flex-col justify-end">
         <img
           src={HERO_IMAGE_URL}
-          alt="سيارة كراء حديثة في المغرب"
+          alt="سيارة كراء اقتصادية في المغرب"
           referrerPolicy="no-referrer"
           className="absolute inset-0 w-full h-full object-cover"
         />
@@ -207,10 +222,12 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
         <div className="relative z-10 w-full max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-6">
           <div className="max-w-xl space-y-2.5">
             <h1 className="text-2xl sm:text-4xl font-extrabold text-white leading-[1.2] [text-wrap:balance] drop-shadow-sm">
-              احجز سيارتك في المغرب خلال دقائق
+              اكري سيارتك في مدينتك بدون ضمان
             </h1>
             <p className="text-slate-200 text-sm sm:text-base leading-relaxed">
-              وكالات موثقة بأسعار واضحة · <span className="font-semibold text-white">10% تسبيق</span> والباقي عند الاستلام.
+              سيارات اقتصادية من وكالات محلية ·{' '}
+              <span className="font-semibold text-white">0 درهم كفالة</span> · حد أدنى 3 أيام و
+              <span className="font-semibold text-white"> 10% تسبيق</span> فقط.
             </p>
           </div>
 
@@ -226,7 +243,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
                 htmlFor="hero-city-select"
                 className="block text-[11px] sm:text-xs font-semibold text-white/90 mb-1.5"
               >
-                المدينة
+                اختر مدينتك
               </label>
               <div className="relative">
                 <MapPin className="w-4 h-4 text-[#2563EB] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -267,13 +284,13 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
               </div>
             </div>
 
-            {/* Days */}
+            {/* Days (Min 3 days) */}
             <div className="col-span-1 sm:col-span-2">
               <label
                 htmlFor="hero-days"
                 className="block text-[11px] sm:text-xs font-semibold text-white/90 mb-1.5"
               >
-                المدة
+                المدة (3 أيام+)
               </label>
               <select
                 id="hero-days"
@@ -281,7 +298,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
                 onChange={(e) => setSearchDays(Number(e.target.value))}
                 className={`${inputBase} appearance-none px-2`}
               >
-                {[1, 2, 3, 4, 5, 7, 10, 14, 30].map((d) => (
+                {[3, 4, 5, 7, 10, 14, 30].map((d) => (
                   <option key={d} value={d}>
                     {formatDays(d)}
                   </option>
@@ -304,27 +321,27 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
 
           {/* Trust micro-copy */}
           <p className="flex items-center gap-1.5 text-[11px] sm:text-xs text-slate-300/90">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" aria-hidden="true" />
-            إلغاء مجاني حتى 24 ساعة قبل الاستلام
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" aria-hidden="true" />
+            بدون ضمان (0 درهم كفالة) · يشترط أقدمية رخصة السياقة سنتين على الأقل
           </p>
         </div>
       </section>
 
-      {/* ===================== POPULAR AIRPORTS ===================== */}
+      {/* ===================== POPULAR LOCAL CITIES ===================== */}
       <section
         className="max-w-6xl mx-auto px-4 sm:px-6 pt-5 pb-2"
-        aria-label="مطارات مغربية شائعة"
+        aria-label="المدن المغربية الرئيسية"
       >
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {POPULAR_AIRPORTS.map((item) => {
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+          {POPULAR_CITIES.map((item) => {
             const active = selectedCity.toLowerCase() === item.cityFr.toLowerCase();
             return (
               <button
-                key={item.code}
+                key={item.cityFr}
                 type="button"
-                onClick={() => handleSelectAirportCity(item.cityFr)}
+                onClick={() => handleSelectQuickCity(item.cityFr)}
                 aria-pressed={active}
-                className={`text-right rounded-xl border px-3.5 py-2.5 transition-all duration-150 flex items-center justify-between gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB] focus-visible:ring-offset-2 ${
+                className={`text-right rounded-xl border px-3 py-2.5 transition-all duration-150 flex items-center justify-between gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB] focus-visible:ring-offset-2 ${
                   active
                     ? 'bg-blue-50/80 border-[#2563EB] text-slate-900 shadow-sm'
                     : 'bg-white border-slate-200 hover:border-[#2563EB]/40 hover:shadow-sm text-slate-800'
@@ -332,12 +349,9 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
               >
                 <div className="min-w-0">
                   <div className="text-xs font-bold truncate">{item.cityAr}</div>
-                  <div className="text-[11px] text-slate-500 truncate">{item.airport}</div>
+                  <div className="text-[11px] text-slate-500 truncate">{item.subtitle}</div>
                 </div>
-                <span className="inline-flex items-center gap-1 font-mono-tabular text-[11px] font-bold text-[#2563EB] shrink-0">
-                  <Plane className="w-3.5 h-3.5" aria-hidden="true" />
-                  <span>{item.code}</span>
-                </span>
+                <MapPin className="w-3.5 h-3.5 text-[#2563EB] shrink-0" aria-hidden="true" />
               </button>
             );
           })}
@@ -353,7 +367,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div className="space-y-1">
             <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
-              السيارات المتاحة في {getCityLabelAr(selectedCity)}
+              السيارات الاقتصادية المتاحة في {getCityLabelAr(selectedCity)}
             </h2>
             <p className="text-xs text-slate-500">
               {loadingCars ? (
@@ -375,14 +389,14 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
                     onClick={onGoToAgency}
                     className="font-semibold text-[#2563EB] hover:underline"
                   >
-                    أضف أسطولك
+                    سجل وكالتك الآن
                   </button>
                 </>
               )}
             </p>
           </div>
 
-          {/* Filters (scrollable on mobile) */}
+          {/* Filters */}
           <div className="flex flex-col gap-2.5 md:flex-row md:items-center">
             {availableBrands.length > 1 && (
               <div
@@ -517,7 +531,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
                       className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500 ease-out"
                     />
                     {car.model_year && (
-                      <span className="absolute top-3 right-3 inline-flex items-center gap-1 rounded-full bg-white/95 backdrop-blur-sm text-slate-800 text-[11px] font-bold px-2.5 py-1 shadow-sm">
+                      <span className="absolute top-3 right-3 inline-flex items-center rounded-full bg-white/95 backdrop-blur-sm text-slate-800 text-[11px] font-bold px-2.5 py-1 shadow-sm">
                         {car.model_year}
                       </span>
                     )}
@@ -564,8 +578,13 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
                       </span>
                     </div>
 
+                    <div className="text-[11px] font-semibold text-emerald-700 mt-2.5 flex items-center gap-1">
+                      <ShieldCheck className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                      <span>بدون ضمان (0 DH كفالة)</span>
+                    </div>
+
                     {/* Price + CTA */}
-                    <div className="mt-auto pt-4 flex items-end justify-between gap-3">
+                    <div className="mt-auto pt-3 flex items-end justify-between gap-3">
                       <div>
                         <div className="flex items-baseline gap-1">
                           <span className="text-2xl font-extrabold text-slate-900 font-mono-tabular leading-none">
@@ -603,10 +622,10 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
       {selectedCar && (
         <BookingModal
           car={selectedCar}
-          pickupDate={searchPickupDate}
-          days={searchDays}
+          initialPickupDate={searchPickupDate}
+          initialDays={searchDays}
           onClose={() => setSelectedCar(null)}
-          onBookingCreated={(booking) => {
+          onBookingCompleted={(booking) => {
             onBookingCreated(booking);
             setSelectedCar(null);
           }}

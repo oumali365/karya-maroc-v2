@@ -10,6 +10,7 @@ import {
   MapPin,
   CalendarClock,
   ShieldCheck,
+  KeyRound,
 } from 'lucide-react';
 import { supabase, formatDH, getCityLabelAr } from '../lib/supabase';
 import type { BookingStatus, CreatedBooking } from '../types/karya';
@@ -126,6 +127,7 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
   const [refundTarget, setRefundTarget] = useState<CreatedBooking | null>(null);
   const [manualRefundMode, setManualRefundMode] = useState(false);
   const [manualCode, setManualCode] = useState('');
+  const [refundPhone, setRefundPhone] = useState('');
   const [refundRib, setRefundRib] = useState('');
   const [refundReason, setRefundReason] = useState('عدم توفر السيارة أو إلغاء الحجز وفق الشروط');
   const [refundSubmitting, setRefundSubmitting] = useState(false);
@@ -164,6 +166,7 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
               agency_payout_amount: Number(row.agency_payout_amount),
               delivery_at: String(row.delivery_at),
               status: row.status,
+              handover_pin: row.handover_pin ? String(row.handover_pin) : undefined,
               is_demo: false,
             })),
           );
@@ -211,6 +214,7 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
           agency_payout_amount: Number(r.agency_payout_amount),
           delivery_at: String(r.delivery_at),
           status: r.status,
+          handover_pin: r.handover_pin ? String(r.handover_pin) : undefined,
           is_demo: false,
         };
         setLookupBookings((prev) => [
@@ -272,6 +276,7 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
           p_booking_code: matchedBooking.booking_code,
           p_customer_rib: accountValidation.value,
           p_reason: refundReason,
+          p_customer_phone: refundPhone.trim() || trackPhone.trim() || null,
         });
         if (error) throw new Error(error.message);
       }
@@ -292,6 +297,7 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
         'تم تسجيل طلب الاسترجاع بنجاح. استرجع تسبيقك كاملاً عبر التحويل الفوري لرقم هاتفك أو حسابك البنكي (مثل Cash Plus أو التطبيقات البنكية) خلال ساعات من التحقق.',
       );
       setRefundRib('');
+      setRefundPhone('');
       setRefundTarget(null);
       setManualRefundMode(false);
     } catch (err) {
@@ -476,6 +482,28 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
                         <span>{booking.pickup_location}</span>
                       </div>
                     )}
+
+                    {booking.handover_pin &&
+                      (booking.status === 'payment_uploaded' ||
+                        booking.status === 'payment_verified') && (
+                        <div className="mt-2 inline-flex flex-wrap items-center gap-2 rounded-xl bg-blue-50 border border-blue-200/80 px-3 py-1.5 text-xs">
+                          <KeyRound className="w-3.5 h-3.5 text-[#2563EB] shrink-0" />
+                          <span className="text-slate-700 font-semibold">رمز التسليم السري:</span>
+                          <span
+                            dir="ltr"
+                            className="font-mono-tabular font-extrabold text-[#2563EB] tracking-wider"
+                          >
+                            {booking.handover_pin}
+                          </span>
+                          <span className="text-[11px] text-slate-500">
+                            (لا يُعطى للوكالة إلا عند استلام المفاتيح بدون ضمان)
+                          </span>
+                        </div>
+                      )}
+
+                    <div className="text-[11px] text-slate-400 pt-0.5">
+                      ملاحظة: أي تمديد أو اتفاق خارج المنصة لا تشمله حماية المنصة أو ضمان الاسترجاع.
+                    </div>
                   </div>
                 </div>
 
@@ -561,11 +589,26 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
             </div>
 
             <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                رقم الهاتف المرتبط بالحجز (للتحقق الأمني)
+              </label>
+              <input
+                required
+                type="tel"
+                dir="ltr"
+                placeholder="06XXXXXXXX"
+                value={refundPhone}
+                onChange={(e) => setRefundPhone(e.target.value)}
+                className="w-full min-h-[44px] rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-mono bg-white focus:border-[#2563EB] focus:outline-none"
+              />
+            </div>
+
+            <div>
               <label
                 htmlFor="refund-destination-input"
                 className="block text-xs font-semibold text-slate-700 mb-1.5"
               >
-                رقم الهاتف (06/07) أو الحساب البنكي (RIB)
+                رقم الهاتف (06/07) أو الحساب البنكي (RIB) لاسترجاع التسبيق
               </label>
               <input
                 id="refund-destination-input"

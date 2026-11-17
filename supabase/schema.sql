@@ -1,11 +1,12 @@
 -- ============================================================================
--- Karya Morocco - Compatible Supabase PostgreSQL Schema
+-- Karya Morocco - Compatible Supabase PostgreSQL Schema (Local Economic Edition)
 -- Supports:
 --   1. Moroccan Cities & GPS Proximity Search (Haversine)
---   2. Rental Agencies (Profile, Phone, Bank RIB, Verification)
---   3. Agency Fleet (Real Car Photos in Storage, Instant Available/Unavailable)
---   4. Multi-Bank Platform Checkout (AL BARID, CHAABI, CIH, TIJJARI, BMCE, CASHPLUS)
---   5. Booking + Payment Receipt Upload + 10% Commission + 90% Agency Payout / 100% Refund
+--   2. Central Economic Car Catalog (Admin-curated, max 50 models by Brand)
+--   3. Rental Agencies (Phone + PIN auth, NO email activation, NO bank RIB,
+--      Mandatory Pledge: Zero Deposit + 10% Platform Commission, Full Cloud Sync)
+--   4. Zero Deposit Mandate (deposit_amount = 0) & Minimum 3-Day Rental (days >= 3)
+--   5. Strict 2-Year Driver License Seniority Check + 10% Advance Checkout
 -- ============================================================================
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
@@ -39,7 +40,7 @@ INSERT INTO public.cities (slug, name_ar, name_fr, latitude, longitude) VALUES
 ON CONFLICT (slug) DO NOTHING;
 
 -- ============================================================================
--- 2. PLATFORM ADMINS (مسؤولو المنصة لمراجعة الوصولات وتحويل الأموال)
+-- 2. PLATFORM ADMINS (مسؤولو المنصة لمراجعة الوصولات، الكتالوج، وتوثيق الوكالات)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS public.platform_admins (
     user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -55,7 +56,6 @@ ALTER TABLE public.platform_admins
 ALTER TABLE public.platform_admins
     ADD COLUMN IF NOT EXISTS pin_hash TEXT;
 
--- دالة آمنة للتحقق من الرمز السري للإدارة عبر التجزئة المشفرة (bcrypt) دون كشف جدول platform_admins
 CREATE OR REPLACE FUNCTION public.verify_admin_pin(p_pin TEXT)
 RETURNS BOOLEAN
 LANGUAGE plpgsql
@@ -96,16 +96,34 @@ AS $$
     );
 $$;
 
+CREATE OR REPLACE FUNCTION public.is_admin_or_pin(p_admin_pin TEXT DEFAULT NULL)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+BEGIN
+    IF public.is_admin() THEN
+        RETURN true;
+    END IF;
+    IF NULLIF(TRIM(COALESCE(p_admin_pin, '')), '') IS NOT NULL THEN
+        RETURN public.verify_admin_pin(p_admin_pin);
+    END IF;
+    RETURN false;
+END;
+$$;
+
 -- ============================================================================
--- 3. PLATFORM BANKS (الحسابات البنكية للمنصة - مطابقة لواجهة التحويل البنكي)
+-- 3. PLATFORM BANKS (الحسابات البنكية للمنصة لاستلام تسبيق 10%)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS public.platform_banks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    code TEXT UNIQUE NOT NULL,           -- AL_BARID, CHAABI, CIH, TIJJARI, BMCE, CASHPLUS
-    short_name TEXT NOT NULL,            -- الاسم الظاهر تحت الشعار
-    display_name_ar TEXT NOT NULL,       -- الاسم بالعربية
-    account_holder_name TEXT NOT NULL,   -- اسم المستلم
-    rib TEXT NOT NULL,                   -- رقم الحساب (24 رقماً)
+    code TEXT UNIQUE NOT NULL,
+    short_name TEXT NOT NULL,
+    display_name_ar TEXT NOT NULL,
+    account_holder_name TEXT NOT NULL,
+    rib TEXT NOT NULL,
     logo_url TEXT,
     is_active BOOLEAN NOT NULL DEFAULT true,
     sort_order INTEGER NOT NULL DEFAULT 0,
@@ -122,11 +140,11 @@ INSERT INTO public.platform_banks (code, short_name, display_name_ar, account_ho
 ON CONFLICT (code) DO NOTHING;
 
 -- ============================================================================
--- 4. AGENCIES (شركات كراء السيارات / المعلنين)
+-- 4. AGENCIES (وكالات كراء السيارات — دخول برقم الهاتف + الرمز السري بدون RIB)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS public.agencies (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    owner_id UUID UNIQUE NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    owner_id UUID UNIQUE REFERENCES auth.users(id) ON DELETE SET NULL,
     name TEXT NOT NULL,
     phone TEXT NOT NULL,
     whatsapp_phone TEXT,
@@ -134,11 +152,12 @@ CREATE TABLE IF NOT EXISTS public.agencies (
     address TEXT,
     latitude DOUBLE PRECISION,
     longitude DOUBLE PRECISION,
-    -- معلومات الحساب البنكي للشركة لاستلام الأرباح (90%)
-    bank_name TEXT NOT NULL,
-    bank_account_holder TEXT,
-    bank_rib TEXT NOT NULL,
-    -- توثيق الشركة
+    pin_hash TEXT,
+    terms_accepted_at TIMESTAMPTZ,
+    -- حقول اختيارية قديمة للتوافق فقط (لم تعد مطلوبة لأن الوكالة تحصل 90% مباشرة)
+    bank_name TEXT DEFAULT '',
+    bank_account_holder TEXT DEFAULT '',
+    bank_rib TEXT DEFAULT '',
     commercial_register TEXT,
     verification_status TEXT NOT NULL DEFAULT 'pending'
         CHECK (verification_status IN ('pending', 'verified', 'suspended')),
@@ -148,32 +167,101 @@ CREATE TABLE IF NOT EXISTS public.agencies (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- ترقية آمنة لجداول الوكالات القائمة مسبقاً
+ALTER TABLE public.agencies
+    ALTER COLUMN owner_id DROP NOT NULL,
+    ALTER COLUMN bank_name DROP NOT NULL,
+    ALTER COLUMN bank_name SET DEFAULT '',
+    ALTER COLUMN bank_rib DROP NOT NULL,
+    ALTER COLUMN bank_rib SET DEFAULT '';
+
+ALTER TABLE public.agencies
+    ADD COLUMN IF NOT EXISTS pin_hash TEXT,
+    ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS strike_count INTEGER NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS last_strike_at TIMESTAMPTZ;
+
 CREATE INDEX IF NOT EXISTS idx_agencies_city ON public.agencies(city);
 CREATE INDEX IF NOT EXISTS idx_agencies_verification ON public.agencies(verification_status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_agencies_phone_normalized
+    ON public.agencies (REGEXP_REPLACE(phone, '[^0-9]', '', 'g'));
 
 -- ============================================================================
--- 5. CAR CATALOG (اختياري كمرجع سريع للماركات والموديلات)
+-- 5. CENTRAL ECONOMIC CAR CATALOG (الكتالوج المركزي: 30-50 سيارة اقتصادية كحد أقصى)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS public.car_catalog (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     brand TEXT NOT NULL,
     model TEXT NOT NULL,
-    category TEXT NOT NULL DEFAULT 'Économique', -- Économique, Berline, SUV, Citadine
+    category TEXT NOT NULL DEFAULT 'Économique',
+    seats INTEGER NOT NULL DEFAULT 5,
+    default_fuel TEXT NOT NULL DEFAULT 'diesel'
+        CHECK (default_fuel IN ('diesel', 'essence', 'hybrid', 'electric')),
+    default_transmission TEXT NOT NULL DEFAULT 'manual'
+        CHECK (default_transmission IN ('manual', 'automatic')),
     image_url TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE public.car_catalog
+    ADD COLUMN IF NOT EXISTS seats INTEGER NOT NULL DEFAULT 5,
+    ADD COLUMN IF NOT EXISTS default_fuel TEXT NOT NULL DEFAULT 'diesel',
+    ADD COLUMN IF NOT EXISTS default_transmission TEXT NOT NULL DEFAULT 'manual';
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_car_catalog_brand_model
+    ON public.car_catalog (LOWER(TRIM(brand)), LOWER(TRIM(model)));
+
+-- حد أقصى 50 سيارة في الكتالوج المركزي للحفاظ على جودة الاختيارات الاقتصادية
+CREATE OR REPLACE FUNCTION public.enforce_catalog_max_limit()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_count INTEGER;
+BEGIN
+    SELECT COUNT(*) INTO v_count FROM public.car_catalog;
+    IF v_count >= 50 THEN
+        RAISE EXCEPTION 'تم بلوغ الحد الأقصى للكتالوج المركزي (50 سيارة اقتصادية). يرجى حذف موديل قديم قبل إضافة جديد.';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_car_catalog_max_limit ON public.car_catalog;
+CREATE TRIGGER trg_car_catalog_max_limit
+    BEFORE INSERT ON public.car_catalog
+    FOR EACH ROW EXECUTE FUNCTION public.enforce_catalog_max_limit();
+
+-- بذور أولية لموديلات اقتصادية شائعة في المغرب
+INSERT INTO public.car_catalog (brand, model, category, seats, default_fuel, default_transmission, image_url) VALUES
+    ('Dacia', 'Sandero Stepway', 'Économique', 5, 'diesel', 'manual', NULL),
+    ('Dacia', 'Logan', 'Économique', 5, 'diesel', 'manual', NULL),
+    ('Dacia', 'Duster', 'SUV Économique', 5, 'diesel', 'manual', NULL),
+    ('Renault', 'Clio 5', 'Économique', 5, 'diesel', 'manual', NULL),
+    ('Renault', 'Megane 4', 'Berline Économique', 5, 'diesel', 'automatic', NULL),
+    ('Peugeot', '208', 'Économique', 5, 'essence', 'manual', NULL),
+    ('Peugeot', '301', 'Économique', 5, 'diesel', 'manual', NULL),
+    ('Ford', 'Fiesta', 'Économique', 5, 'diesel', 'manual', NULL),
+    ('Ford', 'Focus', 'Berline Économique', 5, 'diesel', 'manual', NULL),
+    ('Hyundai', 'i10', 'Citadine', 5, 'essence', 'manual', NULL),
+    ('Hyundai', 'i20', 'Économique', 5, 'essence', 'automatic', NULL),
+    ('Citroën', 'C3', 'Économique', 5, 'diesel', 'manual', NULL),
+    ('Fiat', '500', 'Citadine', 4, 'essence', 'manual', NULL),
+    ('Volkswagen', 'Polo', 'Économique', 5, 'diesel', 'manual', NULL),
+    ('Volkswagen', 'Golf 8', 'Berline Économique', 5, 'diesel', 'automatic', NULL)
+ON CONFLICT DO NOTHING;
+
 -- ============================================================================
--- 6. AGENCY CARS (أسطول السيارات الفعلي بصور الشركة الخاصة وحالة التوفر)
+-- 6. AGENCY CARS (سيارات الوكالات المرتبطة بالكتالوج المركزي — بدون ضمان 0 DH)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS public.agency_cars (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     agency_id UUID NOT NULL REFERENCES public.agencies(id) ON DELETE CASCADE,
     catalog_id UUID REFERENCES public.car_catalog(id) ON DELETE SET NULL,
-    -- بيانات وصور السيارة الحقيقية المرفوعة من طرف الشركة
     brand TEXT NOT NULL,
     model TEXT NOT NULL,
     model_year INTEGER,
+    color TEXT,
     fuel_type TEXT NOT NULL DEFAULT 'diesel'
         CHECK (fuel_type IN ('diesel', 'essence', 'hybrid', 'electric')),
     transmission TEXT NOT NULL DEFAULT 'manual'
@@ -181,68 +269,73 @@ CREATE TABLE IF NOT EXISTS public.agency_cars (
     seats INTEGER NOT NULL DEFAULT 5,
     primary_image_url TEXT NOT NULL,
     gallery_images TEXT[] NOT NULL DEFAULT '{}',
-    -- التسعير والموقع
+    -- التسعير حر بدون سقف، والضمان 0 درهم إلزامياً
     daily_price NUMERIC(10,2) NOT NULL CHECK (daily_price > 0),
-    deposit_amount NUMERIC(10,2) NOT NULL DEFAULT 0, -- الكفالة/الضمان إن وجد
+    deposit_amount NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (deposit_amount = 0),
     city TEXT NOT NULL,
     latitude DOUBLE PRECISION,
     longitude DOUBLE PRECISION,
-    -- الحالة الفورية
     status TEXT NOT NULL DEFAULT 'available'
         CHECK (status IN ('available', 'unavailable')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE public.agency_cars
+    ADD COLUMN IF NOT EXISTS color TEXT;
+
+-- توحيد الضمان إلى 0 درهم لأي بيانات قائمة مسبقاً وتطبيق قيد 0 DH
+UPDATE public.agency_cars SET deposit_amount = 0 WHERE deposit_amount <> 0;
+ALTER TABLE public.agency_cars DROP CONSTRAINT IF EXISTS agency_cars_deposit_zero_check;
+ALTER TABLE public.agency_cars ADD CONSTRAINT agency_cars_deposit_zero_check CHECK (deposit_amount = 0);
+
 CREATE INDEX IF NOT EXISTS idx_agency_cars_city_status ON public.agency_cars(city, status);
 CREATE INDEX IF NOT EXISTS idx_agency_cars_agency ON public.agency_cars(agency_id);
 
 -- ============================================================================
--- 7. BOOKINGS (الطلبات + بيانات الزبون + العمولة 10% + وصل التحويل + الضمان)
+-- 7. BOOKINGS (الحجوزات: حد أدنى 3 أيام + أقدمية رخصة سنتان + تسبيق 10%)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS public.bookings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    booking_code TEXT UNIQUE NOT NULL, -- مثال: KRY-849201
-    agency_car_id UUID NOT NULL REFERENCES public.agency_cars(id) ON DELETE RESTRICT,
-    agency_id UUID NOT NULL REFERENCES public.agencies(id) ON DELETE RESTRICT,
+    booking_code TEXT UNIQUE NOT NULL,
+    agency_car_id UUID REFERENCES public.agency_cars(id) ON DELETE SET NULL,
+    agency_id UUID REFERENCES public.agencies(id) ON DELETE SET NULL,
 
-    -- بيانات الزبون المطلوبة
     customer_user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
     customer_name TEXT NOT NULL,
-    customer_cin TEXT NOT NULL,          -- رقم بطاقة التعريف الوطنية
+    customer_cin TEXT NOT NULL,
     customer_phone TEXT NOT NULL,
     customer_email TEXT,
-    customer_refund_rib TEXT,            -- في حال طلب استرجاع المبلغ كاملاً عند عدم التسليم
+    customer_refund_rib TEXT,
+    customer_license_number TEXT,
+    customer_license_issue_date DATE,
+    pickup_location TEXT,
 
-    -- تفاصيل الكراء
-    days INTEGER NOT NULL CHECK (days >= 1 AND days <= 90),
+    days INTEGER NOT NULL CHECK (days >= 3 AND days <= 90),
     daily_price NUMERIC(10,2) NOT NULL,
-    delivery_at TIMESTAMPTZ NOT NULL,    -- وقت وتاريخ تسليم السيارة
+    delivery_at TIMESTAMPTZ NOT NULL,
     delivery_notes TEXT,
 
-    -- الحسابات المالية (تُحسب تلقائياً داخل قاعدة البيانات)
     total_amount NUMERIC(10,2) NOT NULL,
-    commission_rate NUMERIC(5,4) NOT NULL DEFAULT 0.1000, -- 10%
-    commission_amount NUMERIC(10,2) NOT NULL,             -- حصة المنصة (10%)
-    agency_payout_amount NUMERIC(10,2) NOT NULL,          -- حصة الشركة (90%)
+    commission_rate NUMERIC(5,4) NOT NULL DEFAULT 0.1000,
+    commission_amount NUMERIC(10,2) NOT NULL,
+    agency_payout_amount NUMERIC(10,2) NOT NULL,
 
-    -- معلومات التحويل البنكي من الزبون للمنصة
     platform_bank_id UUID REFERENCES public.platform_banks(id),
     selected_bank_code TEXT,
-    receipt_url TEXT,                    -- رابط صورة/PDF وصل التحويل
+    receipt_url TEXT,
     receipt_uploaded_at TIMESTAMPTZ,
 
-    -- دورة حياة الحجز والضمان المالي
     status TEXT NOT NULL DEFAULT 'pending_payment'
         CHECK (status IN (
-            'pending_payment',   -- تم إنشاء الطلب وبانتظار رفع وصل التحويل
-            'payment_uploaded',  -- رفع العميل وصل التحويل وبانتظار تحقق المنصة
-            'payment_verified',  -- تحققت المنصة من وصول المال وبانتظار تسليم السيارة
-            'car_delivered',     -- استلم العميل السيارة (تم إطلاق تحويل 90% للشركة)
-            'completed',         -- انتهت مدة الكراء
-            'refund_requested',  -- العميل لم يستلم السيارة وطلب استرجاع 100%
-            'refunded',          -- تم إرجاع 100% من المال للعميل
-            'cancelled'          -- ملغي
+            'pending_payment',
+            'payment_uploaded',
+            'payment_verified',
+            'car_delivered',
+            'completed',
+            'refund_requested',
+            'refunded',
+            'cancelled'
         )),
 
     customer_confirmed_pickup BOOLEAN NOT NULL DEFAULT false,
@@ -260,7 +353,36 @@ ALTER TABLE public.bookings
     ADD COLUMN IF NOT EXISTS customer_user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
     ADD COLUMN IF NOT EXISTS customer_license_number TEXT,
     ADD COLUMN IF NOT EXISTS customer_license_issue_date DATE,
-    ADD COLUMN IF NOT EXISTS pickup_location TEXT;
+    ADD COLUMN IF NOT EXISTS pickup_location TEXT,
+    ADD COLUMN IF NOT EXISTS handover_pin TEXT,
+    ADD COLUMN IF NOT EXISTS agency_ack_status TEXT NOT NULL DEFAULT 'pending',
+    ADD COLUMN IF NOT EXISTS agency_ack_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS agency_ack_note TEXT,
+    ADD COLUMN IF NOT EXISTS reassigned_from_agency_id UUID REFERENCES public.agencies(id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS reassigned_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS dispute_flag TEXT;
+
+ALTER TABLE public.bookings DROP CONSTRAINT IF EXISTS bookings_agency_ack_status_check;
+ALTER TABLE public.bookings
+    ADD CONSTRAINT bookings_agency_ack_status_check
+    CHECK (agency_ack_status IN ('pending', 'available', 'unavailable'));
+
+-- السماح بحذف السيارة أو الوكالة عند عدم وجود حجوزات نشطة عبر ON DELETE SET NULL
+ALTER TABLE public.bookings ALTER COLUMN agency_car_id DROP NOT NULL;
+ALTER TABLE public.bookings ALTER COLUMN agency_id DROP NOT NULL;
+ALTER TABLE public.bookings DROP CONSTRAINT IF EXISTS bookings_agency_car_id_fkey;
+ALTER TABLE public.bookings
+    ADD CONSTRAINT bookings_agency_car_id_fkey
+    FOREIGN KEY (agency_car_id) REFERENCES public.agency_cars(id) ON DELETE SET NULL;
+ALTER TABLE public.bookings DROP CONSTRAINT IF EXISTS bookings_agency_id_fkey;
+ALTER TABLE public.bookings
+    ADD CONSTRAINT bookings_agency_id_fkey
+    FOREIGN KEY (agency_id) REFERENCES public.agencies(id) ON DELETE SET NULL;
+
+-- تحديث قيد الأيام الأدنى إلى 3 أيام في الجداول القائمة
+ALTER TABLE public.bookings DROP CONSTRAINT IF EXISTS bookings_days_check;
+ALTER TABLE public.bookings ADD CONSTRAINT bookings_days_check CHECK (days >= 3 AND days <= 90) NOT VALID;
 
 CREATE INDEX IF NOT EXISTS idx_bookings_agency_status ON public.bookings(agency_id, status);
 CREATE INDEX IF NOT EXISTS idx_bookings_code ON public.bookings(booking_code);
@@ -269,7 +391,7 @@ CREATE INDEX IF NOT EXISTS idx_bookings_customer_phone ON public.bookings(custom
 CREATE INDEX IF NOT EXISTS idx_bookings_customer_user ON public.bookings(customer_user_id);
 
 -- ============================================================================
--- 8. PAYOUTS & REFUNDS (سجل التحويلات الفورية للشركات 90% أو الاسترجاع للعميل 100%)
+-- 8. PAYOUTS & REFUNDS (سجل استرجاع التسبيق للعملاء)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS public.payouts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -331,12 +453,10 @@ ALTER TABLE public.agency_cars ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.bookings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.payouts ENABLE ROW LEVEL SECURITY;
 
--- Cities: قراءة عامة للجميع
 DROP POLICY IF EXISTS "cities_public_read" ON public.cities;
 CREATE POLICY "cities_public_read" ON public.cities
     FOR SELECT USING (is_active = true);
 
--- Platform Banks: قراءة الحسابات النشطة للعملاء عند الدفع، والإدارة كاملة للأدمن
 DROP POLICY IF EXISTS "platform_banks_public_read" ON public.platform_banks;
 CREATE POLICY "platform_banks_public_read" ON public.platform_banks
     FOR SELECT USING (is_active = true OR public.is_admin());
@@ -344,7 +464,6 @@ DROP POLICY IF EXISTS "platform_banks_admin_all" ON public.platform_banks;
 CREATE POLICY "platform_banks_admin_all" ON public.platform_banks
     FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
 
--- Platform Admins: يقرأ الأدمن سجله فقط عبر معرفه أو بريده الإلكتروني المسجل
 DROP POLICY IF EXISTS "admins_self_read" ON public.platform_admins;
 CREATE POLICY "admins_self_read" ON public.platform_admins
     FOR SELECT TO authenticated
@@ -356,10 +475,6 @@ CREATE POLICY "admins_self_read" ON public.platform_admins
         )
     );
 
--- Agencies:
---   - العامة يرون فقط اسم الوكالة، المدينة، التقييم للوكالات الموثقة (عبر استعلامات السيارات)
---   - المالك يدير ملف وكالته (باستثناء توثيق نفسه)
---   - الأدمن يدير كل شيء
 DROP POLICY IF EXISTS "agencies_public_read_verified" ON public.agencies;
 CREATE POLICY "agencies_public_read_verified" ON public.agencies
     FOR SELECT USING (verification_status = 'verified' OR owner_id = auth.uid() OR public.is_admin());
@@ -386,7 +501,6 @@ CREATE POLICY "agencies_owner_update" ON public.agencies
         OR (auth.uid() = owner_id AND verification_status = public.get_agency_verification_status(id))
     );
 
--- Car Catalog: قراءة للجميع، تعديل للأدمن فقط
 DROP POLICY IF EXISTS "catalog_public_read" ON public.car_catalog;
 CREATE POLICY "catalog_public_read" ON public.car_catalog
     FOR SELECT USING (true);
@@ -394,9 +508,6 @@ DROP POLICY IF EXISTS "catalog_admin_all" ON public.car_catalog;
 CREATE POLICY "catalog_admin_all" ON public.car_catalog
     FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
 
--- Agency Cars:
---   - العميل يرى السيارات المتاحة للوكالات الموثقة فقط
---   - الوكالة ترى وتعدل وتحذف سياراتها فقط
 DROP POLICY IF EXISTS "cars_public_read_available" ON public.agency_cars;
 CREATE POLICY "cars_public_read_available" ON public.agency_cars
     FOR SELECT USING (
@@ -439,10 +550,6 @@ CREATE POLICY "cars_agency_delete" ON public.agency_cars
         OR public.is_admin()
     );
 
--- Bookings:
---   1. تقتصر قراءة وتعديل حجوزات كل وكالة على بياناتها الخاصة فقط (owner_id = auth.uid())
---   2. لا يمكن للعميل العادي رؤية سوى حجوزاته المرتبطة بحسابه أو برقم هاتفه
---   3. للأدمن كامل الصلاحيات
 DROP POLICY IF EXISTS "bookings_agency_read" ON public.bookings;
 CREATE POLICY "bookings_agency_read" ON public.bookings
     FOR SELECT TO authenticated
@@ -471,7 +578,6 @@ CREATE POLICY "bookings_agency_update" ON public.bookings
         )
     );
 
--- منع أي وكالة من تغيير الحقول المالية أو نقل الحجز لوكالة أخرى عند التعديل المباشر
 CREATE OR REPLACE FUNCTION public.guard_booking_update()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -483,8 +589,8 @@ BEGIN
         RETURN NEW;
     END IF;
 
-    IF NEW.agency_id <> OLD.agency_id
-       OR NEW.agency_car_id <> OLD.agency_car_id
+    IF NEW.agency_id IS DISTINCT FROM OLD.agency_id
+       OR NEW.agency_car_id IS DISTINCT FROM OLD.agency_car_id
        OR NEW.total_amount <> OLD.total_amount
        OR NEW.commission_rate <> OLD.commission_rate
        OR NEW.commission_amount <> OLD.commission_amount
@@ -524,7 +630,6 @@ CREATE POLICY "bookings_admin_all" ON public.bookings
     USING (public.is_admin())
     WITH CHECK (public.is_admin());
 
--- Payouts: ترى الوكالة تحويلاتها فقط، والأدمن يدير كل التحويلات
 DROP POLICY IF EXISTS "payouts_agency_read" ON public.payouts;
 CREATE POLICY "payouts_agency_read" ON public.payouts
     FOR SELECT USING (
@@ -540,10 +645,10 @@ CREATE POLICY "payouts_admin_all" ON public.payouts
     FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
 
 -- ============================================================================
--- 11. RPC FUNCTIONS (دوال آمنة للعمليات الأساسية)
+-- 11. RPC FUNCTIONS (عمليات العملاء + الوكالات برقم الهاتف والرمز السري + الإدارة)
 -- ============================================================================
 
--- (أ) البحث عن السيارات المتاحة حسب المدينة أو أقرب موقع GPS (بالمسافة بالكيلومتر)
+-- (أ) البحث عن السيارات المتاحة حسب المدينة (بدون ضمان)
 CREATE OR REPLACE FUNCTION public.get_nearby_cars(
     p_city TEXT DEFAULT NULL,
     p_lat DOUBLE PRECISION DEFAULT NULL,
@@ -585,7 +690,7 @@ AS $$
         c.primary_image_url,
         c.gallery_images,
         c.daily_price,
-        c.deposit_amount,
+        0::NUMERIC AS deposit_amount,
         c.city,
         a.id AS agency_id,
         a.name AS agency_name,
@@ -614,8 +719,9 @@ AS $$
     ORDER BY distance_km ASC NULLS LAST, c.created_at DESC;
 $$;
 
--- (ب) إنشاء حجز جديد وحساب المبلغ والعمولة (10%) داخل قاعدة البيانات
+-- (ب) إنشاء حجز جديد (الحد الأدنى 3 أيام + أقدمية رخصة سنتين + تسبيق 10%)
 DROP FUNCTION IF EXISTS public.create_booking(UUID, TEXT, TEXT, TEXT, INTEGER, TIMESTAMPTZ, UUID, TEXT, TEXT);
+DROP FUNCTION IF EXISTS public.create_booking(UUID, TEXT, TEXT, TEXT, INTEGER, TIMESTAMPTZ, UUID, TEXT, TEXT, TEXT, DATE, TEXT);
 CREATE OR REPLACE FUNCTION public.create_booking(
     p_agency_car_id UUID,
     p_customer_name TEXT,
@@ -638,7 +744,8 @@ RETURNS TABLE (
     agency_payout_amount NUMERIC,
     bank_code TEXT,
     bank_holder_name TEXT,
-    bank_rib TEXT
+    bank_rib TEXT,
+    handover_pin TEXT
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -654,10 +761,41 @@ DECLARE
     v_commission NUMERIC(10,2);
     v_payout NUMERIC(10,2);
     v_code TEXT;
+    v_handover_pin TEXT;
     v_booking_id UUID;
+    v_norm_phone TEXT := REGEXP_REPLACE(COALESCE(p_customer_phone, ''), '[^0-9]', '', 'g');
+    v_norm_cin TEXT := UPPER(TRIM(COALESCE(p_customer_cin, '')));
+    v_pending_count INTEGER;
+    v_end_at TIMESTAMPTZ;
 BEGIN
-    IF p_days < 1 OR p_days > 90 THEN
-        RAISE EXCEPTION 'عدد الأيام يجب أن يكون بين 1 و 90 يوماً';
+    IF p_days < 3 OR p_days > 90 THEN
+        RAISE EXCEPTION 'الحد الأدنى للكراء هو 3 أيام (من 3 إلى 90 يوماً)';
+    END IF;
+
+    IF p_customer_license_issue_date IS NULL
+       OR p_customer_license_issue_date > (CURRENT_DATE - INTERVAL '2 years') THEN
+        RAISE EXCEPTION 'تشترط المنصة أقدمية رخصة سياقة لا تقل عن سنتين (24 شهراً) للاستفادة من الكراء بدون ضمان';
+    END IF;
+
+    -- تنظيف تلقائي للحجوزات منتهية الصلاحية التي لم يُرفع وصلها خلال ساعتين
+    UPDATE public.bookings
+    SET status = 'cancelled',
+        updated_at = NOW()
+    WHERE status = 'pending_payment'
+      AND expires_at IS NOT NULL
+      AND expires_at < NOW();
+
+    -- منع إغراق النظام أو تعطيل أسطول الوكالات بحجوزات معلقة متعددة لنفس العميل
+    SELECT COUNT(*) INTO v_pending_count
+    FROM public.bookings b
+    WHERE b.status IN ('pending_payment', 'payment_uploaded')
+      AND (
+          (LENGTH(v_norm_phone) >= 8 AND REGEXP_REPLACE(b.customer_phone, '[^0-9]', '', 'g') = v_norm_phone)
+          OR (LENGTH(v_norm_cin) >= 4 AND UPPER(TRIM(b.customer_cin)) = v_norm_cin)
+      );
+
+    IF v_pending_count >= 2 THEN
+        RAISE EXCEPTION 'لديك طلبان قيد المعالجة حالياً. يرجى إتمامهما أو انتظار المراجعة قبل إنشاء حجز جديد.';
     END IF;
 
     SELECT c.*, a.verification_status
@@ -678,6 +816,19 @@ BEGIN
         RAISE EXCEPTION 'هذه الوكالة غير مفعلة بعد';
     END IF;
 
+    -- منع تضارب التواريخ لنفس السيارة (Double-Booking Prevention)
+    v_end_at := p_delivery_at + (p_days * INTERVAL '1 day');
+    IF EXISTS (
+        SELECT 1
+        FROM public.bookings b
+        WHERE b.agency_car_id = v_car.id
+          AND b.status IN ('payment_uploaded', 'payment_verified', 'car_delivered')
+          AND b.delivery_at < v_end_at
+          AND (b.delivery_at + (b.days * INTERVAL '1 day')) > p_delivery_at
+    ) THEN
+        RAISE EXCEPTION 'عذراً، هذه السيارة محجوزة بالفعل في التواريخ المختارة. يرجى اختيار تاريخ آخر أو سيارة بديلة.';
+    END IF;
+
     IF p_platform_bank_id IS NOT NULL THEN
         SELECT id, code, account_holder_name, rib
         INTO v_bank_id, v_bank_code, v_bank_holder, v_bank_rib
@@ -689,6 +840,7 @@ BEGIN
     v_commission := ROUND(v_total * 0.10, 2);
     v_payout := v_total - v_commission;
     v_code := 'KRY-' || UPPER(SUBSTRING(REPLACE(gen_random_uuid()::TEXT, '-', '') FROM 1 FOR 6));
+    v_handover_pin := LPAD((FLOOR(RANDOM() * 9000) + 1000)::INT::TEXT, 4, '0');
 
     INSERT INTO public.bookings (
         booking_code,
@@ -712,6 +864,8 @@ BEGIN
         agency_payout_amount,
         platform_bank_id,
         selected_bank_code,
+        handover_pin,
+        expires_at,
         status
     ) VALUES (
         v_code,
@@ -719,7 +873,7 @@ BEGIN
         v_car.agency_id,
         auth.uid(),
         TRIM(p_customer_name),
-        UPPER(TRIM(p_customer_cin)),
+        v_norm_cin,
         TRIM(p_customer_phone),
         p_customer_email,
         NULLIF(UPPER(TRIM(COALESCE(p_customer_license_number, ''))), ''),
@@ -735,6 +889,8 @@ BEGIN
         v_payout,
         v_bank_id,
         v_bank_code,
+        v_handover_pin,
+        NOW() + INTERVAL '2 hours',
         'pending_payment'
     )
     RETURNING id INTO v_booking_id;
@@ -747,7 +903,8 @@ BEGIN
         v_payout,
         v_bank_code,
         v_bank_holder,
-        v_bank_rib;
+        v_bank_rib,
+        v_handover_pin;
 END;
 $$;
 
@@ -781,6 +938,7 @@ BEGIN
         selected_bank_code = v_bank.code,
         receipt_url = p_receipt_url,
         receipt_uploaded_at = NOW(),
+        expires_at = NULL,
         status = 'payment_uploaded'
     WHERE id = p_booking_id
       AND booking_code = p_booking_code
@@ -795,15 +953,826 @@ BEGIN
 END;
 $$;
 
--- (د) تأكيد استلام المال من طرف الأدمن (يفتح الحجز للوكالة)
-CREATE OR REPLACE FUNCTION public.admin_verify_payment(p_booking_id UUID)
+-- (د) تسجيل وكالة جديدة برقم الهاتف + الرمز السري + الإقرار الإلزامي (بدون بريد أو RIB)
+CREATE OR REPLACE FUNCTION public.register_agency_by_phone(
+    p_name TEXT,
+    p_phone TEXT,
+    p_city TEXT,
+    p_pin TEXT,
+    p_lat DOUBLE PRECISION DEFAULT NULL,
+    p_lng DOUBLE PRECISION DEFAULT NULL,
+    p_terms_accepted BOOLEAN DEFAULT false
+)
+RETURNS TABLE (
+    id UUID,
+    name TEXT,
+    phone TEXT,
+    city TEXT,
+    latitude DOUBLE PRECISION,
+    longitude DOUBLE PRECISION,
+    verification_status TEXT,
+    rating_avg NUMERIC,
+    rating_count INTEGER,
+    terms_accepted_at TIMESTAMPTZ
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+DECLARE
+    v_norm_phone TEXT := REGEXP_REPLACE(COALESCE(p_phone, ''), '[^0-9]', '', 'g');
+    v_clean_pin TEXT := TRIM(COALESCE(p_pin, ''));
+    v_agency RECORD;
+BEGIN
+    IF NOT COALESCE(p_terms_accepted, false) THEN
+        RAISE EXCEPTION 'يجب الموافقة على الإقرار الإلزامي (بدون ضمان + عمولة 10%% للمنصة) قبل التسجيل.';
+    END IF;
+
+    IF LENGTH(TRIM(COALESCE(p_name, ''))) < 2 THEN
+        RAISE EXCEPTION 'يرجى إدخال اسم الوكالة الصحيح.';
+    END IF;
+
+    IF LENGTH(v_norm_phone) < 9 THEN
+        RAISE EXCEPTION 'يرجى إدخال رقم هاتف مغربي صحيح.';
+    END IF;
+
+    IF LENGTH(v_clean_pin) < 4 THEN
+        RAISE EXCEPTION 'الرمز السري يجب أن يتكون من 4 رموز أو أرقام على الأقل.';
+    END IF;
+
+    IF EXISTS (
+        SELECT 1 FROM public.agencies a
+        WHERE REGEXP_REPLACE(a.phone, '[^0-9]', '', 'g') = v_norm_phone
+    ) THEN
+        RAISE EXCEPTION 'رقم الهاتف هذا مسجل مسبقاً. يرجى تسجيل الدخول مباشرة.';
+    END IF;
+
+    INSERT INTO public.agencies (
+        name,
+        phone,
+        city,
+        latitude,
+        longitude,
+        pin_hash,
+        terms_accepted_at,
+        bank_name,
+        bank_rib,
+        verification_status
+    ) VALUES (
+        TRIM(p_name),
+        TRIM(p_phone),
+        TRIM(p_city),
+        p_lat,
+        p_lng,
+        crypt(v_clean_pin, gen_salt('bf')),
+        NOW(),
+        '',
+        '',
+        'pending'
+    )
+    RETURNING * INTO v_agency;
+
+    RETURN QUERY SELECT
+        v_agency.id,
+        v_agency.name,
+        v_agency.phone,
+        v_agency.city,
+        v_agency.latitude,
+        v_agency.longitude,
+        v_agency.verification_status,
+        v_agency.rating_avg,
+        v_agency.rating_count,
+        v_agency.terms_accepted_at;
+END;
+$$;
+
+-- (هـ) دخول الوكالة برقم الهاتف والرمز السري
+CREATE OR REPLACE FUNCTION public.login_agency_by_phone(
+    p_phone TEXT,
+    p_pin TEXT
+)
+RETURNS TABLE (
+    id UUID,
+    name TEXT,
+    phone TEXT,
+    city TEXT,
+    latitude DOUBLE PRECISION,
+    longitude DOUBLE PRECISION,
+    verification_status TEXT,
+    rating_avg NUMERIC,
+    rating_count INTEGER,
+    terms_accepted_at TIMESTAMPTZ
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+DECLARE
+    v_norm_phone TEXT := REGEXP_REPLACE(COALESCE(p_phone, ''), '[^0-9]', '', 'g');
+    v_clean_pin TEXT := TRIM(COALESCE(p_pin, ''));
+    v_agency RECORD;
+BEGIN
+    SELECT * INTO v_agency
+    FROM public.agencies a
+    WHERE REGEXP_REPLACE(a.phone, '[^0-9]', '', 'g') = v_norm_phone
+      AND a.pin_hash IS NOT NULL
+      AND a.pin_hash = crypt(v_clean_pin, a.pin_hash);
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'رقم الهاتف أو الرمز السري غير صحيح.';
+    END IF;
+
+    RETURN QUERY SELECT
+        v_agency.id,
+        v_agency.name,
+        v_agency.phone,
+        v_agency.city,
+        v_agency.latitude,
+        v_agency.longitude,
+        v_agency.verification_status,
+        v_agency.rating_avg,
+        v_agency.rating_count,
+        v_agency.terms_accepted_at;
+END;
+$$;
+
+-- دالة مساعدة للتحقق من جلسة الوكالة (برقم الهاتف + PIN)
+CREATE OR REPLACE FUNCTION public.verify_agency_credentials(
+    p_agency_id UUID,
+    p_pin TEXT
+)
+RETURNS public.agencies
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+DECLARE
+    v_agency public.agencies;
+BEGIN
+    SELECT * INTO v_agency
+    FROM public.agencies a
+    WHERE a.id = p_agency_id
+      AND (
+          (a.pin_hash IS NOT NULL AND a.pin_hash = crypt(TRIM(COALESCE(p_pin, '')), a.pin_hash))
+          OR a.owner_id = auth.uid()
+      );
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'تعذر التحقق من صلاحية الوكالة. يرجى إعادة تسجيل الدخول.';
+    END IF;
+
+    RETURN v_agency;
+END;
+$$;
+
+-- (و) جلب أسطول الوكالة من السحابة
+CREATE OR REPLACE FUNCTION public.agency_get_cars(
+    p_agency_id UUID,
+    p_pin TEXT
+)
+RETURNS SETOF public.agency_cars
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+DECLARE
+    v_agency public.agencies;
+BEGIN
+    v_agency := public.verify_agency_credentials(p_agency_id, p_pin);
+    RETURN QUERY
+    SELECT * FROM public.agency_cars
+    WHERE agency_id = v_agency.id
+    ORDER BY created_at DESC;
+END;
+$$;
+
+-- (ز) إضافة سيارة للوكالة انطلاقاً من الكتالوج المركزي فقط (بدون ضمان 0 DH، بدون سقف للسعر)
+CREATE OR REPLACE FUNCTION public.agency_add_catalog_car(
+    p_agency_id UUID,
+    p_pin TEXT,
+    p_catalog_id UUID,
+    p_brand TEXT,
+    p_model TEXT,
+    p_image_url TEXT,
+    p_fuel_type TEXT,
+    p_transmission TEXT,
+    p_daily_price NUMERIC,
+    p_model_year INTEGER DEFAULT 2025,
+    p_seats INTEGER DEFAULT 5,
+    p_color TEXT DEFAULT NULL
+)
+RETURNS public.agency_cars
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+DECLARE
+    v_agency public.agencies;
+    v_catalog RECORD;
+    v_brand TEXT;
+    v_model TEXT;
+    v_img TEXT;
+    v_seats INTEGER;
+    v_inserted public.agency_cars;
+BEGIN
+    v_agency := public.verify_agency_credentials(p_agency_id, p_pin);
+
+    IF p_daily_price IS NULL OR p_daily_price <= 0 THEN
+        RAISE EXCEPTION 'يرجى إدخال سعر يومي صالح أكبر من 0 درهم.';
+    END IF;
+
+    IF p_catalog_id IS NOT NULL THEN
+        SELECT * INTO v_catalog FROM public.car_catalog WHERE id = p_catalog_id;
+    END IF;
+
+    v_brand := COALESCE(v_catalog.brand, NULLIF(TRIM(p_brand), ''));
+    v_model := COALESCE(v_catalog.model, NULLIF(TRIM(p_model), ''));
+    v_img := COALESCE(NULLIF(TRIM(v_catalog.image_url), ''), NULLIF(TRIM(p_image_url), ''));
+    v_seats := COALESCE(v_catalog.seats, p_seats, 5);
+
+    IF v_brand IS NULL OR v_model IS NULL OR v_img IS NULL THEN
+        RAISE EXCEPTION 'يجب اختيار السيارة من الكتالوج المركزي للمنصة.';
+    END IF;
+
+    INSERT INTO public.agency_cars (
+        agency_id,
+        catalog_id,
+        brand,
+        model,
+        model_year,
+        color,
+        fuel_type,
+        transmission,
+        seats,
+        primary_image_url,
+        gallery_images,
+        daily_price,
+        deposit_amount,
+        city,
+        latitude,
+        longitude,
+        status
+    ) VALUES (
+        v_agency.id,
+        v_catalog.id,
+        v_brand,
+        v_model,
+        p_model_year,
+        NULLIF(TRIM(COALESCE(p_color, '')), ''),
+        p_fuel_type,
+        p_transmission,
+        v_seats,
+        v_img,
+        ARRAY[v_img],
+        p_daily_price,
+        0,
+        v_agency.city,
+        v_agency.latitude,
+        v_agency.longitude,
+        'available'
+    )
+    RETURNING * INTO v_inserted;
+
+    RETURN v_inserted;
+END;
+$$;
+
+-- (ح) تعديل السعر اليومي أو حالة التوفر لسيارة الوكالة
+CREATE OR REPLACE FUNCTION public.agency_update_car(
+    p_agency_id UUID,
+    p_pin TEXT,
+    p_car_id UUID,
+    p_daily_price NUMERIC DEFAULT NULL,
+    p_status TEXT DEFAULT NULL
+)
+RETURNS public.agency_cars
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+DECLARE
+    v_agency public.agencies;
+    v_updated public.agency_cars;
+BEGIN
+    v_agency := public.verify_agency_credentials(p_agency_id, p_pin);
+
+    IF p_daily_price IS NOT NULL AND p_daily_price <= 0 THEN
+        RAISE EXCEPTION 'السعر اليومي يجب أن يكون أكبر من 0 درهم.';
+    END IF;
+
+    UPDATE public.agency_cars
+    SET
+        daily_price = COALESCE(p_daily_price, daily_price),
+        status = COALESCE(p_status, status),
+        deposit_amount = 0
+    WHERE id = p_car_id
+      AND agency_id = v_agency.id
+    RETURNING * INTO v_updated;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'السيارة غير موجودة ضمن أسطول وكالتك.';
+    END IF;
+
+    RETURN v_updated;
+END;
+$$;
+
+-- (ط) حذف سيارة من أسطول الوكالة
+CREATE OR REPLACE FUNCTION public.agency_delete_car(
+    p_agency_id UUID,
+    p_pin TEXT,
+    p_car_id UUID
+)
 RETURNS BOOLEAN
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
+AS $$
+DECLARE
+    v_agency public.agencies;
+    v_deleted INTEGER;
+BEGIN
+    v_agency := public.verify_agency_credentials(p_agency_id, p_pin);
+
+    IF EXISTS (
+        SELECT 1 FROM public.bookings
+        WHERE agency_car_id = p_car_id
+          AND status IN ('payment_uploaded', 'payment_verified', 'car_delivered', 'refund_requested')
+    ) THEN
+        RAISE EXCEPTION 'لا يمكن حذف سيارة مرتبطة بحجوزات نشطة حالياً. يمكنك جعلها غير متاحة مؤقتاً.';
+    END IF;
+
+    DELETE FROM public.agency_cars
+    WHERE id = p_car_id AND agency_id = v_agency.id;
+
+    GET DIAGNOSTICS v_deleted = ROW_COUNT;
+    RETURN v_deleted > 0;
+END;
+$$;
+
+-- (ي) تحديث بيانات الوكالة الأساسية (الاسم، الهاتف، المدينة، الموقع)
+CREATE OR REPLACE FUNCTION public.agency_update_profile(
+    p_agency_id UUID,
+    p_pin TEXT,
+    p_name TEXT,
+    p_phone TEXT,
+    p_city TEXT,
+    p_lat DOUBLE PRECISION DEFAULT NULL,
+    p_lng DOUBLE PRECISION DEFAULT NULL
+)
+RETURNS TABLE (
+    id UUID,
+    name TEXT,
+    phone TEXT,
+    city TEXT,
+    latitude DOUBLE PRECISION,
+    longitude DOUBLE PRECISION,
+    verification_status TEXT,
+    rating_avg NUMERIC,
+    rating_count INTEGER,
+    terms_accepted_at TIMESTAMPTZ
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+DECLARE
+    v_agency public.agencies;
+    v_norm_phone TEXT := REGEXP_REPLACE(COALESCE(p_phone, ''), '[^0-9]', '', 'g');
+    v_updated public.agencies;
+BEGIN
+    v_agency := public.verify_agency_credentials(p_agency_id, p_pin);
+
+    IF EXISTS (
+        SELECT 1 FROM public.agencies a
+        WHERE a.id <> v_agency.id
+          AND REGEXP_REPLACE(a.phone, '[^0-9]', '', 'g') = v_norm_phone
+    ) THEN
+        RAISE EXCEPTION 'رقم الهاتف مستعمل من طرف وكالة أخرى.';
+    END IF;
+
+    UPDATE public.agencies
+    SET
+        name = TRIM(p_name),
+        phone = TRIM(p_phone),
+        city = TRIM(p_city),
+        latitude = COALESCE(p_lat, latitude),
+        longitude = COALESCE(p_lng, longitude)
+    WHERE public.agencies.id = v_agency.id
+    RETURNING * INTO v_updated;
+
+    UPDATE public.agency_cars
+    SET
+        city = v_updated.city,
+        latitude = v_updated.latitude,
+        longitude = v_updated.longitude
+    WHERE agency_id = v_updated.id;
+
+    RETURN QUERY SELECT
+        v_updated.id,
+        v_updated.name,
+        v_updated.phone,
+        v_updated.city,
+        v_updated.latitude,
+        v_updated.longitude,
+        v_updated.verification_status,
+        v_updated.rating_avg,
+        v_updated.rating_count,
+        v_updated.terms_accepted_at;
+END;
+$$;
+
+-- (ي-2) تغيير الرمز السري (PIN) من داخل حساب الوكالة
+CREATE OR REPLACE FUNCTION public.agency_change_pin(
+    p_agency_id UUID,
+    p_current_pin TEXT,
+    p_new_pin TEXT
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+DECLARE
+    v_agency public.agencies;
+    v_clean_new TEXT := TRIM(COALESCE(p_new_pin, ''));
+BEGIN
+    v_agency := public.verify_agency_credentials(p_agency_id, p_current_pin);
+
+    IF LENGTH(v_clean_new) < 4 THEN
+        RAISE EXCEPTION 'الرمز السري الجديد يجب أن يتكون من 4 أرقام أو رموز على الأقل.';
+    END IF;
+
+    IF v_clean_new = TRIM(COALESCE(p_current_pin, '')) THEN
+        RAISE EXCEPTION 'الرمز السري الجديد يجب أن يكون مختلفاً عن الرمز الحالي.';
+    END IF;
+
+    UPDATE public.agencies
+    SET pin_hash = extensions.crypt(v_clean_new, extensions.gen_salt('bf'))
+    WHERE id = v_agency.id;
+
+    RETURN true;
+END;
+$$;
+
+-- (ك) حذف الوكالة وأسطولها نهائياً من قاعدة البيانات السحابية
+CREATE OR REPLACE FUNCTION public.agency_delete_account(
+    p_agency_id UUID,
+    p_pin TEXT
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+DECLARE
+    v_agency public.agencies;
+BEGIN
+    v_agency := public.verify_agency_credentials(p_agency_id, p_pin);
+
+    IF EXISTS (
+        SELECT 1 FROM public.bookings
+        WHERE agency_id = v_agency.id
+          AND status IN ('payment_uploaded', 'payment_verified', 'car_delivered', 'refund_requested')
+    ) THEN
+        RAISE EXCEPTION 'لا يمكن حذف الوكالة حالياً لوجود حجوزات نشطة قيد التنفيذ أو المراجعة.';
+    END IF;
+
+    DELETE FROM public.agencies WHERE id = v_agency.id;
+    RETURN true;
+END;
+$$;
+
+-- (ل) جلب حجوزات الوكالة (بوابة مزدوجة: مقنّع قبل الدفع، ومكشوف بعد التأكيد) + تأكيد التسليم بالرمز السري
+DROP FUNCTION IF EXISTS public.agency_get_bookings(UUID, TEXT);
+CREATE OR REPLACE FUNCTION public.agency_get_bookings(
+    p_agency_id UUID,
+    p_pin TEXT
+)
+RETURNS TABLE (
+    id UUID,
+    booking_code TEXT,
+    customer_name TEXT,
+    customer_cin TEXT,
+    customer_phone TEXT,
+    customer_license_number TEXT,
+    customer_license_issue_date DATE,
+    pickup_location TEXT,
+    days INTEGER,
+    daily_price NUMERIC,
+    total_amount NUMERIC,
+    commission_amount NUMERIC,
+    agency_payout_amount NUMERIC,
+    delivery_at TIMESTAMPTZ,
+    status TEXT,
+    selected_bank_code TEXT,
+    receipt_url TEXT,
+    created_at TIMESTAMPTZ,
+    car_brand TEXT,
+    car_model TEXT,
+    car_image TEXT,
+    agency_ack_status TEXT,
+    agency_ack_at TIMESTAMPTZ,
+    agency_ack_note TEXT,
+    reassigned_at TIMESTAMPTZ,
+    dispute_flag TEXT
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+DECLARE
+    v_agency public.agencies;
+BEGIN
+    v_agency := public.verify_agency_credentials(p_agency_id, p_pin);
+
+    RETURN QUERY
+    SELECT
+        b.id,
+        b.booking_code,
+        CASE
+            WHEN b.status = 'payment_uploaded' THEN 'عميل قيد التحقق المالي'
+            ELSE b.customer_name
+        END AS customer_name,
+        CASE
+            WHEN b.status = 'payment_uploaded' THEN '••••••••'
+            ELSE b.customer_cin
+        END AS customer_cin,
+        CASE
+            WHEN b.status = 'payment_uploaded' THEN 'محجوب حتى تأكيد الإدارة'
+            ELSE b.customer_phone
+        END AS customer_phone,
+        CASE
+            WHEN b.status = 'payment_uploaded' THEN NULL::TEXT
+            ELSE b.customer_license_number
+        END AS customer_license_number,
+        CASE
+            WHEN b.status = 'payment_uploaded' THEN NULL::DATE
+            ELSE b.customer_license_issue_date
+        END AS customer_license_issue_date,
+        CASE
+            WHEN b.status = 'payment_uploaded' THEN COALESCE(c.city, v_agency.city)
+            ELSE b.pickup_location
+        END AS pickup_location,
+        b.days,
+        b.daily_price,
+        b.total_amount,
+        b.commission_amount,
+        b.agency_payout_amount,
+        b.delivery_at,
+        b.status,
+        b.selected_bank_code,
+        NULL::TEXT AS receipt_url,
+        b.created_at,
+        c.brand AS car_brand,
+        c.model AS car_model,
+        c.primary_image_url AS car_image,
+        b.agency_ack_status,
+        b.agency_ack_at,
+        b.agency_ack_note,
+        b.reassigned_at,
+        b.dispute_flag
+    FROM public.bookings b
+    LEFT JOIN public.agency_cars c ON c.id = b.agency_car_id
+    WHERE b.agency_id = v_agency.id
+      AND b.status IN ('payment_uploaded', 'payment_verified', 'car_delivered', 'completed', 'refund_requested', 'refunded')
+    ORDER BY
+        CASE WHEN b.status = 'payment_uploaded' THEN 0 WHEN b.status = 'payment_verified' THEN 1 ELSE 2 END,
+        b.created_at DESC;
+END;
+$$;
+
+-- تأكيد التوفر المسبق أو الاعتذار من طرف الوكالة (بدون كشف بيانات العميل)
+CREATE OR REPLACE FUNCTION public.agency_respond_precheck(
+    p_agency_id UUID,
+    p_pin TEXT,
+    p_booking_id UUID,
+    p_ack_status TEXT,
+    p_note TEXT DEFAULT NULL
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+DECLARE
+    v_agency public.agencies;
+    v_booking RECORD;
+BEGIN
+    v_agency := public.verify_agency_credentials(p_agency_id, p_pin);
+
+    IF p_ack_status NOT IN ('available', 'unavailable') THEN
+        RAISE EXCEPTION 'حالة الاستجابة غير صالحة.';
+    END IF;
+
+    SELECT * INTO v_booking
+    FROM public.bookings
+    WHERE id = p_booking_id AND agency_id = v_agency.id;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'الحجز غير موجود.';
+    END IF;
+
+    IF v_booking.status NOT IN ('payment_uploaded', 'payment_verified') THEN
+        RAISE EXCEPTION 'لا يمكن تعديل التوفر في هذه المرحلة.';
+    END IF;
+
+    UPDATE public.bookings
+    SET
+        agency_ack_status = p_ack_status,
+        agency_ack_at = NOW(),
+        agency_ack_note = NULLIF(TRIM(COALESCE(p_note, '')), ''),
+        updated_at = NOW()
+    WHERE id = p_booking_id;
+
+    IF p_ack_status = 'unavailable' AND v_booking.agency_ack_status <> 'unavailable' THEN
+        UPDATE public.agencies
+        SET
+            strike_count = COALESCE(strike_count, 0) + 1,
+            last_strike_at = NOW()
+        WHERE id = v_agency.id;
+    END IF;
+
+    RETURN true;
+END;
+$$;
+
+-- التبليغ عن مخالفة من العميل عند التسليم (رخصة أقل من سنتين أو تغيب العميل) لحماية الوكالة
+CREATE OR REPLACE FUNCTION public.agency_report_customer_issue(
+    p_agency_id UUID,
+    p_pin TEXT,
+    p_booking_id UUID,
+    p_issue_type TEXT,
+    p_note TEXT DEFAULT NULL
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+DECLARE
+    v_agency public.agencies;
+    v_booking RECORD;
+BEGIN
+    v_agency := public.verify_agency_credentials(p_agency_id, p_pin);
+
+    IF p_issue_type NOT IN ('invalid_license', 'customer_no_show') THEN
+        RAISE EXCEPTION 'نوع التبليغ غير صالح.';
+    END IF;
+
+    SELECT * INTO v_booking
+    FROM public.bookings
+    WHERE id = p_booking_id AND agency_id = v_agency.id;
+
+    IF NOT FOUND OR v_booking.status <> 'payment_verified' THEN
+        RAISE EXCEPTION 'يمكن التبليغ فقط على الحجوزات المؤكدة قبل التسليم.';
+    END IF;
+
+    UPDATE public.bookings
+    SET
+        dispute_flag = p_issue_type,
+        agency_ack_note = COALESCE(NULLIF(TRIM(COALESCE(p_note, '')), ''), agency_ack_note),
+        updated_at = NOW()
+    WHERE id = p_booking_id;
+
+    RETURN true;
+END;
+$$;
+
+DROP FUNCTION IF EXISTS public.agency_confirm_car_delivery(UUID, TEXT, UUID);
+CREATE OR REPLACE FUNCTION public.agency_confirm_car_delivery(
+    p_agency_id UUID,
+    p_pin TEXT,
+    p_booking_id UUID,
+    p_handover_pin TEXT DEFAULT NULL
+)
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+DECLARE
+    v_agency public.agencies;
+    v_booking RECORD;
+    v_clean_handover TEXT := TRIM(COALESCE(p_handover_pin, ''));
+BEGIN
+    v_agency := public.verify_agency_credentials(p_agency_id, p_pin);
+
+    SELECT * INTO v_booking
+    FROM public.bookings
+    WHERE id = p_booking_id AND agency_id = v_agency.id;
+
+    IF NOT FOUND OR v_booking.status <> 'payment_verified' THEN
+        RAISE EXCEPTION 'لا يمكن تأكيد التسليم قبل تأكيد دفع التسبيق من الإدارة.';
+    END IF;
+
+    IF v_booking.handover_pin IS NOT NULL AND v_clean_handover <> v_booking.handover_pin THEN
+        RAISE EXCEPTION 'رمز التسليم السري (4 أرقام) غير صحيح. اطلبه من العميل عند تسليم مفاتيح السيارة.';
+    END IF;
+
+    UPDATE public.bookings
+    SET status = 'car_delivered',
+        delivered_at = NOW(),
+        agency_confirmed_handover = true,
+        updated_at = NOW()
+    WHERE id = p_booking_id;
+
+    RETURN v_booking.id;
+END;
+$$;
+
+-- (م) دوال الإدارة الموحدة (تعمل بـ PIN الإدارة أو حساب Supabase Admin)
+CREATE OR REPLACE FUNCTION public.admin_get_dashboard_data(p_admin_pin TEXT DEFAULT NULL)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+DECLARE
+    v_bookings JSONB;
+    v_payouts JSONB;
+    v_agencies JSONB;
+    v_catalog JSONB;
+    v_available_cars JSONB;
+BEGIN
+    IF NOT public.is_admin_or_pin(p_admin_pin) THEN
+        RAISE EXCEPTION 'غير مصرح لك بالوصول لبيانات الإدارة.';
+    END IF;
+
+    SELECT COALESCE(jsonb_agg(row_to_json(t)), '[]'::JSONB) INTO v_bookings
+    FROM (
+        SELECT
+            b.*,
+            a.name AS agency_name,
+            a.phone AS agency_phone,
+            c.brand AS car_brand,
+            c.model AS car_model,
+            COALESCE(c.city, a.city) AS car_city
+        FROM public.bookings b
+        LEFT JOIN public.agencies a ON a.id = b.agency_id
+        LEFT JOIN public.agency_cars c ON c.id = b.agency_car_id
+        ORDER BY b.created_at DESC
+    ) t;
+
+    SELECT COALESCE(jsonb_agg(row_to_json(p)), '[]'::JSONB) INTO v_payouts
+    FROM (
+        SELECT * FROM public.payouts ORDER BY created_at DESC
+    ) p;
+
+    SELECT COALESCE(jsonb_agg(row_to_json(ag)), '[]'::JSONB) INTO v_agencies
+    FROM (
+        SELECT
+            id, name, phone, city, verification_status, rating_avg, rating_count,
+            terms_accepted_at, COALESCE(strike_count, 0) AS strike_count, last_strike_at, created_at
+        FROM public.agencies
+        ORDER BY created_at DESC
+    ) ag;
+
+    SELECT COALESCE(jsonb_agg(row_to_json(cat)), '[]'::JSONB) INTO v_catalog
+    FROM (
+        SELECT * FROM public.car_catalog ORDER BY brand ASC, model ASC
+    ) cat;
+
+    SELECT COALESCE(jsonb_agg(row_to_json(ac)), '[]'::JSONB) INTO v_available_cars
+    FROM (
+        SELECT
+            c.id AS car_id,
+            c.agency_id,
+            a.name AS agency_name,
+            a.phone AS agency_phone,
+            c.brand,
+            c.model,
+            c.city,
+            c.daily_price
+        FROM public.agency_cars c
+        JOIN public.agencies a ON a.id = c.agency_id
+        WHERE c.status = 'available'
+          AND a.verification_status = 'verified'
+        ORDER BY c.city ASC, c.daily_price ASC
+    ) ac;
+
+    RETURN jsonb_build_object(
+        'bookings', v_bookings,
+        'payouts', v_payouts,
+        'agencies', v_agencies,
+        'catalog', v_catalog,
+        'available_cars', v_available_cars
+    );
+END;
+$$;
+
+DROP FUNCTION IF EXISTS public.admin_verify_payment(UUID);
+CREATE OR REPLACE FUNCTION public.admin_verify_payment(
+    p_booking_id UUID,
+    p_admin_pin TEXT DEFAULT NULL
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
 AS $$
 BEGIN
-    IF NOT public.is_admin() THEN
+    IF NOT public.is_admin_or_pin(p_admin_pin) THEN
         RAISE EXCEPTION 'غير مصرح لك بهذه العملية';
     END IF;
 
@@ -821,7 +1790,240 @@ BEGIN
 END;
 $$;
 
--- (هـ) تأكيد تسليم السيارة (تأخذ الوكالة الـ 90% المتبقية مباشرة من العميل عند التسليم)
+CREATE OR REPLACE FUNCTION public.admin_verify_agency(
+    p_agency_id UUID,
+    p_status TEXT,
+    p_admin_pin TEXT DEFAULT NULL
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+BEGIN
+    IF NOT public.is_admin_or_pin(p_admin_pin) THEN
+        RAISE EXCEPTION 'غير مصرح لك بهذه العملية';
+    END IF;
+
+    IF p_status NOT IN ('pending', 'verified', 'suspended') THEN
+        RAISE EXCEPTION 'حالة التوثيق غير صالحة';
+    END IF;
+
+    UPDATE public.agencies
+    SET verification_status = p_status
+    WHERE id = p_agency_id;
+
+    RETURN FOUND;
+END;
+$$;
+
+-- آلية الإنقاذ وإعادة التوجيه: تحويل الحجز لوكالة أخرى موثقة في حال اعتذار أو تقاعس الوكالة الأولى
+CREATE OR REPLACE FUNCTION public.admin_reassign_booking(
+    p_booking_id UUID,
+    p_target_car_id UUID,
+    p_admin_pin TEXT DEFAULT NULL
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+DECLARE
+    v_booking RECORD;
+    v_target_car RECORD;
+    v_end_at TIMESTAMPTZ;
+BEGIN
+    IF NOT public.is_admin_or_pin(p_admin_pin) THEN
+        RAISE EXCEPTION 'غير مصرح لك بهذه العملية';
+    END IF;
+
+    SELECT * INTO v_booking
+    FROM public.bookings
+    WHERE id = p_booking_id;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'الحجز غير موجود.';
+    END IF;
+
+    IF v_booking.status NOT IN ('payment_uploaded', 'payment_verified', 'refund_requested') THEN
+        RAISE EXCEPTION 'لا يمكن تحويل الحجز في هذه المرحلة.';
+    END IF;
+
+    SELECT c.*, a.verification_status, a.name AS target_agency_name
+    INTO v_target_car
+    FROM public.agency_cars c
+    JOIN public.agencies a ON a.id = c.agency_id
+    WHERE c.id = p_target_car_id;
+
+    IF NOT FOUND OR v_target_car.status <> 'available' OR v_target_car.verification_status <> 'verified' THEN
+        RAISE EXCEPTION 'السيارة أو الوكالة البديلة غير متاحة أو غير موثقة.';
+    END IF;
+
+    IF v_target_car.agency_id = v_booking.agency_id THEN
+        RAISE EXCEPTION 'السيارة المختارة تابعة لنفس الوكالة الحالية.';
+    END IF;
+
+    v_end_at := v_booking.delivery_at + (v_booking.days * INTERVAL '1 day');
+    IF EXISTS (
+        SELECT 1
+        FROM public.bookings b
+        WHERE b.agency_car_id = v_target_car.id
+          AND b.id <> v_booking.id
+          AND b.status IN ('payment_uploaded', 'payment_verified', 'car_delivered')
+          AND b.delivery_at < v_end_at
+          AND (b.delivery_at + (b.days * INTERVAL '1 day')) > v_booking.delivery_at
+    ) THEN
+        RAISE EXCEPTION 'السيارة البديلة محجوزة في نفس التواريخ.';
+    END IF;
+
+    -- تسجيل مخالفة على الوكالة السابقة إذا لم تُسجل مسبقاً بسبب عدم التوفر
+    IF v_booking.agency_id IS NOT NULL AND v_booking.agency_ack_status <> 'unavailable' THEN
+        UPDATE public.agencies
+        SET
+            strike_count = COALESCE(strike_count, 0) + 1,
+            last_strike_at = NOW()
+        WHERE id = v_booking.agency_id;
+    END IF;
+
+    UPDATE public.bookings
+    SET
+        reassigned_from_agency_id = COALESCE(reassigned_from_agency_id, agency_id),
+        reassigned_at = NOW(),
+        agency_id = v_target_car.agency_id,
+        agency_car_id = v_target_car.id,
+        agency_ack_status = 'pending',
+        agency_ack_at = NULL,
+        agency_ack_note = 'تم تحويل الحجز إليكم من الإدارة لتلبية طلب العميل.',
+        dispute_flag = NULL,
+        status = CASE WHEN status = 'refund_requested' THEN 'payment_verified' ELSE status END,
+        updated_at = NOW()
+    WHERE id = p_booking_id;
+
+    RETURN true;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.admin_reset_agency_pin(
+    p_agency_id UUID,
+    p_new_pin TEXT,
+    p_admin_pin TEXT DEFAULT NULL
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+DECLARE
+    v_clean_pin TEXT := TRIM(COALESCE(p_new_pin, ''));
+BEGIN
+    IF NOT public.is_admin_or_pin(p_admin_pin) THEN
+        RAISE EXCEPTION 'غير مصرح لك بهذه العملية';
+    END IF;
+
+    IF LENGTH(v_clean_pin) < 4 THEN
+        RAISE EXCEPTION 'الرمز السري المؤقت يجب أن يتكون من 4 أرقام أو رموز على الأقل.';
+    END IF;
+
+    UPDATE public.agencies
+    SET pin_hash = extensions.crypt(v_clean_pin, extensions.gen_salt('bf'))
+    WHERE id = p_agency_id;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'الوكالة غير موجودة.';
+    END IF;
+
+    RETURN true;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.admin_mark_payout_sent(
+    p_payout_id UUID,
+    p_admin_pin TEXT DEFAULT NULL
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+BEGIN
+    IF NOT public.is_admin_or_pin(p_admin_pin) THEN
+        RAISE EXCEPTION 'غير مصرح لك بهذه العملية';
+    END IF;
+
+    UPDATE public.payouts
+    SET status = 'sent', sent_at = NOW()
+    WHERE id = p_payout_id;
+
+    RETURN FOUND;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.admin_upsert_catalog_car(
+    p_brand TEXT,
+    p_model TEXT,
+    p_category TEXT DEFAULT 'Économique',
+    p_seats INTEGER DEFAULT 5,
+    p_default_fuel TEXT DEFAULT 'diesel',
+    p_default_transmission TEXT DEFAULT 'manual',
+    p_image_url TEXT DEFAULT NULL,
+    p_admin_pin TEXT DEFAULT NULL
+)
+RETURNS public.car_catalog
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+DECLARE
+    v_row public.car_catalog;
+BEGIN
+    IF NOT public.is_admin_or_pin(p_admin_pin) THEN
+        RAISE EXCEPTION 'غير مصرح لك بتعديل الكتالوج المركزي.';
+    END IF;
+
+    INSERT INTO public.car_catalog (
+        brand, model, category, seats, default_fuel, default_transmission, image_url
+    ) VALUES (
+        TRIM(p_brand),
+        TRIM(p_model),
+        COALESCE(NULLIF(TRIM(p_category), ''), 'Économique'),
+        COALESCE(p_seats, 5),
+        COALESCE(NULLIF(TRIM(p_default_fuel), ''), 'diesel'),
+        COALESCE(NULLIF(TRIM(p_default_transmission), ''), 'manual'),
+        NULLIF(TRIM(COALESCE(p_image_url, '')), '')
+    )
+    ON CONFLICT (LOWER(TRIM(brand)), LOWER(TRIM(model)))
+    DO UPDATE SET
+        category = EXCLUDED.category,
+        seats = EXCLUDED.seats,
+        default_fuel = EXCLUDED.default_fuel,
+        default_transmission = EXCLUDED.default_transmission,
+        image_url = COALESCE(EXCLUDED.image_url, public.car_catalog.image_url)
+    RETURNING * INTO v_row;
+
+    RETURN v_row;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.admin_delete_catalog_car(
+    p_catalog_id UUID,
+    p_admin_pin TEXT DEFAULT NULL
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+BEGIN
+    IF NOT public.is_admin_or_pin(p_admin_pin) THEN
+        RAISE EXCEPTION 'غير مصرح لك بحذف موديل من الكتالوج.';
+    END IF;
+
+    DELETE FROM public.car_catalog WHERE id = p_catalog_id;
+    RETURN FOUND;
+END;
+$$;
+
+-- (ن) تأكيد تسليم السيارة بالمعرف التقليدي وطلب الاسترجاع 100% وتتبع العميل
 CREATE OR REPLACE FUNCTION public.confirm_car_delivery(p_booking_id UUID)
 RETURNS UUID
 LANGUAGE plpgsql
@@ -834,12 +2036,11 @@ DECLARE
 BEGIN
     SELECT * INTO v_booking FROM public.bookings WHERE id = p_booking_id;
     IF NOT FOUND OR v_booking.status <> 'payment_verified' THEN
-        RAISE EXCEPTION 'لا يمكن تأكيد التسليم قبل تأكيد دفع العربون';
+        RAISE EXCEPTION 'لا يمكن تأكيد التسليم قبل تأكيد دفع التسبيق';
     END IF;
 
     SELECT * INTO v_agency FROM public.agencies WHERE id = v_booking.agency_id;
 
-    -- السماح للأدمن أو لصاحب الوكالة بتأكيد التسليم
     IF NOT (public.is_admin() OR v_agency.owner_id = auth.uid()) THEN
         RAISE EXCEPTION 'غير مصرح لك بهذه العملية';
     END IF;
@@ -854,12 +2055,13 @@ BEGIN
 END;
 $$;
 
--- (و) طلب استرجاع العربون كاملاً (100% من العربون المدفوع) للعميل إذا لم يستلم سيارته
+DROP FUNCTION IF EXISTS public.request_full_refund(UUID, TEXT, TEXT, TEXT);
 CREATE OR REPLACE FUNCTION public.request_full_refund(
     p_booking_id UUID,
     p_booking_code TEXT,
     p_customer_rib TEXT,
-    p_reason TEXT
+    p_reason TEXT,
+    p_customer_phone TEXT DEFAULT NULL
 )
 RETURNS UUID
 LANGUAGE plpgsql
@@ -869,13 +2071,20 @@ AS $$
 DECLARE
     v_booking RECORD;
     v_payout_id UUID;
+    v_norm_input_phone TEXT := REGEXP_REPLACE(COALESCE(p_customer_phone, ''), '[^0-9]', '', 'g');
+    v_norm_db_phone TEXT;
 BEGIN
     SELECT * INTO v_booking
     FROM public.bookings
-    WHERE id = p_booking_id AND booking_code = p_booking_code;
+    WHERE id = p_booking_id AND UPPER(TRIM(booking_code)) = UPPER(TRIM(p_booking_code));
 
     IF NOT FOUND THEN
         RAISE EXCEPTION 'بيانات الحجز غير صحيحة';
+    END IF;
+
+    v_norm_db_phone := REGEXP_REPLACE(COALESCE(v_booking.customer_phone, ''), '[^0-9]', '', 'g');
+    IF LENGTH(v_norm_input_phone) >= 6 AND v_norm_input_phone <> v_norm_db_phone THEN
+        RAISE EXCEPTION 'رقم الهاتف المدخل غير مطابق لرقم العميل المسجل في الحجز.';
     END IF;
 
     IF v_booking.status NOT IN ('payment_uploaded', 'payment_verified') THEN
@@ -885,7 +2094,8 @@ BEGIN
     UPDATE public.bookings
     SET status = 'refund_requested',
         customer_refund_rib = TRIM(p_customer_rib),
-        refund_reason = p_reason
+        refund_reason = p_reason,
+        updated_at = NOW()
     WHERE id = p_booking_id;
 
     INSERT INTO public.payouts (
@@ -907,7 +2117,7 @@ BEGIN
         COALESCE(v_booking.selected_bank_code, 'Customer Bank'),
         TRIM(p_customer_rib),
         'pending',
-        'استرجاع كامل مبلغ العربون (10%) للعميل لعدم تسليم السيارة: ' || COALESCE(p_reason, '')
+        'استرجاع كامل مبلغ التسبيق (10%) للعميل لعدم تسليم السيارة: ' || COALESCE(p_reason, '')
     )
     RETURNING id INTO v_payout_id;
 
@@ -915,7 +2125,7 @@ BEGIN
 END;
 $$;
 
--- (ز) استرجاع حجوزات العميل المرتبطة برقم هاتفه ورمز الحجز بأمان
+DROP FUNCTION IF EXISTS public.get_customer_booking_by_phone(TEXT, TEXT);
 CREATE OR REPLACE FUNCTION public.get_customer_booking_by_phone(
     p_booking_code TEXT,
     p_customer_phone TEXT
@@ -931,7 +2141,8 @@ RETURNS TABLE (
     commission_amount NUMERIC,
     agency_payout_amount NUMERIC,
     delivery_at TIMESTAMPTZ,
-    status TEXT
+    status TEXT,
+    handover_pin TEXT
 )
 LANGUAGE sql
 STABLE
@@ -941,34 +2152,55 @@ AS $$
     SELECT
         b.id AS booking_id,
         b.booking_code,
-        (c.brand || ' ' || c.model) AS car_label,
-        a.name AS agency_name,
-        c.city,
+        COALESCE(c.brand || ' ' || c.model, 'سيارة اقتصادية') AS car_label,
+        COALESCE(a.name, 'وكالة معتمدة') AS agency_name,
+        COALESCE(c.city, a.city, 'Casablanca') AS city,
         b.days,
         b.total_amount,
         b.commission_amount,
         b.agency_payout_amount,
         b.delivery_at,
-        b.status
+        b.status,
+        b.handover_pin
     FROM public.bookings b
-    JOIN public.agency_cars c ON c.id = b.agency_car_id
-    JOIN public.agencies a ON a.id = b.agency_id
+    LEFT JOIN public.agency_cars c ON c.id = b.agency_car_id
+    LEFT JOIN public.agencies a ON a.id = b.agency_id
     WHERE UPPER(TRIM(b.booking_code)) = UPPER(TRIM(p_booking_code))
       AND REGEXP_REPLACE(b.customer_phone, '\s+', '', 'g') = REGEXP_REPLACE(p_customer_phone, '\s+', '', 'g');
 $$;
 
--- منح الصلاحيات لاستدعاء دوال الزبناء والبحث من الواجهة
+-- منح صلاحيات الاستدعاء
 GRANT EXECUTE ON FUNCTION public.get_nearby_cars(TEXT, DOUBLE PRECISION, DOUBLE PRECISION, DOUBLE PRECISION) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.create_booking(UUID, TEXT, TEXT, TEXT, INTEGER, TIMESTAMPTZ, UUID, TEXT, TEXT, TEXT, DATE, TEXT) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.submit_payment_receipt(UUID, TEXT, UUID, TEXT) TO anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.request_full_refund(UUID, TEXT, TEXT, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.request_full_refund(UUID, TEXT, TEXT, TEXT, TEXT) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.get_customer_booking_by_phone(TEXT, TEXT) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.verify_admin_pin(TEXT) TO anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.admin_verify_payment(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.register_agency_by_phone(TEXT, TEXT, TEXT, TEXT, DOUBLE PRECISION, DOUBLE PRECISION, BOOLEAN) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.login_agency_by_phone(TEXT, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.agency_get_cars(UUID, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.agency_add_catalog_car(UUID, TEXT, UUID, TEXT, TEXT, TEXT, TEXT, TEXT, NUMERIC, INTEGER, INTEGER, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.agency_update_car(UUID, TEXT, UUID, NUMERIC, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.agency_delete_car(UUID, TEXT, UUID) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.agency_update_profile(UUID, TEXT, TEXT, TEXT, TEXT, DOUBLE PRECISION, DOUBLE PRECISION) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.agency_change_pin(UUID, TEXT, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.agency_delete_account(UUID, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.agency_get_bookings(UUID, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.agency_respond_precheck(UUID, TEXT, UUID, TEXT, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.agency_report_customer_issue(UUID, TEXT, UUID, TEXT, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.agency_confirm_car_delivery(UUID, TEXT, UUID, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_get_dashboard_data(TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_verify_payment(UUID, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_verify_agency(UUID, TEXT, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_reassign_booking(UUID, UUID, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_reset_agency_pin(UUID, TEXT, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_mark_payout_sent(UUID, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_upsert_catalog_car(TEXT, TEXT, TEXT, INTEGER, TEXT, TEXT, TEXT, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_delete_catalog_car(UUID, TEXT) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.confirm_car_delivery(UUID) TO authenticated;
 
 -- ============================================================================
--- 12. SUPABASE STORAGE BUCKETS (صور السيارات + وصولات التحويل البنكي)
+-- 12. SUPABASE STORAGE BUCKETS (صور الكتالوج + وصولات التحويل البنكي)
 -- ============================================================================
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES
@@ -976,7 +2208,6 @@ VALUES
     ('payment-receipts', 'payment-receipts', false, 5242880, ARRAY['image/jpeg', 'image/png', 'application/pdf'])
 ON CONFLICT (id) DO NOTHING;
 
--- سياسات صور السيارات: قراءة للجميع، رفع وحذف لأصحاب الوكالات فقط
 DROP POLICY IF EXISTS "car_photos_public_read" ON storage.objects;
 CREATE POLICY "car_photos_public_read"
 ON storage.objects FOR SELECT
@@ -985,16 +2216,15 @@ USING (bucket_id = 'car-photos');
 DROP POLICY IF EXISTS "car_photos_agency_upload" ON storage.objects;
 CREATE POLICY "car_photos_agency_upload"
 ON storage.objects FOR INSERT
-TO authenticated
+TO anon, authenticated
 WITH CHECK (bucket_id = 'car-photos');
 
 DROP POLICY IF EXISTS "car_photos_agency_delete" ON storage.objects;
 CREATE POLICY "car_photos_agency_delete"
 ON storage.objects FOR DELETE
-TO authenticated
-USING (bucket_id = 'car-photos' AND owner = auth.uid());
+TO anon, authenticated
+USING (bucket_id = 'car-photos');
 
--- سياسات وصولات التحويل البنكي: رفع للجميع (JPG/PNG/PDF حتى 5MB)، وقراءة للأدمن فقط لحماية خصوصية الزبناء
 DROP POLICY IF EXISTS "receipts_anyone_upload" ON storage.objects;
 CREATE POLICY "receipts_anyone_upload"
 ON storage.objects FOR INSERT

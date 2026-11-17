@@ -13,7 +13,9 @@ export interface PinVerificationResult {
 }
 
 const ADMIN_TOKEN_STORAGE_KEY = 'karya_admin_session_token_v1';
+const ADMIN_PIN_STORAGE_KEY = 'karya_admin_pin_session_v1';
 let rpcPinUnlocked = false;
+let inMemoryAdminPin: string | null = null;
 
 function getStoredToken(): string | null {
   try {
@@ -28,6 +30,24 @@ function setStoredToken(token: string) {
     window.sessionStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, token);
   } catch {
     // Ignore storage errors
+  }
+}
+
+function setStoredAdminPin(pin: string) {
+  inMemoryAdminPin = pin;
+  try {
+    window.sessionStorage.setItem(ADMIN_PIN_STORAGE_KEY, pin);
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+export function getAdminSessionPin(): string | null {
+  if (inMemoryAdminPin) return inMemoryAdminPin;
+  try {
+    return window.sessionStorage.getItem(ADMIN_PIN_STORAGE_KEY);
+  } catch {
+    return null;
   }
 }
 
@@ -66,6 +86,7 @@ export async function verifyAdminPin(pinInput: string): Promise<PinVerificationR
       if (payload.token) {
         setStoredToken(payload.token);
       }
+      setStoredAdminPin(pin);
       return { ok: true };
     }
 
@@ -89,6 +110,7 @@ export async function verifyAdminPin(pinInput: string): Promise<PinVerificationR
     if (!error) {
       if (data === true) {
         rpcPinUnlocked = true;
+        setStoredAdminPin(pin);
         return { ok: true };
       }
       return {
@@ -111,8 +133,10 @@ export async function verifyAdminPin(pinInput: string): Promise<PinVerificationR
 
 export async function logoutAdminAccess(): Promise<void> {
   rpcPinUnlocked = false;
+  inMemoryAdminPin = null;
   try {
     window.sessionStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
+    window.sessionStorage.removeItem(ADMIN_PIN_STORAGE_KEY);
   } catch {
     // Ignore storage errors
   }

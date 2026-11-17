@@ -31,9 +31,22 @@ export interface PlatformBank {
   is_active: boolean;
 }
 
+export interface CatalogCar {
+  id: string;
+  brand: string;
+  model: string;
+  category: string;
+  seats: number;
+  default_fuel: FuelType;
+  default_transmission: TransmissionType;
+  image_url: string;
+  created_at?: string;
+}
+
 export interface CarOffer {
   id: string;
   agency_id: string;
+  catalog_id?: string | null;
   agency_name: string;
   agency_phone?: string;
   agency_rating: number;
@@ -41,6 +54,7 @@ export interface CarOffer {
   brand: string;
   model: string;
   model_year: number | null;
+  color?: string | null;
   fuel_type: FuelType;
   transmission: TransmissionType;
   seats: number;
@@ -86,12 +100,13 @@ export interface CreatedBooking {
   status: BookingStatus;
   selected_bank_code?: string;
   receipt_url?: string;
+  handover_pin?: string;
   is_demo?: boolean;
 }
 
 export interface AgencyProfile {
   id: string;
-  owner_id: string;
+  owner_id?: string | null;
   name: string;
   phone: string;
   whatsapp_phone?: string | null;
@@ -99,14 +114,19 @@ export interface AgencyProfile {
   address?: string | null;
   latitude?: number | null;
   longitude?: number | null;
-  bank_name: string;
+  bank_name?: string | null;
   bank_account_holder?: string | null;
-  bank_rib: string;
+  bank_rib?: string | null;
   commercial_register?: string | null;
   verification_status: 'pending' | 'verified' | 'suspended';
   rating_avg: number;
   rating_count: number;
+  terms_accepted_at?: string | null;
+  strike_count?: number;
+  created_at?: string;
 }
+
+export type AgencyAckStatus = 'pending' | 'available' | 'unavailable';
 
 export interface AgencyBookingRecord {
   id: string;
@@ -127,10 +147,30 @@ export interface AgencyBookingRecord {
   selected_bank_code?: string | null;
   receipt_url?: string | null;
   created_at: string;
+  agency_id?: string | null;
   agency_name?: string;
+  agency_phone?: string | null;
   car_brand?: string;
   car_model?: string;
   car_image?: string;
+  car_city?: string;
+  handover_pin?: string | null;
+  agency_ack_status?: AgencyAckStatus;
+  agency_ack_at?: string | null;
+  agency_ack_note?: string | null;
+  reassigned_at?: string | null;
+  dispute_flag?: string | null;
+}
+
+export interface AdminReassignCarOption {
+  car_id: string;
+  agency_id: string;
+  agency_name: string;
+  agency_phone: string;
+  brand: string;
+  model: string;
+  city: string;
+  daily_price: number;
 }
 
 export interface PayoutRecord {

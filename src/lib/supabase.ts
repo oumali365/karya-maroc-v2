@@ -41,35 +41,6 @@ export const MOROCCAN_CITIES: CityOption[] = [
   { slug: 'nador', nameAr: 'الناظور', nameFr: 'Nador', latitude: 35.1681, longitude: -2.9335 },
 ];
 
-export interface PickupLocationOption {
-  id: string;
-  label: string;
-  category: 'airport' | 'city';
-  cityFr: string;
-}
-
-export const MOROCCAN_PICKUP_LOCATIONS: PickupLocationOption[] = [
-  { id: 'cmn-airport', label: 'مطار محمد الخامس الدولي — الدار البيضاء', category: 'airport', cityFr: 'Casablanca' },
-  { id: 'rak-airport', label: 'مطار مراكش المنارة الدولي — مراكش', category: 'airport', cityFr: 'Marrakech' },
-  { id: 'aga-airport', label: 'مطار أكادير المسيرة الدولي — أكادير', category: 'airport', cityFr: 'Agadir' },
-  { id: 'tng-airport', label: 'مطار طنجة ابن بطوطة الدولي — طنجة', category: 'airport', cityFr: 'Tangier' },
-  { id: 'fez-airport', label: 'مطار فاس سايس الدولي — فاس', category: 'airport', cityFr: 'Fès' },
-  { id: 'rba-airport', label: 'مطار الرباط سلا الدولي — الرباط', category: 'airport', cityFr: 'Rabat' },
-  { id: 'oud-airport', label: 'مطار وجدة أنجاد الدولي — وجدة', category: 'airport', cityFr: 'Oujda' },
-  { id: 'casablanca-city', label: 'وسط مدينة الدار البيضاء / محطة الدار البيضاء المسافرين', category: 'city', cityFr: 'Casablanca' },
-  { id: 'marrakech-city', label: 'وسط مدينة مراكش (جليز / محطة القطار)', category: 'city', cityFr: 'Marrakech' },
-  { id: 'rabat-city', label: 'وسط مدينة الرباط (أكدال / محطة القطار)', category: 'city', cityFr: 'Rabat' },
-  { id: 'tangier-city', label: 'وسط مدينة طنجة (ميناء طنجة / محطة البراق)', category: 'city', cityFr: 'Tangier' },
-  { id: 'fes-city', label: 'وسط مدينة فاس (المدينة الجديدة)', category: 'city', cityFr: 'Fès' },
-  { id: 'agadir-city', label: 'وسط مدينة أكادير (الكورنيش / المركز)', category: 'city', cityFr: 'Agadir' },
-  { id: 'meknes-city', label: 'وسط مدينة مكناس', category: 'city', cityFr: 'Meknès' },
-  { id: 'kenitra-city', label: 'وسط مدينة القنيطرة (محطة القطار)', category: 'city', cityFr: 'Kénitra' },
-  { id: 'tetouan-city', label: 'وسط مدينة تطوان', category: 'city', cityFr: 'Tétouan' },
-  { id: 'essaouira-city', label: 'وسط مدينة الصويرة', category: 'city', cityFr: 'Essaouira' },
-  { id: 'oujda-city', label: 'وسط مدينة وجدة', category: 'city', cityFr: 'Oujda' },
-  { id: 'nador-city', label: 'وسط مدينة الناظور', category: 'city', cityFr: 'Nador' },
-];
-
 export function formatDH(amount: number): string {
   return `${amount.toFixed(2)} DH`;
 }
