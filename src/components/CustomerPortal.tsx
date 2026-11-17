@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   ChevronDown,
   Check,
+  HelpCircle,
 } from 'lucide-react';
 import { supabase, MOROCCAN_CITIES, getCityLabelAr } from '../lib/supabase';
 import {
@@ -43,6 +44,25 @@ function formatDays(d: number): string {
   return `${d} يومًا`;
 }
 
+const CUSTOMER_FAQS = [
+  {
+    q: 'كيف أسترجع مبلغ التسبيق (10%) إذا اعتذرت الوكالة أو تعذر التسليم؟',
+    a: 'إذا اعتذرت الوكالة أو لم تلتزم بموعد التسليم، يُفتح لك تلقائياً زر «طلب استرجاع التسبيق» في صفحة «حجوزاتي» لاسترجاع 100% من تسبيقك إلى رقم هاتفك أو حسابك البنكي خلال ساعات، كما تعمل الإدارة على توفير سيارة بديلة في مدينتك إذا رغبت.',
+  },
+  {
+    q: 'متى أدفع المبلغ المتبقي (90%) وهل أعاين السيارة أولاً؟',
+    a: 'تدفع عبر المنصة 10% فقط لتأكيد جدية الحجز وحماية حقك، أما 90% المتبقية فتدفعها مباشرة للوكالة عند معاينة السيارة وتوقيع عقد الكراء الرسمي واستلام المفاتيح.',
+  },
+  {
+    q: 'ما هي الوثائق المطلوبة عند الاستلام وهل أحتاج إلى شيك ضمان؟',
+    a: 'لا يُطلب منك لا شيك ضمان ولا بطاقة ائتمان دولية ولا تجميد أي كفالة (0 DH). يكفي إحضار البطاقة الوطنية (CIN) ورخصة سياقة سارية المفعول بأقدمية سنتين على الأقل.',
+  },
+  {
+    q: 'كيف أتابع حالة حجزي بعد إرسال وصل التحويل؟',
+    a: 'من صفحة «حجوزاتي» يمكنك متابعة حالة طلبك لحظة بلحظة عبر رمز الحجز (KRY-...) ورقم هاتفك المسجل فقط، دون الحاجة إلى إنشاء حساب أو كلمة مرور.',
+  },
+];
+
 export const CustomerPortal: React.FC<CustomerPortalProps> = ({
   onBookingCreated,
   onGoToAgency,
@@ -58,6 +78,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
 
   const [brandFilter, setBrandFilter] = useState<string>('all');
   const [selectedCar, setSelectedCar] = useState<CarOffer | null>(null);
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
 
   const loadCars = async (
     cityToLoad: string,
@@ -551,6 +572,86 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
             ))}
           </div>
         )}
+      </section>
+
+      {/* ===================== CUSTOMER CARE FAQ SECTION ===================== */}
+      <section
+        aria-label="أسئلة شائعة تهمّ عملاء Karya"
+        className="max-w-6xl mx-auto px-4 sm:px-6 pb-12 pt-2"
+      >
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+          {/* Refined Header Band */}
+          <div className="bg-gradient-to-l from-[#0F2942] to-[#173B5E] px-5 py-5 sm:px-7 sm:py-6 flex items-center gap-3.5 text-white">
+            <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/15 text-[#2DD4BF] flex items-center justify-center shrink-0">
+              <HelpCircle className="w-5 h-5" aria-hidden="true" />
+            </div>
+            <div className="space-y-0.5 min-w-0">
+              <h2 className="text-base sm:text-lg font-extrabold tracking-tight">
+                أسئلة شائعة تهمّ عملاء Karya
+              </h2>
+              <p className="text-xs text-slate-200">
+                كل ما تحتاج معرفته لحجز سيارتك بدون ضمان وبأمان تام
+              </p>
+            </div>
+          </div>
+
+          {/* Interactive Numbered FAQ Cards */}
+          <div className="p-4 sm:p-6 space-y-2.5">
+            {CUSTOMER_FAQS.map((item, idx) => {
+              const isOpen = openFaqIndex === idx;
+              const numLabel = String(idx + 1).padStart(2, '0');
+
+              return (
+                <div
+                  key={item.q}
+                  className={`rounded-xl border transition-all duration-150 ${
+                    isOpen
+                      ? 'border-[#0D9488]/60 bg-teal-50/40 shadow-xs'
+                      : 'border-slate-200/80 bg-[#F8FAFC] hover:bg-white hover:border-[#0F2942]/25'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    aria-expanded={isOpen}
+                    onClick={() => setOpenFaqIndex((prev) => (prev === idx ? null : idx))}
+                    className="w-full flex items-center justify-between gap-3 text-right p-3.5 sm:px-4 sm:py-3.5"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span
+                        className={`w-7 h-7 rounded-lg font-mono-tabular text-xs font-bold flex items-center justify-center shrink-0 transition-colors ${
+                          isOpen
+                            ? 'bg-[#0D9488] text-white'
+                            : 'bg-white text-[#0F2942] border border-slate-200'
+                        }`}
+                        aria-hidden="true"
+                      >
+                        {numLabel}
+                      </span>
+                      <span className="text-xs sm:text-sm font-extrabold text-[#0F2942] leading-snug">
+                        {item.q}
+                      </span>
+                    </div>
+
+                    <ChevronDown
+                      className={`w-4 h-4 shrink-0 transition-transform duration-200 ${
+                        isOpen ? 'rotate-180 text-[#0D9488]' : 'text-slate-400'
+                      }`}
+                      aria-hidden="true"
+                    />
+                  </button>
+
+                  {isOpen && (
+                    <div className="px-4 pb-3.5 sm:pr-14 sm:pl-6">
+                      <p className="text-xs sm:text-[13px] text-slate-600 leading-relaxed">
+                        {item.a}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </section>
 
       {selectedCar && (

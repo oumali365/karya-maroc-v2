@@ -28,6 +28,9 @@ import {
   Bell,
   Calendar,
   MapPin,
+  TrendingUp,
+  ChevronDown,
+  HelpCircle,
 } from 'lucide-react';
 import { supabase, MOROCCAN_CITIES, formatDH, getCityLabelAr } from '../lib/supabase';
 import {
@@ -658,6 +661,25 @@ export const AgencyPortal: React.FC<AgencyPortalProps> = ({ onGoToCustomer }) =>
 /* ============================================================================
    1. SINGLE-SCREEN PHONE + PIN AUTH & REGISTRATION (NO EMAIL, NO BANK RIB)
    ============================================================================ */
+const AGENCY_FAQS = [
+  {
+    q: 'هل «بدون ضمان (0 DH)» تعني تسليم السيارة بدون عقد أو وثائق؟',
+    a: 'لا، «بدون ضمان» تعني فقط عدم تجميد شيك أو مبلغ كفالة مالي، بينما توقّع وكالتك عقد الكراء الرسمي المعتاد وتتحقق من البطاقة الوطنية ورخصة السياقة ذات أقدمية سنتين على الأقل قبل تسليم المفاتيح.',
+  },
+  {
+    q: 'كيف أضمن جدية الزبون ومتى أستلم مستحقاتي؟',
+    a: 'كل طلب يصلك يكون الزبون قد دفع عنه 10% تسبيق جدية وتم التحقق من وصله البنكي، والحد الأدنى لأي كراء هو 3 أيام. كما تقبض 90% المتبقية مباشرة من الزبون عند التسليم دون انتظار أي تحويلات مؤجلة.',
+  },
+  {
+    q: 'ماذا يحدث إذا تخلف الزبون عن الحضور أو كانت رخصته أقل من سنتين؟',
+    a: 'تحميك المنصة عبر زر «تسجيل مخالفة» في لوحة الحجوزات؛ وعند تسجيل عدم التزام الزبون بشروط الرخصة أو عدم الحضور، يتم حفظ حق وكالتك ومنع الاسترجاع التلقائي غير المستحق.',
+  },
+  {
+    q: 'هل يمكنني تعديل السعر اليومي لتغطية التأمين الشامل وتعويض غياب الكفالة؟',
+    a: 'نعم، لديك حرية كاملة في التسعير دون سقف وفي أي وقت. وننصح الوكالات بإضافة هامش 15% إلى 20% لتغطية التأمين، حيث يفضّل الزبون دفع فرق يومي بسيط على تجميد مبلغ كفالة كبير.',
+  },
+];
+
 const AgencyPhoneAuthView: React.FC<{
   onAuthenticated: (profile: AgencyProfile, creds: StoredAgencySession) => void;
   onGoToCustomer: () => void;
@@ -675,6 +697,7 @@ const AgencyPhoneAuthView: React.FC<{
   const [error, setError] = useState<string | null>(null);
   const [gpsNote, setGpsNote] = useState<string | null>(null);
   const [showForgotPin, setShowForgotPin] = useState(false);
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
 
   const captureGps = () => {
     if (!navigator.geolocation) {
@@ -777,7 +800,7 @@ const AgencyPhoneAuthView: React.FC<{
   };
 
   return (
-    <div className="max-w-lg mx-auto px-4 py-10" dir="rtl">
+    <div className="max-w-lg mx-auto px-4 py-10 space-y-6" dir="rtl">
       <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200/90 shadow-sm space-y-6">
         <div className="text-center space-y-1">
           <h2 className="text-2xl font-bold text-slate-900">
@@ -990,6 +1013,84 @@ const AgencyPhoneAuthView: React.FC<{
           </button>
         </div>
       </div>
+
+      {/* Agency Partner FAQ Section */}
+      <section
+        aria-label="الأسئلة الشائعة للوكالات"
+        className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden"
+      >
+        {/* Refined Header Band */}
+        <div className="bg-gradient-to-l from-[#0F2942] to-[#173B5E] px-5 py-4 sm:px-6 sm:py-5 flex items-center gap-3.5 text-white">
+          <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/15 text-[#2DD4BF] flex items-center justify-center shrink-0">
+            <HelpCircle className="w-5 h-5" aria-hidden="true" />
+          </div>
+          <div className="space-y-0.5 min-w-0">
+            <h3 className="text-sm sm:text-base font-extrabold tracking-tight">
+              أسئلة شائعة تهمّ الوكالات الشريكة
+            </h3>
+            <p className="text-xs text-slate-200">
+              كل ما يضمن حقوق وكالتك ويزيد أرباحك عبر Karya
+            </p>
+          </div>
+        </div>
+
+        {/* Interactive Numbered FAQ Cards */}
+        <div className="p-4 sm:p-5 space-y-2.5">
+          {AGENCY_FAQS.map((item, idx) => {
+            const isOpen = openFaqIndex === idx;
+            const numLabel = String(idx + 1).padStart(2, '0');
+
+            return (
+              <div
+                key={item.q}
+                className={`rounded-xl border transition-all duration-150 ${
+                  isOpen
+                    ? 'border-[#0D9488]/60 bg-teal-50/40 shadow-xs'
+                    : 'border-slate-200/80 bg-[#F8FAFC] hover:bg-white hover:border-[#0F2942]/25'
+                }`}
+              >
+                <button
+                  type="button"
+                  aria-expanded={isOpen}
+                  onClick={() => setOpenFaqIndex((prev) => (prev === idx ? null : idx))}
+                  className="w-full flex items-center justify-between gap-3 text-right p-3.5"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span
+                      className={`w-7 h-7 rounded-lg font-mono-tabular text-xs font-bold flex items-center justify-center shrink-0 transition-colors ${
+                        isOpen
+                          ? 'bg-[#0D9488] text-white'
+                          : 'bg-white text-[#0F2942] border border-slate-200'
+                      }`}
+                      aria-hidden="true"
+                    >
+                      {numLabel}
+                    </span>
+                    <span className="text-xs sm:text-sm font-extrabold text-[#0F2942] leading-snug">
+                      {item.q}
+                    </span>
+                  </div>
+
+                  <ChevronDown
+                    className={`w-4 h-4 shrink-0 transition-transform duration-200 ${
+                      isOpen ? 'rotate-180 text-[#0D9488]' : 'text-slate-400'
+                    }`}
+                    aria-hidden="true"
+                  />
+                </button>
+
+                {isOpen && (
+                  <div className="px-4 pb-3.5 sm:pr-14 sm:pl-5">
+                    <p className="text-xs text-slate-600 leading-relaxed">
+                      {item.a}
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </section>
     </div>
   );
 };
@@ -1329,6 +1430,43 @@ const AgencyFleetManager: React.FC<{
                   />
                 </div>
               </div>
+
+              {/* Smart Pricing Hint & Live 90% Net Handover Calculator */}
+              <div className="rounded-xl bg-[#F4F6F9] border border-slate-200/80 p-3.5 sm:p-4 space-y-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
+                  <div>
+                    <div className="text-[11px] font-semibold text-slate-500">
+                      صافي ما تقبضه يومياً عند التسليم (90%)
+                    </div>
+                    <div className="text-base sm:text-lg font-extrabold text-[#0D9488] font-mono-tabular mt-0.5">
+                      {formatDH(Math.max(0, dailyPrice || 0) * 0.9)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-semibold text-slate-500">
+                      صافي أقل حجز (3 أيام — 90%)
+                    </div>
+                    <div className="text-base sm:text-lg font-extrabold text-[#0F2942] font-mono-tabular mt-0.5">
+                      {formatDH(Math.max(0, dailyPrice || 0) * 3 * 0.9)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-semibold text-slate-500">
+                      تسبيق الجدية للمنصة (3 أيام — 10%)
+                    </div>
+                    <div className="text-sm font-bold text-slate-700 font-mono-tabular mt-0.5">
+                      {formatDH(Math.max(0, dailyPrice || 0) * 3 * 0.1)}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2 pt-2 border-t border-slate-200/70 text-xs text-slate-600 leading-relaxed">
+                  <TrendingUp className="w-4 h-4 text-[#0D9488] shrink-0 mt-0.5" />
+                  <span>
+                    <strong>نصيحة تسعير بدون ضمان:</strong> العملاء المعفيون من تجميد الكفالة يتقبلون زيادة{' '}
+                    <strong className="text-[#0F2942]">15% إلى 20%</strong> في السعر اليومي لتغطية التأمين — حدد سعرك بحرية لتحصيل صافي الربح المناسب لك عند التسليم.
+                  </span>
+                </div>
+              </div>
             </div>
           )}
 
@@ -1412,49 +1550,59 @@ const AgencyFleetManager: React.FC<{
                     </div>
 
                     {isEditingPrice ? (
-                      <div className="flex items-center gap-1.5">
-                        <input
-                          type="number"
-                          min={1}
-                          value={priceDraft}
-                          onChange={(e) => setPriceDraft(Number(e.target.value))}
-                          className="w-28 rounded-lg border border-[#0D9488] px-2.5 py-1 text-sm font-mono-tabular focus:outline-none"
-                        />
-                        <span className="text-xs text-slate-500">DH</span>
-                        <button
-                          type="button"
-                          disabled={isBusy}
-                          onClick={() => handleSavePrice(car.id)}
-                          className="p-1.5 rounded-lg bg-[#0D9488] text-white hover:bg-[#0F766E]"
-                          aria-label="حفظ السعر"
-                        >
-                          <Check className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setEditingPriceId(null)}
-                          className="p-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200"
-                          aria-label="إلغاء"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="number"
+                            min={1}
+                            value={priceDraft}
+                            onChange={(e) => setPriceDraft(Number(e.target.value))}
+                            className="w-28 rounded-lg border border-[#0D9488] px-2.5 py-1 text-sm font-mono-tabular focus:outline-none"
+                          />
+                          <span className="text-xs text-slate-500">DH</span>
+                          <button
+                            type="button"
+                            disabled={isBusy}
+                            onClick={() => handleSavePrice(car.id)}
+                            className="p-1.5 rounded-lg bg-[#0D9488] text-white hover:bg-[#0F766E]"
+                            aria-label="حفظ السعر"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingPriceId(null)}
+                            className="p-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200"
+                            aria-label="إلغاء"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <div className="text-[11px] font-semibold text-[#0D9488] font-mono-tabular">
+                          صافي التسليم (90%): {formatDH(Math.max(0, priceDraft || 0) * 0.9)} / يوم
+                        </div>
                       </div>
                     ) : (
-                      <div className="flex items-center justify-between">
-                        <div className="font-mono-tabular font-bold text-sm text-[#0F2942]">
-                          {formatDH(car.daily_price)} / يوم
+                      <div className="space-y-0.5">
+                        <div className="flex items-center justify-between">
+                          <div className="font-mono-tabular font-bold text-sm text-[#0F2942]">
+                            {formatDH(car.daily_price)} / يوم
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingPriceId(car.id);
+                              setPriceDraft(car.daily_price);
+                            }}
+                            className="text-xs font-semibold text-slate-600 hover:text-[#0F2942] inline-flex items-center gap-1"
+                          >
+                            <Pencil className="w-3 h-3" />
+                            <span>تعديل السعر</span>
+                          </button>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingPriceId(car.id);
-                            setPriceDraft(car.daily_price);
-                          }}
-                          className="text-xs font-semibold text-slate-600 hover:text-[#0F2942] inline-flex items-center gap-1"
-                        >
-                          <Pencil className="w-3 h-3" />
-                          <span>تعديل السعر</span>
-                        </button>
+                        <div className="text-[11px] font-semibold text-[#0D9488] font-mono-tabular">
+                          صافي التسليم (90%): {formatDH(car.daily_price * 0.9)} / يوم
+                        </div>
                       </div>
                     )}
                   </div>
