@@ -11,6 +11,20 @@ export const DEFAULT_CAR_IMAGE_URL = carRenaultClio;
 
 export const MAX_CATALOG_CARS = 50;
 
+export const KNOWN_ECONOMIC_BRANDS: string[] = [
+  'Dacia',
+  'Renault',
+  'Peugeot',
+  'Citroën',
+  'Ford',
+  'Hyundai',
+  'Fiat',
+  'Volkswagen',
+  'Kia',
+  'Opel',
+  'Toyota',
+];
+
 export const STARTER_IMAGE_TEMPLATES = [
   { label: 'Dacia Duster', url: carDaciaDuster },
   { label: 'Renault Clio 5', url: carRenaultClio },

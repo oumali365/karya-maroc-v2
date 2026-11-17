@@ -7,10 +7,12 @@ import {
   Clock,
   ShieldCheck,
   ChevronDown,
+  Check,
 } from 'lucide-react';
 import { supabase, MOROCCAN_CITIES, getCityLabelAr } from '../lib/supabase';
 import {
   HERO_IMAGE_URL,
+  KNOWN_ECONOMIC_BRANDS,
   STARTER_CARS,
   resolveCatalogImage,
 } from '../data/starterData';
@@ -50,12 +52,11 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
   const [searchDays, setSearchDays] = useState<number>(3);
 
   const [cars, setCars] = useState<CarOffer[]>([]);
+  const [catalogBrands, setCatalogBrands] = useState<string[]>(KNOWN_ECONOMIC_BRANDS);
   const [loadingCars, setLoadingCars] = useState(true);
   const [dbConnected, setDbConnected] = useState(false);
 
   const [brandFilter, setBrandFilter] = useState<string>('all');
-  const [transmissionFilter, setTransmissionFilter] =
-    useState<'all' | 'automatic' | 'manual'>('all');
   const [selectedCar, setSelectedCar] = useState<CarOffer | null>(null);
 
   const loadCars = async (
@@ -187,6 +188,37 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
   };
 
   useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const { data, error } = await supabase.from('car_catalog').select('brand');
+        if (!active || error || !Array.isArray(data)) return;
+        const dbBrands = data
+          .map((r: { brand?: unknown }) => String(r.brand || '').trim())
+          .filter(Boolean);
+        if (dbBrands.length > 0) {
+          setCatalogBrands((prev) => {
+            const seen = new Set(prev.map((b) => b.toLowerCase()));
+            const merged = [...prev];
+            for (const b of dbBrands) {
+              if (!seen.has(b.toLowerCase())) {
+                seen.add(b.toLowerCase());
+                merged.push(b);
+              }
+            }
+            return merged;
+          });
+        }
+      } catch {
+        // Keep KNOWN_ECONOMIC_BRANDS fallback
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
     setBrandFilter('all');
   }, [selectedCity]);
 
@@ -205,25 +237,36 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
     document.getElementById('fleet-offers')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  const availableBrands = useMemo(
-    () => Array.from(new Set(cars.map((c) => c.brand).filter(Boolean))),
-    [cars],
-  );
+  const availableBrands = useMemo(() => {
+    const counts = new Map<string, number>();
+    const displayNames = new Map<string, string>();
+
+    for (const brand of catalogBrands) {
+      const key = brand.trim().toLowerCase();
+      if (!key) continue;
+      if (!displayNames.has(key)) displayNames.set(key, brand.trim());
+      if (!counts.has(key)) counts.set(key, 0);
+    }
+
+    for (const car of cars) {
+      const cleanBrand = car.brand?.trim();
+      if (!cleanBrand) continue;
+      const key = cleanBrand.toLowerCase();
+      if (!displayNames.has(key)) displayNames.set(key, cleanBrand);
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+
+    return Array.from(displayNames.entries()).map(([key, brand]) => ({
+      brand,
+      count: counts.get(key) || 0,
+    }));
+  }, [cars, catalogBrands]);
 
   const filteredCars = useMemo(() => {
-    return cars.filter((car) => {
-      const matchTransmission =
-        transmissionFilter === 'all' || car.transmission === transmissionFilter;
-      const matchBrand = brandFilter === 'all' || car.brand === brandFilter;
-      return matchTransmission && matchBrand;
-    });
-  }, [cars, transmissionFilter, brandFilter]);
-
-  const availableFilteredCount = useMemo(
-    () => filteredCars.filter((c) => !c.is_booked).length,
-    [filteredCars],
-  );
-  const bookedFilteredCount = filteredCars.length - availableFilteredCount;
+    return cars.filter(
+      (car) => brandFilter === 'all' || car.brand.trim().toLowerCase() === brandFilter.trim().toLowerCase(),
+    );
+  }, [cars, brandFilter]);
 
   const fieldClasses =
     'w-full min-h-[50px] rounded-xl bg-[#F4F6F9] border border-slate-200 px-3.5 py-2.5 text-sm font-bold text-[#0F2942] transition-colors focus:bg-white focus:border-[#0D9488] focus:outline-none focus:ring-2 focus:ring-[#0D9488]/20';
@@ -362,110 +405,96 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
         id="fleet-offers"
         className="max-w-6xl mx-auto px-4 sm:px-6 py-7 sm:py-9 space-y-6 scroll-mt-4"
       >
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div className="space-y-4">
           <div className="space-y-1">
             <h2 className="text-xl sm:text-2xl font-extrabold text-[#0F2942]">
               السيارات المتاحة في {getCityLabelAr(selectedCity)}
             </h2>
-            <p className="text-xs sm:text-sm text-slate-600">
-              {loadingCars ? (
-                'جارٍ تحميل العروض...'
-              ) : (
-                <span aria-live="polite">
-                  {availableFilteredCount} سيارة متاحة
-                  {bookedFilteredCount > 0 ? ` · ${bookedFilteredCount} محجوزة` : ''} ·{' '}
-                  {formatDays(searchDays)} · استلام{' '}
-                  <span className="font-mono-tabular font-semibold text-[#0F2942]">
-                    {searchPickupDate}
-                  </span>
-                </span>
-              )}
-              {!dbConnected && cars.length > 0 && (
-                <>
-                  {' '}·{' '}
-                  <span className="text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-1.5 py-0.5 text-xs">
-                    عروض توضيحية
-                  </span>{' '}
-                  <button
-                    type="button"
-                    onClick={onGoToAgency}
-                    className="font-bold text-[#0D9488] hover:underline"
-                  >
-                    سجل وكالتك الآن
-                  </button>
-                </>
-              )}
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-2.5 md:flex-row md:items-center">
-            {availableBrands.length > 1 && (
-              <div
-                className="flex items-center gap-1 p-1 bg-white border border-slate-200/80 rounded-xl overflow-x-auto no-scrollbar shadow-xs"
-                role="tablist"
-                aria-label="تصفية حسب الماركة"
-              >
+            {!dbConnected && !loadingCars && cars.length > 0 && (
+              <p className="text-xs sm:text-sm text-slate-600">
+                <span className="text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-1.5 py-0.5 text-xs">
+                  عروض توضيحية
+                </span>{' '}
                 <button
                   type="button"
-                  role="tab"
-                  aria-selected={brandFilter === 'all'}
-                  onClick={() => setBrandFilter('all')}
-                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors whitespace-nowrap shrink-0 ${
-                    brandFilter === 'all'
-                      ? 'bg-[#0F2942] text-white'
-                      : 'text-slate-600 hover:text-[#0F2942] hover:bg-slate-50'
-                  }`}
+                  onClick={onGoToAgency}
+                  className="font-bold text-[#0D9488] hover:underline"
                 >
-                  كل الماركات
+                  سجل وكالتك الآن
                 </button>
-                {availableBrands.map((brand) => (
+              </p>
+            )}
+          </div>
+
+          {availableBrands.length > 0 && (
+            <div
+              className="flex gap-2.5 overflow-x-auto no-scrollbar snap-x pb-1"
+              role="group"
+              aria-label="تصفية حسب الماركة"
+            >
+              {availableBrands.map(({ brand, count }) => {
+                const isSelected = brandFilter.toLowerCase() === brand.toLowerCase();
+                const subtitle =
+                  count === 0
+                    ? 'غير متوفرة حالياً'
+                    : count === 1
+                      ? 'سيارة واحدة'
+                      : count === 2
+                        ? 'سيارتان'
+                        : count <= 10
+                          ? `${count} سيارات`
+                          : `${count} سيارة`;
+
+                return (
                   <button
                     key={brand}
                     type="button"
-                    role="tab"
-                    aria-selected={brandFilter === brand}
-                    onClick={() => setBrandFilter(brand)}
-                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors whitespace-nowrap shrink-0 ${
-                      brandFilter === brand
-                        ? 'bg-[#0F2942] text-white'
-                        : 'text-slate-600 hover:text-[#0F2942] hover:bg-slate-50'
+                    aria-pressed={isSelected}
+                    onClick={() =>
+                      setBrandFilter((prev) =>
+                        prev.toLowerCase() === brand.toLowerCase() ? 'all' : brand,
+                      )
+                    }
+                    className={`snap-start shrink-0 min-w-[152px] text-right rounded-2xl border p-3 transition-all duration-150 flex items-center justify-between gap-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] ${
+                      isSelected
+                        ? 'bg-teal-50/75 border-[#0D9488] ring-1 ring-[#0D9488]/25 shadow-sm'
+                        : 'bg-white border-slate-200/90 hover:border-[#0F2942]/30 shadow-xs'
                     }`}
                   >
-                    {brand}
-                  </button>
-                ))}
-              </div>
-            )}
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span
+                        className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                          isSelected
+                            ? 'bg-[#0D9488] text-white'
+                            : 'bg-[#F4F6F9] text-[#0F2942]'
+                        }`}
+                        aria-hidden="true"
+                      >
+                        <CarFront className="w-4 h-4" />
+                      </span>
+                      <div className="min-w-0">
+                        <div className="text-xs font-extrabold text-[#0F2942] truncate">
+                          {brand}
+                        </div>
+                        <div className="text-[10px] font-medium text-slate-500 truncate">
+                          {subtitle}
+                        </div>
+                      </div>
+                    </div>
 
-            <div
-              className="flex items-center gap-1 p-1 bg-white border border-slate-200/80 rounded-xl shadow-xs"
-              role="tablist"
-              aria-label="تصفية حسب ناقل الحركة"
-            >
-              {(
-                [
-                  { key: 'all', label: `الكل (${cars.length})` },
-                  { key: 'automatic', label: 'أوتوماتيك' },
-                  { key: 'manual', label: 'يدوي' },
-                ] as const
-              ).map(({ key, label }) => (
-                <button
-                  key={key}
-                  type="button"
-                  role="tab"
-                  aria-selected={transmissionFilter === key}
-                  onClick={() => setTransmissionFilter(key)}
-                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors whitespace-nowrap shrink-0 ${
-                    transmissionFilter === key
-                      ? 'bg-[#0D9488] text-white'
-                      : 'text-slate-600 hover:text-[#0F2942] hover:bg-slate-50'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
+                    {isSelected && (
+                      <span
+                        className="w-5 h-5 rounded-full bg-[#0D9488] text-white flex items-center justify-center shrink-0"
+                        aria-hidden="true"
+                      >
+                        <Check className="w-3 h-3 stroke-[3]" />
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
-          </div>
+          )}
         </div>
 
         {loadingCars ? (
@@ -504,7 +533,6 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
               type="button"
               onClick={() => {
                 setBrandFilter('all');
-                setTransmissionFilter('all');
               }}
               className="inline-flex items-center gap-1.5 mt-2 px-5 py-2.5 rounded-xl bg-[#0F2942] text-white text-sm font-bold hover:bg-[#173B5E] transition-colors"
             >

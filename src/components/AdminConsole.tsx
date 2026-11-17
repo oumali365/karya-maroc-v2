@@ -27,6 +27,7 @@ import {
 } from '../lib/adminAuth';
 import { compressImageFile, formatFileSize } from '../lib/imageCompression';
 import {
+  KNOWN_ECONOMIC_BRANDS,
   MAX_CATALOG_CARS,
   STARTER_CATALOG,
   mapCatalogRow,
@@ -45,20 +46,6 @@ interface AdminConsoleProps {
   onUnauthorized: () => void;
   onLogout?: () => void;
 }
-
-const KNOWN_ECONOMIC_BRANDS = [
-  'Dacia',
-  'Renault',
-  'Peugeot',
-  'Ford',
-  'Hyundai',
-  'Citroën',
-  'Fiat',
-  'Volkswagen',
-  'Kia',
-  'Opel',
-  'Toyota',
-];
 
 export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLogout }) => {
   const [tab, setTab] = useState<'receipts' | 'payouts' | 'agencies' | 'catalog'>('receipts');

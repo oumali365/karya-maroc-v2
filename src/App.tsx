@@ -282,17 +282,8 @@ export function App() {
           <div onClick={handleCopyrightClick} className="select-none cursor-default">
             © Karya — منصة كراء السيارات بالمغرب بدون ضمان
           </div>
-          <div className="flex items-center gap-5">
-            <button type="button" onClick={() => navigate('discover')} className="hover:text-[#0F2942]">
-              الرئيسية
-            </button>
-            <button type="button" onClick={() => navigate('bookings')} className="hover:text-[#0F2942]">
-              حجوزاتي
-            </button>
-            <button type="button" onClick={() => navigate('agency')} className="hover:text-[#0F2942]">
-              بوابة الوكالات
-            </button>
-            {route === 'discover' && (
+          {route === 'discover' && (
+            <div className="flex items-center">
               <button
                 type="button"
                 onClick={handleOpenAdminEntry}
@@ -302,8 +293,8 @@ export function App() {
               >
                 <Lock className="w-3 h-3" />
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </footer>
 
