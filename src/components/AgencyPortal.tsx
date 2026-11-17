@@ -1353,7 +1353,6 @@ const AgencyBookingsManager: React.FC<{
   title?: string;
 }> = ({ creds, bookings, onRefresh, title = 'الحجوزات والطلبات الواردة' }) => {
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [handoverPins, setHandoverPins] = useState<Record<string, string>>({});
   const [disputeOpenId, setDisputeOpenId] = useState<string | null>(null);
   const [actionErr, setActionErr] = useState<string | null>(null);
 
@@ -1376,30 +1375,18 @@ const AgencyBookingsManager: React.FC<{
   };
 
   const handleDeliverCar = async (bookingId: string) => {
-    const pin = (handoverPins[bookingId] || '').trim();
-    if (!pin) {
-      setActionErr('يرجى إدخال رمز التسليم السري (4 أرقام) من العميل لتأكيد تسليم السيارة.');
-      return;
-    }
-
     setBusyId(bookingId);
     setActionErr(null);
     const { error } = await supabase.rpc('agency_confirm_car_delivery', {
       p_agency_id: creds.agencyId,
       p_pin: creds.pin,
       p_booking_id: bookingId,
-      p_handover_pin: pin,
     });
     setBusyId(null);
     if (error) {
       setActionErr(error.message);
       return;
     }
-    setHandoverPins((prev) => {
-      const next = { ...prev };
-      delete next[bookingId];
-      return next;
-    });
     onRefresh();
   };
 
@@ -1597,36 +1584,16 @@ const AgencyBookingsManager: React.FC<{
                     )}
 
                     {b.status === 'payment_verified' && (
-                      <div className="space-y-2 w-full md:w-auto">
-                        <div className="flex items-center gap-1.5">
-                          <input
-                            type="text"
-                            maxLength={6}
-                            dir="ltr"
-                            placeholder="رمز العميل (4 أرقام)"
-                            value={handoverPins[b.id] || ''}
-                            onChange={(e) =>
-                              setHandoverPins((prev) => ({
-                                ...prev,
-                                [b.id]: e.target.value,
-                              }))
-                            }
-                            className="w-36 min-h-[40px] rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-mono text-center focus:border-[#2563EB] focus:outline-none"
-                          />
-                          <button
-                            type="button"
-                            disabled={busyId === b.id}
-                            onClick={() => handleDeliverCar(b.id)}
-                            className="min-h-[40px] rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] disabled:opacity-60 text-white px-3.5 py-2 text-xs font-bold transition-colors flex items-center gap-1.5 whitespace-nowrap"
-                          >
-                            {busyId === b.id ? (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            ) : (
-                              <KeyRound className="w-3.5 h-3.5" />
-                            )}
-                            <span>تأكيد التسليم</span>
-                          </button>
-                        </div>
+                      <div className="space-y-2 w-full md:w-auto flex flex-col md:items-end">
+                        <button
+                          type="button"
+                          disabled={busyId === b.id}
+                          onClick={() => handleDeliverCar(b.id)}
+                          className="min-h-[40px] rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] disabled:opacity-60 text-white px-4 py-2 text-xs font-bold transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap"
+                        >
+                          {busyId === b.id && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                          <span>{busyId === b.id ? 'جاري التأكيد...' : 'تم تسليم السيارة للعميل'}</span>
+                        </button>
 
                         {!b.dispute_flag && (
                           <div className="text-left">
@@ -1673,7 +1640,7 @@ const AgencyBookingsManager: React.FC<{
                     {b.status === 'car_delivered' && (
                       <span className="text-xs font-bold text-emerald-700 flex items-center gap-1">
                         <CheckCircle2 className="w-4 h-4" />
-                        <span>تم تسليم السيارة بالرمز السري</span>
+                        <span>تم تسليم السيارة</span>
                       </span>
                     )}
                   </div>

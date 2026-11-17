@@ -10,7 +10,6 @@ import {
   MapPin,
   CalendarClock,
   ShieldCheck,
-  KeyRound,
 } from 'lucide-react';
 import { supabase, formatDH, getCityLabelAr } from '../lib/supabase';
 import type { BookingStatus, CreatedBooking } from '../types/karya';
@@ -166,7 +165,6 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
               agency_payout_amount: Number(row.agency_payout_amount),
               delivery_at: String(row.delivery_at),
               status: row.status,
-              handover_pin: row.handover_pin ? String(row.handover_pin) : undefined,
               is_demo: false,
             })),
           );
@@ -214,7 +212,6 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
           agency_payout_amount: Number(r.agency_payout_amount),
           delivery_at: String(r.delivery_at),
           status: r.status,
-          handover_pin: r.handover_pin ? String(r.handover_pin) : undefined,
           is_demo: false,
         };
         setLookupBookings((prev) => [
@@ -482,24 +479,6 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
                         <span>{booking.pickup_location}</span>
                       </div>
                     )}
-
-                    {booking.handover_pin &&
-                      (booking.status === 'payment_uploaded' ||
-                        booking.status === 'payment_verified') && (
-                        <div className="mt-2 inline-flex flex-wrap items-center gap-2 rounded-xl bg-blue-50 border border-blue-200/80 px-3 py-1.5 text-xs">
-                          <KeyRound className="w-3.5 h-3.5 text-[#2563EB] shrink-0" />
-                          <span className="text-slate-700 font-semibold">رمز التسليم السري:</span>
-                          <span
-                            dir="ltr"
-                            className="font-mono-tabular font-extrabold text-[#2563EB] tracking-wider"
-                          >
-                            {booking.handover_pin}
-                          </span>
-                          <span className="text-[11px] text-slate-500">
-                            (لا يُعطى للوكالة إلا عند استلام المفاتيح بدون ضمان)
-                          </span>
-                        </div>
-                      )}
 
                     <div className="text-[11px] text-slate-400 pt-0.5">
                       ملاحظة: أي تمديد أو اتفاق خارج المنصة لا تشمله حماية المنصة أو ضمان الاسترجاع.

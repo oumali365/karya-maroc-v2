@@ -289,7 +289,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
       `• العميل: ${b.customer_name} | الهاتف: ${b.customer_phone}`,
       `• البطاقة الوطنية: ${b.customer_cin}${b.customer_license_number ? ` | الرخصة: ${b.customer_license_number}` : ''}`,
       `• المبلغ المستخلص عند التسليم (90%): ${formatDH(Number(b.agency_payout_amount))}`,
-      `ملاحظة: يرجى طلب رمز التسليم السري (4 أرقام) من العميل وإدخاله في بوابة الوكالات عند تسليم المفاتيح.`,
+      `ملاحظة: يرجى تأكيد تسليم السيارة في بوابة الوكالات عند تسليم المفاتيح (بدون ضمان 0 DH).`,
     ]
       .filter(Boolean)
       .join('\n');
@@ -540,14 +540,6 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
                                 {formatDH(Number(b.agency_payout_amount))}
                               </span>
                             </span>
-                            {b.handover_pin && (
-                              <>
-                                <span>·</span>
-                                <span>
-                                  رمز التسليم: <span className="font-mono font-bold">{b.handover_pin}</span>
-                                </span>
-                              </>
-                            )}
                           </div>
 
                           <div className="flex flex-wrap items-center gap-2 text-xs">

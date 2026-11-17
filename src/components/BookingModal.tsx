@@ -323,7 +323,6 @@ export const BookingModal: React.FC<BookingModalProps> = ({
             agency_payout_amount: Number(row.agency_payout_amount),
             delivery_at: deliveryAtLocal,
             status: 'pending_payment',
-            handover_pin: row.handover_pin ? String(row.handover_pin) : undefined,
             is_demo: false,
           };
           setCreatedBooking(bookingObj);
@@ -333,7 +332,6 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       }
 
       const fallbackCode = `KRY-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-      const fallbackHandoverPin = String(Math.floor(1000 + Math.random() * 9000));
       const demoBooking: CreatedBooking = {
         booking_id: crypto.randomUUID(),
         booking_code: fallbackCode,
@@ -351,7 +349,6 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         agency_payout_amount: agencyPayoutAmount,
         delivery_at: deliveryAtLocal,
         status: 'pending_payment',
-        handover_pin: fallbackHandoverPin,
         is_demo: true,
       };
       setCreatedBooking(demoBooking);
@@ -923,23 +920,6 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                 <div className="text-xs font-bold text-emerald-700">
                   بدون ضمان · 0.00 DH كفالة
                 </div>
-
-                {createdBooking.handover_pin && (
-                  <div className="rounded-xl bg-blue-50 border border-blue-200 px-3.5 py-2.5 space-y-1">
-                    <div className="text-[11px] font-bold text-slate-700">
-                      رمز التسليم السري (4 أرقام)
-                    </div>
-                    <div
-                      dir="ltr"
-                      className="font-mono-tabular text-xl font-extrabold tracking-widest text-[#2563EB]"
-                    >
-                      {createdBooking.handover_pin}
-                    </div>
-                    <p className="text-[11px] text-slate-600 leading-relaxed">
-                      احتفظ بهذا الرمز ولا تُعطه للوكالة إلا لحظة استلام مفاتيح السيارة بالسعر المتفق عليه وبدون أي ضمان.
-                    </p>
-                  </div>
-                )}
 
                 <div className="text-xs text-slate-600 pt-2 border-t border-slate-200/75 flex items-center justify-between">
                   <span>

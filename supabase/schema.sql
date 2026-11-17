@@ -354,7 +354,6 @@ ALTER TABLE public.bookings
     ADD COLUMN IF NOT EXISTS customer_license_number TEXT,
     ADD COLUMN IF NOT EXISTS customer_license_issue_date DATE,
     ADD COLUMN IF NOT EXISTS pickup_location TEXT,
-    ADD COLUMN IF NOT EXISTS handover_pin TEXT,
     ADD COLUMN IF NOT EXISTS agency_ack_status TEXT NOT NULL DEFAULT 'pending',
     ADD COLUMN IF NOT EXISTS agency_ack_at TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS agency_ack_note TEXT,
@@ -744,8 +743,7 @@ RETURNS TABLE (
     agency_payout_amount NUMERIC,
     bank_code TEXT,
     bank_holder_name TEXT,
-    bank_rib TEXT,
-    handover_pin TEXT
+    bank_rib TEXT
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -761,7 +759,6 @@ DECLARE
     v_commission NUMERIC(10,2);
     v_payout NUMERIC(10,2);
     v_code TEXT;
-    v_handover_pin TEXT;
     v_booking_id UUID;
     v_norm_phone TEXT := REGEXP_REPLACE(COALESCE(p_customer_phone, ''), '[^0-9]', '', 'g');
     v_norm_cin TEXT := UPPER(TRIM(COALESCE(p_customer_cin, '')));
@@ -840,7 +837,6 @@ BEGIN
     v_commission := ROUND(v_total * 0.10, 2);
     v_payout := v_total - v_commission;
     v_code := 'KRY-' || UPPER(SUBSTRING(REPLACE(gen_random_uuid()::TEXT, '-', '') FROM 1 FOR 6));
-    v_handover_pin := LPAD((FLOOR(RANDOM() * 9000) + 1000)::INT::TEXT, 4, '0');
 
     INSERT INTO public.bookings (
         booking_code,
@@ -864,7 +860,6 @@ BEGIN
         agency_payout_amount,
         platform_bank_id,
         selected_bank_code,
-        handover_pin,
         expires_at,
         status
     ) VALUES (
@@ -889,7 +884,6 @@ BEGIN
         v_payout,
         v_bank_id,
         v_bank_code,
-        v_handover_pin,
         NOW() + INTERVAL '2 hours',
         'pending_payment'
     )
@@ -903,8 +897,7 @@ BEGIN
         v_payout,
         v_bank_code,
         v_bank_holder,
-        v_bank_rib,
-        v_handover_pin;
+        v_bank_rib;
 END;
 $$;
 
@@ -1639,12 +1632,12 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS public.agency_confirm_car_delivery(UUID, TEXT, UUID, TEXT);
 DROP FUNCTION IF EXISTS public.agency_confirm_car_delivery(UUID, TEXT, UUID);
 CREATE OR REPLACE FUNCTION public.agency_confirm_car_delivery(
     p_agency_id UUID,
     p_pin TEXT,
-    p_booking_id UUID,
-    p_handover_pin TEXT DEFAULT NULL
+    p_booking_id UUID
 )
 RETURNS UUID
 LANGUAGE plpgsql
@@ -1654,7 +1647,6 @@ AS $$
 DECLARE
     v_agency public.agencies;
     v_booking RECORD;
-    v_clean_handover TEXT := TRIM(COALESCE(p_handover_pin, ''));
 BEGIN
     v_agency := public.verify_agency_credentials(p_agency_id, p_pin);
 
@@ -1664,10 +1656,6 @@ BEGIN
 
     IF NOT FOUND OR v_booking.status <> 'payment_verified' THEN
         RAISE EXCEPTION 'لا يمكن تأكيد التسليم قبل تأكيد دفع التسبيق من الإدارة.';
-    END IF;
-
-    IF v_booking.handover_pin IS NOT NULL AND v_clean_handover <> v_booking.handover_pin THEN
-        RAISE EXCEPTION 'رمز التسليم السري (4 أرقام) غير صحيح. اطلبه من العميل عند تسليم مفاتيح السيارة.';
     END IF;
 
     UPDATE public.bookings
@@ -2141,8 +2129,7 @@ RETURNS TABLE (
     commission_amount NUMERIC,
     agency_payout_amount NUMERIC,
     delivery_at TIMESTAMPTZ,
-    status TEXT,
-    handover_pin TEXT
+    status TEXT
 )
 LANGUAGE sql
 STABLE
@@ -2160,8 +2147,7 @@ AS $$
         b.commission_amount,
         b.agency_payout_amount,
         b.delivery_at,
-        b.status,
-        b.handover_pin
+        b.status
     FROM public.bookings b
     LEFT JOIN public.agency_cars c ON c.id = b.agency_car_id
     LEFT JOIN public.agencies a ON a.id = b.agency_id
@@ -2188,7 +2174,7 @@ GRANT EXECUTE ON FUNCTION public.agency_delete_account(UUID, TEXT) TO anon, auth
 GRANT EXECUTE ON FUNCTION public.agency_get_bookings(UUID, TEXT) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.agency_respond_precheck(UUID, TEXT, UUID, TEXT, TEXT) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.agency_report_customer_issue(UUID, TEXT, UUID, TEXT, TEXT) TO anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.agency_confirm_car_delivery(UUID, TEXT, UUID, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.agency_confirm_car_delivery(UUID, TEXT, UUID) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.admin_get_dashboard_data(TEXT) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.admin_verify_payment(UUID, TEXT) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.admin_verify_agency(UUID, TEXT, TEXT) TO anon, authenticated;

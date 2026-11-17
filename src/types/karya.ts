@@ -100,7 +100,6 @@ export interface CreatedBooking {
   status: BookingStatus;
   selected_bank_code?: string;
   receipt_url?: string;
-  handover_pin?: string;
   is_demo?: boolean;
 }
 
@@ -154,7 +153,6 @@ export interface AgencyBookingRecord {
   car_model?: string;
   car_image?: string;
   car_city?: string;
-  handover_pin?: string | null;
   agency_ack_status?: AgencyAckStatus;
   agency_ack_at?: string | null;
   agency_ack_note?: string | null;
