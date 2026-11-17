@@ -20,7 +20,7 @@ interface BankTransferCheckoutProps {
   onBack?: () => void;
 }
 
-const MAX_RECEIPT_BYTES = 5 * 1024 * 1024; // 5MB
+const MAX_RECEIPT_BYTES = 5 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'application/pdf']);
 const ALLOWED_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'pdf']);
 
@@ -56,7 +56,7 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
           setSelectedBank(data[0] as PlatformBank);
         }
       } catch {
-        // Fallback smoothly to STARTER_BANKS if platform_banks table isn't migrated yet
+        // Fallback smoothly to STARTER_BANKS
       }
     };
     loadBanks();
@@ -207,39 +207,37 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
 
   return (
     <div className="space-y-4" dir="rtl">
-      {/* Summary bar */}
-      <div className="rounded-xl bg-[#F8FAFC] px-4 py-3 border border-slate-200/80 text-sm space-y-1.5">
+      <div className="rounded-xl bg-[#F4F6F9] px-4 py-3 border border-slate-200/80 text-sm space-y-1.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="text-slate-700 text-xs sm:text-sm">
-            <span className="font-bold text-slate-900">{booking.car_label}</span>
+            <span className="font-extrabold text-[#0F2942]">{booking.car_label}</span>
             <span className="mx-1.5 text-slate-400">·</span>
             <span>{booking.days} أيام</span>
           </div>
-          <div className="font-mono-tabular text-xs font-bold text-[#2563EB]">
+          <div className="font-mono-tabular text-xs font-bold text-[#0F2942]">
             {booking.booking_code}
           </div>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-1.5 border-t border-slate-200/70">
-          <span className="text-slate-900 font-bold">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-1.5 border-t border-slate-200/80">
+          <span className="text-[#0F2942] font-bold">
             التسبيق الآن (10%):{' '}
-            <span dir="ltr" className="font-mono-tabular text-[#2563EB]">
+            <span dir="ltr" className="font-mono-tabular text-[#0D9488] font-extrabold">
               {formatDH(booking.commission_amount)}
             </span>
           </span>
-          <span className="text-slate-500">
+          <span className="text-slate-600">
             عند الاستلام:{' '}
-            <span dir="ltr" className="font-mono-tabular font-semibold text-slate-800">
+            <span dir="ltr" className="font-mono-tabular font-bold text-[#0F2942]">
               {formatDH(booking.agency_payout_amount)}
             </span>
           </span>
         </div>
       </div>
 
-      {/* Bank Selection Radio Cards */}
       <div>
         <div className="flex items-center gap-2 mb-2.5">
-          <Landmark className="w-4 h-4 text-[#2563EB]" />
-          <h4 className="font-bold text-slate-900 text-sm">اختر البنك للتحويل</h4>
+          <Landmark className="w-4 h-4 text-[#0F2942]" />
+          <h4 className="font-bold text-[#0F2942] text-sm">اختر البنك للتحويل</h4>
         </div>
 
         <div
@@ -256,16 +254,16 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
                 role="radio"
                 aria-checked={isSelected}
                 onClick={() => handleSelectBank(bank)}
-                className={`relative flex items-center gap-2 rounded-xl p-2.5 border text-right transition-all min-h-[58px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB] ${
+                className={`relative flex items-center gap-2 rounded-xl p-2.5 border text-right transition-all min-h-[58px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] ${
                   isSelected
-                    ? 'border-[#2563EB] bg-blue-50/60 ring-1 ring-[#2563EB]/20'
+                    ? 'border-[#0D9488] bg-teal-50/70 ring-1 ring-[#0D9488]/25'
                     : 'border-slate-200 bg-white hover:border-slate-300'
                 }`}
               >
                 <span
                   className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
                     isSelected
-                      ? 'border-[#2563EB] bg-[#2563EB] text-white'
+                      ? 'border-[#0D9488] bg-[#0D9488] text-white'
                       : 'border-slate-300 bg-white'
                   }`}
                   aria-hidden="true"
@@ -276,7 +274,7 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
                 <BankLogo code={bank.code} className="w-7 h-7 shrink-0" />
 
                 <div className="min-w-0 flex-1">
-                  <div className="text-xs font-bold tracking-tight text-slate-900 truncate">
+                  <div className="text-xs font-bold tracking-tight text-[#0F2942] truncate">
                     {bank.short_name}
                   </div>
                   <div className="text-[11px] text-slate-500 truncate">{bank.display_name_ar}</div>
@@ -287,11 +285,10 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
         </div>
       </div>
 
-      {/* Selected Bank RIB Card */}
-      <div className="rounded-xl border border-slate-200/80 bg-[#F8FAFC] p-4 space-y-2.5">
+      <div className="rounded-xl border border-slate-200/80 bg-[#F4F6F9] p-4 space-y-2.5">
         <div className="flex items-center justify-between text-xs">
           <span className="text-slate-500">المستفيد</span>
-          <span className="font-bold text-slate-900">{selectedBank.account_holder_name}</span>
+          <span className="font-bold text-[#0F2942]">{selectedBank.account_holder_name}</span>
         </div>
 
         <div className="flex items-center justify-between gap-3 pt-1">
@@ -301,8 +298,8 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
             onClick={handleCopyRib}
             className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors whitespace-nowrap shrink-0 min-h-[34px] ${
               copiedRib
-                ? 'bg-emerald-600 text-white'
-                : 'bg-slate-900 hover:bg-slate-800 text-white'
+                ? 'bg-[#0D9488] text-white'
+                : 'bg-[#0F2942] hover:bg-[#173B5E] text-white'
             }`}
           >
             {copiedRib ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
@@ -314,19 +311,18 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
           dir="ltr"
           className={`rounded-xl border px-3 py-2.5 text-center font-mono-tabular text-sm font-bold tracking-wider select-all transition-colors ${
             copiedRib
-              ? 'border-emerald-500 bg-emerald-50 text-emerald-950'
-              : 'border-slate-200 bg-white text-slate-900'
+              ? 'border-[#0D9488] bg-teal-50 text-[#0F2942]'
+              : 'border-slate-200 bg-white text-[#0F2942]'
           }`}
         >
           {selectedBank.rib}
         </div>
       </div>
 
-      {/* Receipt Upload Section */}
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <Upload className="w-4 h-4 text-[#2563EB]" />
-          <h4 className="font-bold text-slate-900 text-sm">إرفاق وصل التحويل</h4>
+          <Upload className="w-4 h-4 text-[#0F2942]" />
+          <h4 className="font-bold text-[#0F2942] text-sm">إرفاق وصل التحويل</h4>
         </div>
 
         <input
@@ -343,7 +339,7 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
           className={`w-full min-h-[104px] rounded-xl border-2 border-dashed transition-colors p-4 flex flex-col items-center justify-center gap-1.5 text-center ${
             fileError
               ? 'border-red-400 bg-red-50/40'
-              : 'border-slate-300 bg-[#F8FAFC] hover:bg-blue-50/30 hover:border-[#2563EB]/50'
+              : 'border-slate-300 bg-[#F4F6F9] hover:bg-teal-50/30 hover:border-[#0D9488]/60'
           }`}
         >
           {receiptFile ? (
@@ -355,9 +351,9 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
                   className="h-20 w-auto rounded-lg object-cover border border-slate-200"
                 />
               ) : (
-                <FileText className="w-7 h-7 text-[#2563EB]" />
+                <FileText className="w-7 h-7 text-[#0F2942]" />
               )}
-              <span className="text-xs font-bold text-slate-900 break-all">
+              <span className="text-xs font-bold text-[#0F2942] break-all">
                 {receiptFile.name}
               </span>
               <span className="text-[11px] text-slate-500 font-mono-tabular">
@@ -366,8 +362,10 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
             </div>
           ) : (
             <>
-              <Upload className="w-5 h-5 text-[#2563EB]" />
-              <span className="text-xs sm:text-sm font-bold text-slate-800">اختر صورة أو ملف PDF للوصل</span>
+              <Upload className="w-5 h-5 text-[#0D9488]" />
+              <span className="text-xs sm:text-sm font-bold text-[#0F2942]">
+                اختر صورة أو ملف PDF للوصل
+              </span>
               <span className="text-[11px] text-slate-500">JPG, PNG, PDF — حتى 5MB</span>
             </>
           )}
@@ -394,13 +392,12 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
         </div>
       )}
 
-      {/* Primary Action Button */}
       <div className="space-y-2 pt-1">
         <button
           type="button"
           disabled={submitting}
           onClick={handleConfirmPayment}
-          className="w-full min-h-[48px] rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] disabled:opacity-65 disabled:cursor-not-allowed text-white py-3 px-5 font-bold text-sm transition-colors flex items-center justify-center gap-2.5"
+          className="w-full min-h-[48px] rounded-xl bg-[#0D9488] hover:bg-[#0F766E] disabled:opacity-65 disabled:cursor-not-allowed text-white py-3 px-5 font-extrabold text-sm transition-colors flex items-center justify-center gap-2 shadow-md shadow-teal-600/20"
         >
           {submitting ? (
             <>
@@ -409,8 +406,8 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
             </>
           ) : (
             <>
-              <span>تأكيد الدفع</span>
-              <span dir="ltr" className="font-mono-tabular text-blue-100">
+              <span>تأكيد وإرسال الوصل</span>
+              <span dir="ltr" className="font-mono-tabular text-teal-100">
                 ({formatDH(booking.commission_amount)})
               </span>
             </>
@@ -422,14 +419,14 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
             type="button"
             disabled={submitting}
             onClick={onBack}
-            className="w-full min-h-[38px] py-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors"
+            className="w-full min-h-[38px] py-1.5 text-xs font-semibold text-slate-500 hover:text-[#0F2942] transition-colors"
           >
             العودة لتعديل البيانات
           </button>
         )}
 
         <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-500 text-center">
-          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+          <ShieldCheck className="w-3.5 h-3.5 text-[#0D9488] shrink-0" />
           <span>ضمان استرجاع 100% عند تعذر تسليم السيارة</span>
         </div>
       </div>

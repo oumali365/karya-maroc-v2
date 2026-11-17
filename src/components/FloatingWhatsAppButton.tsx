@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { HelpCircle, ShieldCheck, X, MessageCircle } from 'lucide-react';
 
-const CONFIGURED_WHATSAPP = (import.meta.env.VITE_SUPPORT_WHATSAPP || '')
+export const CONFIGURED_WHATSAPP = (import.meta.env.VITE_SUPPORT_WHATSAPP || '')
   .replace(/[^0-9]/g, '')
   .trim();
 
-const DEFAULT_SUPPORT_MESSAGE = encodeURIComponent(
+export const DEFAULT_SUPPORT_MESSAGE = encodeURIComponent(
   'مرحباً فريق دعم Karya، أحتاج إلى مساعدة بخصوص حجز سيارة.',
 );
 
@@ -21,28 +21,30 @@ export const FloatingWhatsAppButton: React.FC = () => {
         rel="noopener noreferrer"
         aria-label="تواصل مع الدعم الفني عبر واتساب"
         title="تواصل مع الدعم الفني عبر واتساب"
-        className="fixed bottom-5 left-5 z-40 inline-flex items-center gap-2 rounded-full bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 min-h-[44px] shadow-md shadow-slate-900/15 transition-transform hover:scale-[1.03] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-slate-900"
+        className="fixed bottom-[76px] left-4 md:bottom-6 md:left-6 z-30 inline-flex items-center justify-center md:gap-2 rounded-full bg-[#0D9488] hover:bg-[#0F766E] text-white w-12 h-12 md:w-auto md:h-auto md:px-4 md:py-2.5 shadow-lg shadow-teal-900/20 transition-transform hover:scale-[1.04] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#0D9488]"
       >
-        <MessageCircle className="w-4 h-4 shrink-0 text-emerald-400" aria-hidden="true" />
-        <span className="hidden sm:inline text-xs font-bold whitespace-nowrap">مساعدة</span>
+        <MessageCircle className="w-5 h-5 md:w-4 md:h-4 shrink-0" aria-hidden="true" />
+        <span className="hidden md:inline text-xs font-extrabold whitespace-nowrap">
+          دعم واتساب
+        </span>
       </a>
     );
   }
 
   return (
-    <div className="fixed bottom-5 left-5 z-40" dir="rtl">
+    <div className="fixed bottom-[76px] left-4 md:bottom-6 md:left-6 z-30" dir="rtl">
       {open && (
-        <div className="mb-3 w-72 rounded-2xl bg-white border border-slate-200 shadow-xl p-4 space-y-2.5 text-xs text-slate-700">
+        <div className="mb-3 w-72 sm:w-80 rounded-2xl bg-white border border-slate-200 shadow-2xl p-4 space-y-2.5 text-xs text-slate-700">
           <div className="flex items-center justify-between gap-2">
-            <span className="font-bold text-slate-900 flex items-center gap-1.5">
-              <ShieldCheck className="w-4 h-4 text-[#2563EB]" />
+            <span className="font-extrabold text-[#0F2942] flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-[#0D9488]" />
               <span>كيف تعمل منصة Karya؟</span>
             </span>
             <button
               type="button"
               onClick={() => setOpen(false)}
               aria-label="إغلاق المساعدة"
-              className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+              className="p-1 rounded-lg text-slate-400 hover:text-[#0F2942] hover:bg-slate-100"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -60,10 +62,10 @@ export const FloatingWhatsAppButton: React.FC = () => {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-label="دليل ومساعدة المنصة"
-        className="inline-flex items-center gap-2 rounded-full bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 min-h-[44px] shadow-md shadow-slate-900/15 transition-transform hover:scale-[1.03] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-slate-900"
+        className="inline-flex items-center justify-center md:gap-2 rounded-full bg-[#0F2942] hover:bg-[#173B5E] text-white w-12 h-12 md:w-auto md:h-auto md:px-4 md:py-2.5 shadow-lg shadow-[#0F2942]/25 transition-transform hover:scale-[1.04] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#0F2942]"
       >
-        <HelpCircle className="w-4 h-4 shrink-0 text-blue-400" aria-hidden="true" />
-        <span className="hidden sm:inline text-xs font-bold whitespace-nowrap">كيف نعمل؟</span>
+        <HelpCircle className="w-5 h-5 md:w-4 md:h-4 shrink-0 text-[#2DD4BF]" aria-hidden="true" />
+        <span className="hidden md:inline text-xs font-extrabold whitespace-nowrap">مساعدة</span>
       </button>
     </div>
   );

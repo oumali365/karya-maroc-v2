@@ -24,6 +24,10 @@ import {
   Clock,
   Ban,
   RefreshCw,
+  Menu,
+  Bell,
+  Calendar,
+  MapPin,
 } from 'lucide-react';
 import { supabase, MOROCCAN_CITIES, formatDH, getCityLabelAr } from '../lib/supabase';
 import {
@@ -84,6 +88,7 @@ export const AgencyPortal: React.FC<AgencyPortalProps> = ({ onGoToCustomer }) =>
   const [loading, setLoading] = useState<boolean>(() => Boolean(loadAgencySession()));
   const [refreshing, setRefreshing] = useState(false);
   const [view, setView] = useState<'dashboard' | 'cars' | 'bookings' | 'profile'>('dashboard');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const [cars, setCars] = useState<CarOffer[]>([]);
   const [bookings, setBookings] = useState<AgencyBookingRecord[]>([]);
@@ -279,7 +284,7 @@ export const AgencyPortal: React.FC<AgencyPortalProps> = ({ onGoToCustomer }) =>
   if (loading) {
     return (
       <div className="min-h-[65vh] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#2563EB]" />
+        <Loader2 className="w-8 h-8 animate-spin text-[#0F2942]" />
       </div>
     );
   }
@@ -319,109 +324,199 @@ export const AgencyPortal: React.FC<AgencyPortalProps> = ({ onGoToCustomer }) =>
     .filter((b) => ['payment_verified', 'car_delivered', 'completed'].includes(b.status))
     .reduce((sum, b) => sum + b.agency_payout_amount, 0);
 
+  const selectView = (nextView: 'dashboard' | 'cars' | 'bookings' | 'profile') => {
+    setView(nextView);
+    setMobileMenuOpen(false);
+  };
+
+  const navContent = (
+    <>
+      <div className="flex items-center gap-3 pb-3.5 border-b border-slate-100">
+        <div className="w-10 h-10 rounded-xl bg-[#0F2942] text-white font-bold flex items-center justify-center shrink-0">
+          <Building2 className="w-5 h-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] text-slate-500">بوابة الوكالات</p>
+          <p className="font-extrabold text-[#0F2942] truncate">{agency.name}</p>
+        </div>
+      </div>
+
+      <nav className="space-y-1">
+        <button
+          type="button"
+          onClick={() => selectView('dashboard')}
+          className={`w-full text-right px-3.5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2.5 transition-colors ${
+            view === 'dashboard'
+              ? 'bg-[#0F2942] text-white'
+              : 'text-slate-600 hover:bg-slate-100/80 hover:text-[#0F2942]'
+          }`}
+        >
+          <Home className="w-4 h-4" />
+          <span>الرئيسية</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => selectView('cars')}
+          className={`w-full text-right px-3.5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2.5 transition-colors ${
+            view === 'cars'
+              ? 'bg-[#0F2942] text-white'
+              : 'text-slate-600 hover:bg-slate-100/80 hover:text-[#0F2942]'
+          }`}
+        >
+          <CarFront className="w-4 h-4" />
+          <span>أسطول السيارات ({cars.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => selectView('bookings')}
+          className={`w-full text-right px-3.5 py-2.5 rounded-xl text-sm font-bold flex items-center justify-between gap-2 transition-colors ${
+            view === 'bookings'
+              ? 'bg-[#0F2942] text-white'
+              : 'text-slate-600 hover:bg-slate-100/80 hover:text-[#0F2942]'
+          }`}
+        >
+          <span className="flex items-center gap-2.5">
+            <CalendarCheck2 className="w-4 h-4" />
+            <span>الحجوزات ({bookings.length})</span>
+          </span>
+          {preAlertBookings.length > 0 && (
+            <span
+              className={`text-[11px] font-extrabold px-2 py-0.5 rounded-md ${
+                view === 'bookings'
+                  ? 'bg-[#0D9488] text-white'
+                  : 'bg-amber-100 text-amber-900'
+              }`}
+            >
+              {preAlertBookings.length} جديد
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => selectView('profile')}
+          className={`w-full text-right px-3.5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2.5 transition-colors ${
+            view === 'profile'
+              ? 'bg-[#0F2942] text-white'
+              : 'text-slate-600 hover:bg-slate-100/80 hover:text-[#0F2942]'
+          }`}
+        >
+          <Settings className="w-4 h-4" />
+          <span>معلومات الوكالة</span>
+        </button>
+      </nav>
+
+      <div className="pt-3 border-t border-slate-100 space-y-1">
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="w-full text-right px-3.5 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50 rounded-xl flex items-center gap-2"
+        >
+          <LogOut className="w-4 h-4" />
+          <span>تسجيل الخروج</span>
+        </button>
+      </div>
+    </>
+  );
+
+  const unreadNotificationsCount = preAlertBookings.length + verifiedBookings.length;
+
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 flex flex-col lg:flex-row gap-6" dir="rtl">
-      {/* Sidebar */}
-      <aside className="w-full lg:w-64 shrink-0 bg-white rounded-2xl border border-slate-200/90 p-4 flex flex-col gap-4 self-start">
-        <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
-          <div className="w-10 h-10 rounded-xl bg-[#2563EB] text-white font-bold flex items-center justify-center shrink-0">
-            <Building2 className="w-5 h-5" />
-          </div>
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5 sm:py-8 space-y-6" dir="rtl">
+      {/* Screen 6: Clean Top Header with Hamburger Trigger, Agency Name & Notification Bell */}
+      <header className="bg-white rounded-2xl border border-slate-200/80 shadow-sm px-4 py-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(true)}
+            aria-label="فتح قائمة الوكالة"
+            className="min-h-[44px] min-w-[44px] rounded-xl bg-[#0F2942] text-white flex items-center justify-center shrink-0 hover:bg-[#173B5E] transition-colors"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
           <div className="min-w-0">
-            <p className="text-xs text-slate-500">بوابة الوكالات</p>
-            <p className="font-bold text-slate-900 truncate">{agency.name}</p>
+            <div className="text-[11px] font-semibold text-slate-500">
+              {view === 'dashboard' && 'بوابة الوكالات · الرئيسية'}
+              {view === 'cars' && `أسطول السيارات (${cars.length})`}
+              {view === 'bookings' && `الطلبات والحجوزات (${bookings.length})`}
+              {view === 'profile' && 'إعدادات الوكالة'}
+            </div>
+            <div className="text-base font-extrabold text-[#0F2942] truncate">{agency.name}</div>
           </div>
         </div>
 
-        <nav className="space-y-1">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
-            onClick={() => setView('dashboard')}
-            className={`w-full text-right px-3.5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2.5 transition-colors ${
-              view === 'dashboard'
-                ? 'bg-blue-50 text-[#2563EB]'
-                : 'text-slate-600 hover:bg-slate-50'
-            }`}
+            disabled={refreshing}
+            onClick={() => refreshAgencyData(sessionCreds)}
+            aria-label="تحديث البيانات"
+            className="min-h-[42px] min-w-[42px] rounded-xl border border-slate-200 bg-[#F4F6F9] hover:bg-slate-200/70 text-[#0F2942] flex items-center justify-center transition-colors"
           >
-            <Home className="w-4 h-4" />
-            <span>الرئيسية</span>
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
 
           <button
             type="button"
-            onClick={() => setView('cars')}
-            className={`w-full text-right px-3.5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2.5 transition-colors ${
-              view === 'cars'
-                ? 'bg-blue-50 text-[#2563EB]'
-                : 'text-slate-600 hover:bg-slate-50'
-            }`}
+            onClick={() => selectView('bookings')}
+            aria-label="تنبيهات الحجوزات"
+            className="relative min-h-[42px] min-w-[42px] rounded-xl border border-slate-200 bg-[#F4F6F9] hover:bg-slate-200/70 text-[#0F2942] flex items-center justify-center transition-colors"
           >
-            <CarFront className="w-4 h-4" />
-            <span>أسطول السيارات ({cars.length})</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setView('bookings')}
-            className={`w-full text-right px-3.5 py-2.5 rounded-xl text-sm font-semibold flex items-center justify-between gap-2 transition-colors ${
-              view === 'bookings'
-                ? 'bg-blue-50 text-[#2563EB]'
-                : 'text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <span className="flex items-center gap-2.5">
-              <CalendarCheck2 className="w-4 h-4" />
-              <span>الحجوزات ({bookings.length})</span>
-            </span>
-            {preAlertBookings.length > 0 && (
-              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
-                {preAlertBookings.length} جديد
+            <Bell className="w-4 h-4" />
+            {unreadNotificationsCount > 0 && (
+              <span className="absolute -top-1.5 -left-1.5 min-w-[20px] h-5 px-1 rounded-full bg-[#0D9488] text-white text-[10px] font-extrabold flex items-center justify-center font-mono-tabular shadow-sm">
+                {unreadNotificationsCount}
               </span>
             )}
           </button>
-
-          <button
-            type="button"
-            onClick={() => setView('profile')}
-            className={`w-full text-right px-3.5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2.5 transition-colors ${
-              view === 'profile'
-                ? 'bg-blue-50 text-[#2563EB]'
-                : 'text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <Settings className="w-4 h-4" />
-            <span>معلومات الوكالة</span>
-          </button>
-        </nav>
-
-        <div className="pt-3 border-t border-slate-100 space-y-1">
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="w-full text-right px-3.5 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-xl flex items-center gap-2"
-          >
-            <LogOut className="w-4 h-4" />
-            <span>تسجيل الخروج</span>
-          </button>
         </div>
-      </aside>
+      </header>
+
+      {/* Collapsible Sidebar Drawer (all viewports, zero permanent wasted space) */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-[#0F2942]/55 backdrop-blur-xs flex"
+          onClick={() => setMobileMenuOpen(false)}
+          dir="rtl"
+        >
+          <aside
+            className="w-76 max-w-[85vw] h-full bg-white shadow-2xl p-5 flex flex-col gap-5 overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-400">قائمة إدارة الوكالة</span>
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(false)}
+                aria-label="إغلاق القائمة"
+                className="min-h-[40px] min-w-[40px] rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            {navContent}
+          </aside>
+        </div>
+      )}
 
       {/* Main Content */}
-      <main className="flex-1 min-w-0 space-y-6">
+      <main className="min-w-0 space-y-6">
         {agency.verification_status === 'pending' && (
-          <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-900">
+          <div className="rounded-2xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs sm:text-sm text-amber-900">
             حساب وكالتك قيد المراجعة والتوثيق من طرف مدير المنصة. يمكنك إضافة سياراتك الاقتصادية من الكتالوج وتعديل أسعارها الآن، وستظهر للعملاء فور التوثيق.
           </div>
         )}
 
         {agency.verification_status === 'suspended' && (
-          <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-800">
+          <div className="rounded-2xl bg-red-50 border border-red-200 px-4 py-3 text-xs sm:text-sm text-red-800">
             تم إيقاف ظهور سيارات هذه الوكالة مؤقتاً من طرف الإدارة. تواصل مع إدارة المنصة لمزيد من التفاصيل.
           </div>
         )}
 
         {(agency.strike_count ?? 0) > 0 && (
-          <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs sm:text-sm text-amber-900 flex items-center gap-2">
+          <div className="rounded-2xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs sm:text-sm text-amber-900 flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0" />
             <span>
               مؤشر الالتزام: سُجّل على وكالتك <strong>{agency.strike_count}</strong> حالة عدم توفر/تحويل طلب. الالتزام بالحجوزات المؤكدة يحمي حسابك من الإيقاف المؤقت.
@@ -430,59 +525,84 @@ export const AgencyPortal: React.FC<AgencyPortalProps> = ({ onGoToCustomer }) =>
         )}
 
         {view === 'dashboard' && (
-          <div className="space-y-6">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <div className="text-xs text-slate-400 mb-0.5">بوابة الوكالات / الرئيسية</div>
-                <h1 className="text-2xl font-bold text-slate-900">مرحباً، {agency.name}</h1>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {getCityLabelAr(agency.city)} · <span dir="ltr">{agency.phone}</span> · بدون ضمان (0 DH)
-                </p>
+          <div className="space-y-5">
+            {/* Welcoming Hero Section */}
+            <section className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-1.5">
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0F2942]">
+                  مرحباً، {agency.name}
+                </h1>
+                <div className="flex flex-wrap items-center gap-3 text-xs sm:text-sm text-slate-600">
+                  <span className="inline-flex items-center gap-1 font-semibold text-[#0F2942]">
+                    <MapPin className="w-4 h-4 text-[#0D9488]" />
+                    <span>{getCityLabelAr(agency.city)}</span>
+                  </span>
+                  <span className="text-slate-300" aria-hidden="true">·</span>
+                  <span className="inline-flex items-center gap-1 font-bold text-[#0D9488]">
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>ضمان 0 DH (بدون كفالة)</span>
+                  </span>
+                </div>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  disabled={refreshing}
-                  onClick={() => refreshAgencyData(sessionCreds)}
-                  className="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 px-3 py-2 text-xs font-bold transition-colors flex items-center gap-1.5"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-                  <span>تحديث</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setView('cars')}
-                  className="rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-4 py-2 text-xs font-bold transition-colors flex items-center gap-1.5"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>إدارة الأسطول</span>
-                </button>
-              </div>
-            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="bg-white p-5 rounded-2xl border border-slate-200/80">
-                <p className="text-xs text-slate-500 font-medium">الحجوزات المؤكدة لليوم</p>
-                <p className="text-2xl sm:text-3xl font-bold text-slate-900 mt-1 font-mono-tabular">
-                  {todayConfirmedCount}
-                </p>
-                <p className="text-xs text-slate-400 mt-1 font-mono-tabular">
-                  جاهز للتسليم: {verifiedBookings.length}
-                </p>
-              </div>
-              <div className="bg-white p-5 rounded-2xl border border-slate-200/80">
-                <p className="text-xs text-slate-500 font-medium">السيارات المتاحة</p>
-                <p className="text-2xl sm:text-3xl font-bold text-slate-900 mt-1 font-mono-tabular">
-                  {availableCarsCount} / {cars.length}
-                </p>
-              </div>
-              <div className="bg-white p-5 rounded-2xl border border-slate-200/80">
-                <p className="text-xs text-slate-500 font-medium">يُستخلص مباشرة عند التسليم (90%)</p>
-                <p className="text-2xl sm:text-3xl font-bold text-[#2563EB] mt-1 font-mono-tabular">
+              <div className="rounded-2xl bg-[#F4F6F9] px-4 py-3 shrink-0">
+                <div className="text-[11px] font-semibold text-slate-500">
+                  يُستخلص عند التسليم (90%)
+                </div>
+                <div className="text-xl font-extrabold text-[#0F2942] font-mono-tabular">
                   {formatDH(totalPayoutExpected)}
-                </p>
+                </div>
               </div>
-            </div>
+            </section>
+
+            {/* Dashboard Stats Grid (2 Modern Stat Cards) */}
+            <section className="grid grid-cols-1 sm:grid-cols-2 gap-4" aria-label="إحصائيات الوكالة">
+              {/* Card 1: Confirmed Bookings Today (Soft Blue) */}
+              <div className="rounded-2xl bg-blue-50/90 border border-blue-200/75 p-5 shadow-xs flex items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <p className="text-xs sm:text-sm font-bold text-[#0F2942]/80">
+                    الحجوزات المؤكدة اليوم
+                  </p>
+                  <p className="text-3xl sm:text-4xl font-extrabold text-[#0F2942] font-mono-tabular leading-none pt-1">
+                    {todayConfirmedCount}
+                  </p>
+                  <p className="text-xs font-semibold text-blue-800/80 pt-1">
+                    جاهز للتسليم الآن: <span className="font-mono-tabular">{verifiedBookings.length}</span>
+                  </p>
+                </div>
+                <div className="w-12 h-12 rounded-2xl bg-white text-[#0F2942] shadow-xs flex items-center justify-center shrink-0">
+                  <Calendar className="w-6 h-6" />
+                </div>
+              </div>
+
+              {/* Card 2: Available Cars (Soft Green/Teal) */}
+              <div className="rounded-2xl bg-teal-50/90 border border-teal-200/75 p-5 shadow-xs flex items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <p className="text-xs sm:text-sm font-bold text-[#0F2942]/80">
+                    السيارات المتاحة
+                  </p>
+                  <p className="text-3xl sm:text-4xl font-extrabold text-[#0F766E] font-mono-tabular leading-none pt-1" dir="ltr">
+                    {availableCarsCount} / {cars.length}
+                  </p>
+                  <p className="text-xs font-semibold text-[#0F766E]/80 pt-1">
+                    نشطة وظاهرة للعملاء في {getCityLabelAr(agency.city)}
+                  </p>
+                </div>
+                <div className="w-12 h-12 rounded-2xl bg-white text-[#0D9488] shadow-xs flex items-center justify-center shrink-0">
+                  <CarFront className="w-6 h-6" />
+                </div>
+              </div>
+            </section>
+
+            {/* Full-Width Primary Button for Manage Fleet */}
+            <button
+              type="button"
+              onClick={() => selectView('cars')}
+              className="w-full min-h-[52px] rounded-2xl bg-[#0D9488] hover:bg-[#0F766E] active:scale-[0.99] text-white px-6 py-3.5 text-sm sm:text-base font-extrabold transition-all flex items-center justify-center gap-2 shadow-md shadow-teal-600/20"
+            >
+              <CarFront className="w-5 h-5" />
+              <span>إدارة الأسطول</span>
+            </button>
 
             <AgencyBookingsManager
               creds={sessionCreds}
@@ -679,7 +799,7 @@ const AgencyPhoneAuthView: React.FC<{
               setError(null);
             }}
             className={`py-2 text-xs font-bold rounded-lg transition-colors ${
-              mode === 'login' ? 'bg-white text-[#2563EB] shadow-sm' : 'text-slate-600'
+              mode === 'login' ? 'bg-white text-[#0F2942] shadow-sm' : 'text-slate-600'
             }`}
           >
             تسجيل الدخول
@@ -692,7 +812,7 @@ const AgencyPhoneAuthView: React.FC<{
               setShowForgotPin(false);
             }}
             className={`py-2 text-xs font-bold rounded-lg transition-colors ${
-              mode === 'register' ? 'bg-white text-[#2563EB] shadow-sm' : 'text-slate-600'
+              mode === 'register' ? 'bg-white text-[#0F2942] shadow-sm' : 'text-slate-600'
             }`}
           >
             تسجيل وكالة جديدة
@@ -717,7 +837,7 @@ const AgencyPhoneAuthView: React.FC<{
                 placeholder="مثال: أطلس كار الدار البيضاء"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full min-h-[44px] rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:border-[#2563EB] focus:outline-none"
+                className="w-full min-h-[44px] rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:border-[#0D9488] focus:outline-none"
               />
             </div>
           )}
@@ -735,7 +855,7 @@ const AgencyPhoneAuthView: React.FC<{
                 placeholder="0612345678"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className="w-full min-h-[44px] rounded-xl border border-slate-200 pr-9 pl-3.5 py-2.5 text-sm font-mono focus:border-[#2563EB] focus:outline-none"
+                className="w-full min-h-[44px] rounded-xl border border-slate-200 pr-9 pl-3.5 py-2.5 text-sm font-mono focus:border-[#0D9488] focus:outline-none"
               />
             </div>
           </div>
@@ -749,7 +869,7 @@ const AgencyPhoneAuthView: React.FC<{
                 <select
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
-                  className="w-full min-h-[44px] rounded-xl border border-slate-200 px-3 py-2.5 text-sm bg-white focus:border-[#2563EB] focus:outline-none"
+                  className="w-full min-h-[44px] rounded-xl border border-slate-200 px-3 py-2.5 text-sm bg-white focus:border-[#0D9488] focus:outline-none"
                 >
                   {MOROCCAN_CITIES.map((c) => (
                     <option key={c.slug} value={c.nameFr}>
@@ -787,7 +907,7 @@ const AgencyPhoneAuthView: React.FC<{
                 <button
                   type="button"
                   onClick={() => setShowForgotPin((v) => !v)}
-                  className="text-xs font-semibold text-[#2563EB] hover:underline"
+                  className="text-xs font-semibold text-[#0F2942] hover:underline"
                 >
                   نسيت الرمز السري؟
                 </button>
@@ -803,7 +923,7 @@ const AgencyPhoneAuthView: React.FC<{
                 placeholder="••••"
                 value={pin}
                 onChange={(e) => setPin(e.target.value)}
-                className="w-full min-h-[44px] rounded-xl border border-slate-200 pr-9 pl-10 py-2.5 text-sm font-mono focus:border-[#2563EB] focus:outline-none"
+                className="w-full min-h-[44px] rounded-xl border border-slate-200 pr-9 pl-10 py-2.5 text-sm font-mono focus:border-[#0D9488] focus:outline-none"
               />
               <button
                 type="button"
@@ -817,7 +937,7 @@ const AgencyPhoneAuthView: React.FC<{
             {mode === 'login' && showForgotPin && (
               <div className="mt-2.5 rounded-xl border border-blue-200 bg-blue-50/70 p-3 text-xs text-slate-700 space-y-1 leading-relaxed">
                 <div className="font-bold text-slate-900 flex items-center gap-1.5">
-                  <KeyRound className="w-3.5 h-3.5 text-[#2563EB]" />
+                  <KeyRound className="w-3.5 h-3.5 text-[#0F2942]" />
                   <span>استرجاع حساب الوكالة برقم الهاتف</span>
                 </div>
                 <p>
@@ -833,11 +953,11 @@ const AgencyPhoneAuthView: React.FC<{
                 type="checkbox"
                 checked={termsAccepted}
                 onChange={(e) => setTermsAccepted(e.target.checked)}
-                className="mt-1 w-4 h-4 rounded border-slate-300 text-[#2563EB] focus:ring-[#2563EB] shrink-0"
+                className="mt-1 w-4 h-4 rounded border-slate-300 text-[#0F2942] focus:ring-[#0D9488] shrink-0"
               />
               <span className="text-xs text-slate-800 leading-relaxed space-y-1 block">
                 <span className="font-bold text-slate-900 flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-[#2563EB]" />
+                  <ShieldCheck className="w-3.5 h-3.5 text-[#0F2942]" />
                   الإقرار الإلزامي للانضمام إلى المنصة:
                 </span>
                 <span className="block">
@@ -853,7 +973,7 @@ const AgencyPhoneAuthView: React.FC<{
           <button
             type="submit"
             disabled={loading}
-            className="w-full min-h-[46px] rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] disabled:opacity-65 text-white py-3 font-bold text-sm transition-colors flex items-center justify-center gap-2"
+            className="w-full min-h-[46px] rounded-xl bg-[#0D9488] hover:bg-[#0F766E] disabled:opacity-65 text-white py-3 font-bold text-sm transition-colors flex items-center justify-center gap-2"
           >
             {loading && <Loader2 className="w-4 h-4 animate-spin" />}
             <span>{mode === 'login' ? 'تسجيل الدخول' : 'تسجيل الوكالة والدخول مباشرة'}</span>
@@ -1041,7 +1161,7 @@ const AgencyFleetManager: React.FC<{
             if (!selectedModel && catalog.length > 0) handleSelectCatalogModel(catalog[0]);
             setShowAddForm(!showAddForm);
           }}
-          className="inline-flex items-center gap-2 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-4 py-2.5 text-sm font-bold transition-colors"
+          className="inline-flex items-center gap-2 rounded-xl bg-[#0D9488] hover:bg-[#0F766E] text-white px-4 py-2.5 text-sm font-bold transition-colors"
         >
           <Plus className="w-4 h-4" />
           <span>إضافة سيارة من الكتالوج</span>
@@ -1072,7 +1192,7 @@ const AgencyFleetManager: React.FC<{
                 onClick={() => setSelectedBrand('all')}
                 className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap ${
                   selectedBrand === 'all'
-                    ? 'bg-[#2563EB] text-white'
+                    ? 'bg-[#0F2942] text-white'
                     : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                 }`}
               >
@@ -1085,7 +1205,7 @@ const AgencyFleetManager: React.FC<{
                   onClick={() => setSelectedBrand(brand)}
                   className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap ${
                     selectedBrand === brand
-                      ? 'bg-[#2563EB] text-white'
+                      ? 'bg-[#0F2942] text-white'
                       : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                   }`}
                 >
@@ -1105,7 +1225,7 @@ const AgencyFleetManager: React.FC<{
                   onClick={() => handleSelectCatalogModel(item)}
                   className={`text-right rounded-xl border overflow-hidden transition-all flex flex-col ${
                     active
-                      ? 'border-[#2563EB] ring-2 ring-[#2563EB]/25 bg-blue-50/40'
+                      ? 'border-[#0D9488] ring-2 ring-[#0D9488]/25 bg-teal-50/40'
                       : 'border-slate-200 bg-white hover:border-slate-300'
                   }`}
                 >
@@ -1229,7 +1349,7 @@ const AgencyFleetManager: React.FC<{
             <button
               type="submit"
               disabled={saving || !selectedModel}
-              className="rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] disabled:opacity-60 text-white px-5 py-2.5 text-sm font-bold flex items-center gap-2"
+              className="rounded-xl bg-[#0D9488] hover:bg-[#0F766E] disabled:opacity-60 text-white px-5 py-2.5 text-sm font-bold flex items-center gap-2"
             >
               {saving && <Loader2 className="w-4 h-4 animate-spin" />}
               <span>نشر السيارة في أسطولي</span>
@@ -1249,7 +1369,7 @@ const AgencyFleetManager: React.FC<{
             <button
               type="button"
               onClick={() => setShowAddForm(true)}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-4 py-2 text-xs font-bold transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[#0D9488] hover:bg-[#0F766E] text-white px-4 py-2 text-xs font-bold transition-colors"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>إضافة سيارة الآن</span>
@@ -1298,14 +1418,14 @@ const AgencyFleetManager: React.FC<{
                           min={1}
                           value={priceDraft}
                           onChange={(e) => setPriceDraft(Number(e.target.value))}
-                          className="w-28 rounded-lg border border-[#2563EB] px-2.5 py-1 text-sm font-mono-tabular focus:outline-none"
+                          className="w-28 rounded-lg border border-[#0D9488] px-2.5 py-1 text-sm font-mono-tabular focus:outline-none"
                         />
                         <span className="text-xs text-slate-500">DH</span>
                         <button
                           type="button"
                           disabled={isBusy}
                           onClick={() => handleSavePrice(car.id)}
-                          className="p-1.5 rounded-lg bg-[#2563EB] text-white hover:bg-[#1D4ED8]"
+                          className="p-1.5 rounded-lg bg-[#0D9488] text-white hover:bg-[#0F766E]"
                           aria-label="حفظ السعر"
                         >
                           <Check className="w-3.5 h-3.5" />
@@ -1321,7 +1441,7 @@ const AgencyFleetManager: React.FC<{
                       </div>
                     ) : (
                       <div className="flex items-center justify-between">
-                        <div className="font-mono-tabular font-bold text-sm text-[#2563EB]">
+                        <div className="font-mono-tabular font-bold text-sm text-[#0F2942]">
                           {formatDH(car.daily_price)} / يوم
                         </div>
                         <button
@@ -1330,7 +1450,7 @@ const AgencyFleetManager: React.FC<{
                             setEditingPriceId(car.id);
                             setPriceDraft(car.daily_price);
                           }}
-                          className="text-xs font-semibold text-slate-600 hover:text-[#2563EB] inline-flex items-center gap-1"
+                          className="text-xs font-semibold text-slate-600 hover:text-[#0F2942] inline-flex items-center gap-1"
                         >
                           <Pencil className="w-3 h-3" />
                           <span>تعديل السعر</span>
@@ -1495,7 +1615,7 @@ const AgencyBookingsManager: React.FC<{
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">{title}</h2>
+          <h2 className="text-lg sm:text-xl font-extrabold text-[#0F2942]">{title}</h2>
           <p className="text-xs text-slate-500 mt-0.5">
             تُحجب بيانات العميل أثناء مراجعة الوصل وتُكشف فور تأكيد الدفع · تحصّل 90% عند التسليم (بدون ضمان)
           </p>
@@ -1504,7 +1624,7 @@ const AgencyBookingsManager: React.FC<{
         <button
           type="button"
           onClick={onRefresh}
-          className="self-start sm:self-auto rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 px-3 py-1.5 text-xs font-bold inline-flex items-center gap-1.5"
+          className="self-start sm:self-auto rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-[#0F2942] px-3.5 py-2 text-xs font-bold inline-flex items-center gap-1.5 shadow-xs"
         >
           <RefreshCw className="w-3.5 h-3.5" />
           <span>تحديث الطلبات</span>
@@ -1536,8 +1656,8 @@ const AgencyBookingsManager: React.FC<{
               onClick={() => setStatusFilter(f.key)}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
                 statusFilter === f.key
-                  ? 'bg-[#2563EB] text-white'
-                  : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900'
+                  ? 'bg-[#0F2942] text-white'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:text-[#0F2942]'
               }`}
             >
               {f.label}
@@ -1553,15 +1673,19 @@ const AgencyBookingsManager: React.FC<{
       )}
 
       {filteredBookings.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-10 text-center text-sm text-slate-500">
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-10 text-center text-sm text-slate-500">
           لا توجد طلبات أو حجوزات في هذه القائمة حالياً.
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {filteredBookings.map((b) => {
             const isMaskedPreAlert = b.status === 'payment_uploaded';
             const isMaskedClosed = ['refund_requested', 'refunded', 'cancelled'].includes(b.status);
             const hidePii = isMaskedPreAlert || isMaskedClosed;
+            const hasUrgentAlert =
+              Boolean(b.dispute_flag) || b.agency_ack_status === 'unavailable';
+            const isMissedPickup = b.dispute_flag === 'customer_no_show';
+
             const formattedDelivery = (() => {
               const dt = new Date(b.delivery_at);
               return Number.isNaN(dt.getTime())
@@ -1575,215 +1699,241 @@ const AgencyBookingsManager: React.FC<{
             })();
 
             return (
-              <div
+              <article
                 key={b.id}
-                className={`bg-white rounded-2xl border p-4 sm:p-5 space-y-3 transition-colors ${
-                  isMaskedPreAlert
-                    ? 'border-amber-200 bg-amber-50/20'
-                    : b.agency_ack_status === 'unavailable'
-                      ? 'border-red-200'
-                      : 'border-slate-200/80 hover:border-slate-300/80'
+                className={`bg-white rounded-2xl overflow-hidden transition-all ${
+                  hasUrgentAlert
+                    ? 'border-2 border-red-500 shadow-md shadow-red-500/10'
+                    : isMaskedPreAlert
+                      ? 'border-2 border-amber-300 shadow-sm'
+                      : 'border border-slate-200/90 shadow-sm hover:border-[#0F2942]/30'
                 }`}
               >
-                <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                  <div className="space-y-1.5 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-mono-tabular text-xs font-bold text-slate-500">
-                        {b.booking_code}
+                {/* Striking Red Alert Banner for Missed Pickup / Urgent Disputes */}
+                {hasUrgentAlert && (
+                  <div className="bg-red-600 text-white px-4 py-2 flex items-center justify-between gap-2 text-xs font-extrabold">
+                    <span className="flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 shrink-0" />
+                      <span>
+                        {isMissedPickup
+                          ? 'تنبيه عاجل: تغيب العميل عن موعد استلام السيارة'
+                          : b.dispute_flag === 'invalid_license'
+                            ? 'تنبيه عاجل: رخصة العميل غير مطابقة (أقل من سنتين)'
+                            : 'تم الإبلاغ عن عدم توفر السيارة — بانتظار التحويل'}
                       </span>
-                      <span className="text-slate-300">·</span>
-                      <span className="font-bold text-slate-900">
-                        {b.car_brand} {b.car_model}
-                      </span>
-                      {isMaskedPreAlert ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-900 px-2.5 py-0.5 text-[11px] font-bold">
-                          <Clock className="w-3 h-3" />
-                          <span>قيد مراجعة الوصل (بيانات محجوبة)</span>
-                        </span>
-                      ) : b.status === 'payment_verified' ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-800 px-2.5 py-0.5 text-[11px] font-bold">
-                          <CheckCircle2 className="w-3 h-3" />
-                          <span>دفع مؤكد — جاهز للتسليم</span>
-                        </span>
-                      ) : b.status === 'car_delivered' || b.status === 'completed' ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 text-slate-800 px-2.5 py-0.5 text-[11px] font-bold">
-                          <CheckCircle2 className="w-3 h-3" />
-                          <span>تم تسليم السيارة</span>
-                        </span>
-                      ) : b.status === 'refund_requested' ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-red-100 text-red-800 px-2.5 py-0.5 text-[11px] font-bold">
-                          <span>طلب استرجاع</span>
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 text-slate-600 px-2.5 py-0.5 text-[11px] font-bold">
-                          <span>ملغى / مسترجع</span>
-                        </span>
-                      )}
+                    </span>
+                    <span className="font-mono-tabular text-[11px] bg-white/20 px-2 py-0.5 rounded">
+                      {b.booking_code}
+                    </span>
+                  </div>
+                )}
 
-                      {b.reassigned_at && (
-                        <span className="rounded-full bg-blue-100 text-[#2563EB] px-2.5 py-0.5 text-[11px] font-bold">
-                          حجز محوّل إليكم من الإدارة
+                <div className="p-4 sm:p-5 space-y-4">
+                  {/* TOP CRITICAL INFO BAR: Car + Delivery Time + 90% Payout */}
+                  <div className="flex flex-wrap items-start justify-between gap-3 pb-3.5 border-b border-slate-100">
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-base sm:text-lg font-extrabold text-[#0F2942]">
+                          {b.car_brand} {b.car_model}
+                        </h3>
+                        <span className="font-mono-tabular text-xs font-bold text-slate-500 bg-[#F4F6F9] px-2 py-0.5 rounded-md">
+                          {b.booking_code}
                         </span>
-                      )}
+                        {b.reassigned_at && (
+                          <span className="rounded-md bg-[#0F2942]/10 text-[#0F2942] px-2 py-0.5 text-[11px] font-bold">
+                            حجز محوّل إليكم
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2.5 text-xs text-slate-600">
+                        <span className="font-bold text-[#0F2942]">{formattedDelivery}</span>
+                        <span className="text-slate-300">·</span>
+                        <span>{b.days} أيام</span>
+                        <span className="text-slate-300">·</span>
+                        {isMaskedPreAlert ? (
+                          <span className="inline-flex items-center gap-1 text-amber-800 font-bold">
+                            <Clock className="w-3.5 h-3.5 text-amber-600" />
+                            <span>بانتظار تأكيد التوفر</span>
+                          </span>
+                        ) : b.status === 'payment_verified' ? (
+                          <span className="inline-flex items-center gap-1 text-[#0D9488] font-extrabold">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>دفع مؤكد — جاهز للتسليم</span>
+                          </span>
+                        ) : b.status === 'car_delivered' || b.status === 'completed' ? (
+                          <span className="inline-flex items-center gap-1 text-[#0F2942] font-bold">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-[#0D9488]" />
+                            <span>تم تسليم السيارة</span>
+                          </span>
+                        ) : b.status === 'refund_requested' ? (
+                          <span className="text-red-700 font-bold">طلب استرجاع</span>
+                        ) : (
+                          <span className="text-slate-500 font-semibold">ملغى / مسترجع</span>
+                        )}
+                      </div>
                     </div>
 
-                    {hidePii ? (
-                      <div className="rounded-xl bg-white border border-amber-200/80 px-3 py-2 text-xs text-slate-700 flex items-center gap-2">
-                        <Lock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                        <span>
-                          {isMaskedPreAlert
-                            ? 'هاتف العميل ووثائقه محجوبة مؤقتاً لحماية العمولة، وستظهر فور تأكيد الإدارة لوصل التسبيق. يرجى تأكيد توفر السيارة الآن.'
-                            : 'تم إغلاق أو إلغاء هذا الطلب ولا تظهر بيانات العميل الشخصية.'}
-                        </span>
+                    {/* Prominent Payout at Pickup */}
+                    <div className="rounded-xl bg-[#F4F6F9] px-3.5 py-2 text-right sm:text-left shrink-0">
+                      <div className="text-[11px] font-semibold text-slate-500">
+                        يُحصّل عند التسليم (90%)
                       </div>
-                    ) : (
-                      <div className="text-xs text-slate-600">
-                        العميل: <span className="font-semibold text-slate-900">{b.customer_name}</span> · الهاتف:{' '}
+                      <div className="text-lg font-extrabold text-[#0F2942] font-mono-tabular">
+                        {formatDH(b.agency_payout_amount)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Customer Info / PII Privacy Mask */}
+                  {hidePii ? (
+                    <div className="rounded-xl bg-amber-50/60 border border-amber-200/80 px-3.5 py-2.5 text-xs text-slate-700 flex items-center gap-2">
+                      <Lock className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span>
+                        {isMaskedPreAlert
+                          ? 'بيانات العميل محجوبة مؤقتاً لحماية العمولة وتُكشف فور تأكيد الإدارة لوصل التسبيق. يرجى تأكيد توفر السيارة الآن.'
+                          : 'تم إغلاق أو إلغاء هذا الطلب ولا تظهر بيانات العميل الشخصية.'}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-600 bg-[#F4F6F9] rounded-xl p-3">
+                      <div>
+                        العميل:{' '}
+                        <strong className="text-[#0F2942] text-sm">{b.customer_name}</strong>
+                      </div>
+                      <div>
+                        الهاتف:{' '}
                         <a
                           href={`tel:${b.customer_phone}`}
                           dir="ltr"
-                          className="font-mono font-bold text-[#2563EB] hover:underline"
+                          className="font-mono font-extrabold text-[#0D9488] hover:underline"
                         >
                           {b.customer_phone}
-                        </a>{' '}
-                        · CIN: <span className="font-mono">{b.customer_cin}</span>
-                        {b.customer_license_number && (
-                          <>
-                            {' '}
-                            · الرخصة: <span className="font-mono">{b.customer_license_number}</span>
-                          </>
-                        )}
+                        </a>
                       </div>
-                    )}
-
-                    <div className="text-xs text-slate-600 flex flex-wrap items-center gap-x-3 gap-y-1">
-                      <span>الاستلام: {formattedDelivery}</span>
+                      <div>
+                        البطاقة الوطنية: <span className="font-mono font-semibold text-[#0F2942]">{b.customer_cin}</span>
+                      </div>
+                      {b.customer_license_number && (
+                        <div>
+                          رخصة السياقة:{' '}
+                          <span className="font-mono font-semibold text-[#0F2942]">
+                            {b.customer_license_number}
+                          </span>
+                        </div>
+                      )}
                       {b.pickup_location && (
-                        <span>
-                          · {hidePii ? 'المدينة' : 'مكان التسليم'}:{' '}
-                          <strong className="text-slate-800">{b.pickup_location}</strong>
-                        </span>
+                        <div className="sm:col-span-2">
+                          مكان التسليم:{' '}
+                          <strong className="text-[#0F2942]">{b.pickup_location}</strong>
+                        </div>
                       )}
                     </div>
+                  )}
 
-                    <div className="text-xs text-slate-500">
-                      المدة: {b.days} أيام · المستحق عند التسليم (90%):{' '}
-                      <span className="font-mono-tabular font-bold text-slate-900">
-                        {formatDH(b.agency_payout_amount)}
-                      </span>{' '}
-                      · بدون ضمان (0 DH)
+                  {/* DISTINCT ACTION AREA */}
+                  {isMaskedPreAlert && (
+                    <div className="pt-1">
+                      {b.agency_ack_status === 'available' ? (
+                        <div className="text-xs font-extrabold text-[#0F766E] bg-teal-50 border border-teal-200 rounded-xl px-4 py-2.5 text-center">
+                          أكدتَ توفر السيارة — بانتظار اعتماد الإدارة لوصل العميل
+                        </div>
+                      ) : b.agency_ack_status === 'unavailable' ? (
+                        <div className="text-xs font-extrabold text-red-700 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5 text-center">
+                          أبلغتَ بعدم التوفر — سيتم تحويل الطلب لوكالة أخرى
+                        </div>
+                      ) : (
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                          <button
+                            type="button"
+                            disabled={busyId === b.id}
+                            onClick={() => handlePrecheck(b.id, 'available')}
+                            className="flex-1 min-h-[46px] rounded-xl bg-[#0D9488] hover:bg-[#0F766E] disabled:opacity-60 text-white px-4 py-2.5 text-sm font-extrabold transition-colors flex items-center justify-center gap-2 shadow-sm shadow-teal-600/20"
+                          >
+                            <Check className="w-4 h-4" />
+                            <span>السيارة متوفرة</span>
+                          </button>
+                          <button
+                            type="button"
+                            disabled={busyId === b.id}
+                            onClick={() => handlePrecheck(b.id, 'unavailable')}
+                            className="min-h-[46px] rounded-xl border border-red-200 bg-white hover:bg-red-50 disabled:opacity-60 text-red-700 px-4 py-2.5 text-xs sm:text-sm font-bold transition-colors flex items-center justify-center gap-1.5"
+                          >
+                            <Ban className="w-4 h-4" />
+                            <span>غير متوفرة</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
+                  )}
 
-                    {b.dispute_flag && (
-                      <div className="text-xs font-semibold text-red-700 bg-red-50 border border-red-200 rounded-lg px-2.5 py-1 inline-block">
-                        تم التبليغ للإدارة:{' '}
-                        {b.dispute_flag === 'invalid_license'
-                          ? 'رخصة العميل غير مطابقة (أقل من سنتين)'
-                          : 'تغيب العميل عن موعد التسليم'}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Right Actions Column */}
-                  <div className="flex flex-col items-stretch md:items-end gap-2 shrink-0">
-                    {isMaskedPreAlert && (
-                      <div className="space-y-1.5">
-                        {b.agency_ack_status === 'available' ? (
-                          <div className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 text-center">
-                            أكدتَ توفر السيارة — بانتظار اعتماد الإدارة
-                          </div>
-                        ) : b.agency_ack_status === 'unavailable' ? (
-                          <div className="text-xs font-bold text-red-700 bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-center">
-                            أبلغتَ بعدم التوفر — سيتم تحويل الطلب
-                          </div>
+                  {b.status === 'payment_verified' && (
+                    <div className="space-y-2.5 pt-1">
+                      {/* UNMISSABLE HANDOVER CAR BUTTON */}
+                      <button
+                        type="button"
+                        disabled={busyId === b.id}
+                        onClick={() => handleDeliverCar(b.id)}
+                        className="w-full min-h-[50px] rounded-xl bg-[#0D9488] hover:bg-[#0F766E] active:scale-[0.99] disabled:opacity-60 text-white px-5 py-3 text-sm sm:text-base font-extrabold transition-all flex items-center justify-center gap-2 shadow-md shadow-teal-600/25"
+                      >
+                        {busyId === b.id ? (
+                          <Loader2 className="w-5 h-5 animate-spin" />
                         ) : (
-                          <div className="flex flex-wrap items-center gap-2">
-                            <button
-                              type="button"
-                              disabled={busyId === b.id}
-                              onClick={() => handlePrecheck(b.id, 'available')}
-                              className="min-h-[38px] rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white px-3.5 py-1.5 text-xs font-bold transition-colors flex items-center gap-1.5"
-                            >
-                              <Check className="w-3.5 h-3.5" />
-                              <span>السيارة متوفرة</span>
-                            </button>
-                            <button
-                              type="button"
-                              disabled={busyId === b.id}
-                              onClick={() => handlePrecheck(b.id, 'unavailable')}
-                              className="min-h-[38px] rounded-xl border border-red-200 bg-white hover:bg-red-50 disabled:opacity-60 text-red-700 px-3 py-1.5 text-xs font-bold transition-colors flex items-center gap-1.5"
-                            >
-                              <Ban className="w-3.5 h-3.5" />
-                              <span>غير متوفرة</span>
-                            </button>
-                          </div>
+                          <CarFront className="w-5 h-5" />
                         )}
-                      </div>
-                    )}
+                        <span>{busyId === b.id ? 'جاري التأكيد...' : 'تم تسليم السيارة'}</span>
+                      </button>
 
-                    {b.status === 'payment_verified' && (
-                      <div className="space-y-2 w-full md:w-auto flex flex-col md:items-end">
-                        <button
-                          type="button"
-                          disabled={busyId === b.id}
-                          onClick={() => handleDeliverCar(b.id)}
-                          className="min-h-[40px] rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] disabled:opacity-60 text-white px-4 py-2 text-xs font-bold transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap"
-                        >
-                          {busyId === b.id && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                          <span>{busyId === b.id ? 'جاري التأكيد...' : 'تم تسليم السيارة للعميل'}</span>
-                        </button>
-
-                        {!b.dispute_flag && (
-                          <div className="text-left">
-                            {disputeOpenId === b.id ? (
-                              <div className="flex flex-wrap items-center gap-1.5 justify-end">
-                                <button
-                                  type="button"
-                                  disabled={busyId === b.id}
-                                  onClick={() => handleReportIssue(b.id, 'invalid_license')}
-                                  className="rounded-lg bg-red-50 border border-red-200 text-red-700 px-2.5 py-1 text-[11px] font-bold hover:bg-red-100"
-                                >
-                                  رخصة أقل من سنتين
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={busyId === b.id}
-                                  onClick={() => handleReportIssue(b.id, 'customer_no_show')}
-                                  className="rounded-lg bg-amber-50 border border-amber-200 text-amber-800 px-2.5 py-1 text-[11px] font-bold hover:bg-amber-100"
-                                >
-                                  تغيب العميل
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setDisputeOpenId(null)}
-                                  className="text-[11px] text-slate-500 px-1.5"
-                                >
-                                  إلغاء
-                                </button>
-                              </div>
-                            ) : (
+                      {!b.dispute_flag && (
+                        <div className="flex justify-center sm:justify-end">
+                          {disputeOpenId === b.id ? (
+                            <div className="flex flex-wrap items-center gap-2 justify-center sm:justify-end w-full pt-1">
                               <button
                                 type="button"
-                                onClick={() => setDisputeOpenId(b.id)}
-                                className="text-[11px] font-semibold text-slate-500 hover:text-red-600"
+                                disabled={busyId === b.id}
+                                onClick={() => handleReportIssue(b.id, 'customer_no_show')}
+                                className="rounded-xl bg-red-600 hover:bg-red-700 text-white px-3.5 py-2 text-xs font-extrabold transition-colors"
                               >
-                                مشكلة مع العميل؟ (رخصة غير مطابقة / تغيب)
+                                تغيب العميل
                               </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
+                              <button
+                                type="button"
+                                disabled={busyId === b.id}
+                                onClick={() => handleReportIssue(b.id, 'invalid_license')}
+                                className="rounded-xl bg-red-50 border border-red-200 text-red-700 px-3.5 py-2 text-xs font-bold hover:bg-red-100"
+                              >
+                                رخصة أقل من سنتين
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setDisputeOpenId(null)}
+                                className="text-xs font-semibold text-slate-500 px-2 py-1"
+                              >
+                                إلغاء
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setDisputeOpenId(b.id)}
+                              className="text-xs font-semibold text-slate-500 hover:text-red-600 transition-colors"
+                            >
+                              مشكلة عند التسليم؟ (تغيب العميل / رخصة غير مطابقة)
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
-                    {b.status === 'car_delivered' && (
-                      <span className="text-xs font-bold text-emerald-700 flex items-center gap-1">
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>تم تسليم السيارة</span>
-                      </span>
-                    )}
-                  </div>
+                  {b.status === 'car_delivered' && (
+                    <div className="rounded-xl bg-teal-50/70 border border-teal-200 px-4 py-2.5 text-xs font-extrabold text-[#0F766E] flex items-center justify-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-[#0D9488]" />
+                      <span>تم تسليم السيارة للعميل بنجاح</span>
+                    </div>
+                  )}
                 </div>
-              </div>
+              </article>
             );
           })}
         </div>
@@ -2018,7 +2168,7 @@ const AgencyProfileSettings: React.FC<{
         <button
           type="submit"
           disabled={saving}
-          className="rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-5 py-2.5 text-sm font-bold"
+          className="rounded-xl bg-[#0D9488] hover:bg-[#0F766E] text-white px-5 py-2.5 text-sm font-bold"
         >
           {saving ? 'جاري الحفظ...' : 'حفظ التغييرات'}
         </button>
@@ -2030,7 +2180,7 @@ const AgencyProfileSettings: React.FC<{
         className="bg-white rounded-2xl border border-slate-200/90 p-6 space-y-4"
       >
         <div className="flex items-start gap-2.5">
-          <KeyRound className="w-5 h-5 text-[#2563EB] shrink-0 mt-0.5" />
+          <KeyRound className="w-5 h-5 text-[#0F2942] shrink-0 mt-0.5" />
           <div>
             <h3 className="font-bold text-slate-900 text-base">تغيير الرمز السري (PIN)</h3>
             <p className="text-xs text-slate-500 mt-0.5">
@@ -2051,7 +2201,7 @@ const AgencyProfileSettings: React.FC<{
               placeholder="••••"
               value={currentPin}
               onChange={(e) => setCurrentPin(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-mono focus:border-[#2563EB] focus:outline-none"
+              className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-mono focus:border-[#0D9488] focus:outline-none"
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -2067,7 +2217,7 @@ const AgencyProfileSettings: React.FC<{
                 placeholder="••••"
                 value={newPin}
                 onChange={(e) => setNewPin(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-mono focus:border-[#2563EB] focus:outline-none"
+                className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-mono focus:border-[#0D9488] focus:outline-none"
               />
             </div>
             <div>
@@ -2082,7 +2232,7 @@ const AgencyProfileSettings: React.FC<{
                 placeholder="••••"
                 value={confirmNewPin}
                 onChange={(e) => setConfirmNewPin(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-mono focus:border-[#2563EB] focus:outline-none"
+                className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-mono focus:border-[#0D9488] focus:outline-none"
               />
             </div>
           </div>

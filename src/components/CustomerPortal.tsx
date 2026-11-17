@@ -3,12 +3,8 @@ import {
   MapPin,
   Search,
   CarFront,
-  Star,
-  Fuel,
-  Users,
-  Gauge,
   Calendar,
-  ArrowLeft,
+  Clock,
   ShieldCheck,
   ChevronDown,
 } from 'lucide-react';
@@ -19,21 +15,14 @@ import {
   resolveCatalogImage,
 } from '../data/starterData';
 import { BookingModal } from './BookingModal';
+import { CarOfferCard } from './CarOfferCard';
+import { CitySelector } from './CitySelector';
 import type { CarOffer, CreatedBooking } from '../types/karya';
 
 interface CustomerPortalProps {
   onBookingCreated: (booking: CreatedBooking) => void;
   onGoToAgency: () => void;
 }
-
-const POPULAR_CITIES = [
-  { cityFr: 'Casablanca', cityAr: 'الدار البيضاء', subtitle: 'التسليم داخل المدينة' },
-  { cityFr: 'Rabat', cityAr: 'الرباط', subtitle: 'التسليم داخل المدينة' },
-  { cityFr: 'Marrakech', cityAr: 'مراكش', subtitle: 'التسليم داخل المدينة' },
-  { cityFr: 'Tangier', cityAr: 'طنجة', subtitle: 'التسليم داخل المدينة' },
-  { cityFr: 'Fès', cityAr: 'فاس', subtitle: 'التسليم داخل المدينة' },
-  { cityFr: 'Agadir', cityAr: 'أكادير', subtitle: 'التسليم داخل المدينة' },
-];
 
 function getTodayLocalDate(): string {
   const now = new Date();
@@ -47,26 +36,9 @@ function getDefaultPickupDate(): string {
   return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
 }
 
-function getFuelLabel(fuel: CarOffer['fuel_type']): string {
-  if (fuel === 'diesel') return 'ديزل';
-  if (fuel === 'hybrid') return 'هجين';
-  if (fuel === 'electric') return 'كهرباء';
-  return 'بنزين';
-}
-
 function formatDays(d: number): string {
   if (d <= 10) return `${d} أيام`;
   return `${d} يومًا`;
-}
-
-function formatBookedUntil(iso?: string | null): string | null {
-  if (!iso) return null;
-  const dt = new Date(iso);
-  if (Number.isNaN(dt.getTime())) return null;
-  return dt.toLocaleDateString('ar-MA', {
-    day: 'numeric',
-    month: 'short',
-  });
 }
 
 export const CustomerPortal: React.FC<CustomerPortalProps> = ({
@@ -253,57 +225,65 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
   );
   const bookedFilteredCount = filteredCars.length - availableFilteredCount;
 
-  const inputBase =
-    'w-full min-h-[48px] rounded-xl bg-white px-3 py-2.5 text-sm font-semibold text-slate-900 shadow-lg ring-1 ring-black/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB] focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900';
+  const fieldClasses =
+    'w-full min-h-[50px] rounded-xl bg-[#F4F6F9] border border-slate-200 px-3.5 py-2.5 text-sm font-bold text-[#0F2942] transition-colors focus:bg-white focus:border-[#0D9488] focus:outline-none focus:ring-2 focus:ring-[#0D9488]/20';
 
   return (
-    <div dir="rtl" className="bg-slate-50/50 min-h-screen">
-      {/* ===================== HERO ===================== */}
-      <section className="relative w-full overflow-hidden bg-slate-900 min-h-[420px] sm:min-h-[460px] flex flex-col justify-end">
+    <div dir="rtl" className="bg-[#F4F6F9] min-h-screen">
+      {/* ===================== SCREEN 1: HERO ===================== */}
+      <section className="relative w-full overflow-hidden bg-[#0F2942] min-h-[340px] sm:min-h-[410px] flex flex-col justify-end pb-24 sm:pb-28">
         <img
           src={HERO_IMAGE_URL}
-          alt="سيارة كراء اقتصادية في المغرب"
+          alt="سيارة كراء في الطريق الساحلي المغربي"
           referrerPolicy="no-referrer"
           className="absolute inset-0 w-full h-full object-cover"
         />
         <div
-          className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/60 to-slate-950/20"
+          className="absolute inset-0 bg-gradient-to-t from-[#0F2942]/95 via-[#0F2942]/65 to-[#0F2942]/30"
           aria-hidden="true"
         />
 
-        <div className="relative z-10 w-full max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-6">
-          <div className="max-w-xl space-y-2.5">
-            <h1 className="text-2xl sm:text-4xl font-extrabold text-white leading-[1.2] [text-wrap:balance] drop-shadow-sm">
-              اكري سيارتك في مدينتك بدون ضمان
+        <div className="relative z-10 w-full max-w-6xl mx-auto px-4 sm:px-6 pt-10 space-y-3">
+          <div className="max-w-2xl space-y-2.5">
+            <h1 className="text-2xl sm:text-4xl font-extrabold text-white leading-[1.25] [text-wrap:balance]">
+              اكري سيارتك بالمغرب بدون ضمان وبأفضل سعر
             </h1>
-            <p className="text-slate-200 text-sm sm:text-base leading-relaxed">
-              سيارات اقتصادية من وكالات محلية ·{' '}
-              <span className="font-semibold text-white">0 درهم كفالة</span> · حد أدنى 3 أيام و
-              <span className="font-semibold text-white"> 10% تسبيق</span> فقط.
+            <p className="text-slate-200 text-sm sm:text-base leading-relaxed font-normal">
+              سيارات اقتصادية من وكالات محلية موثوقة ·{' '}
+              <span className="font-bold text-white">0 درهم كفالة</span> · تثبيت فوري بـ{' '}
+              <span className="font-bold text-white">10% تسبيق</span> فقط.
             </p>
           </div>
 
-          {/* Floating search form */}
-          <form
-            onSubmit={handleDiscoverClick}
-            className="grid grid-cols-2 sm:grid-cols-12 gap-3 items-end"
-            aria-label="بحث عن سيارة للإيجار"
-          >
-            {/* City */}
-            <div className="col-span-2 sm:col-span-5">
+          <p className="flex items-center gap-2 text-xs text-slate-200">
+            <ShieldCheck className="w-4 h-4 text-[#2DD4BF] shrink-0" aria-hidden="true" />
+            <span>يشترط أقدمية رخصة السياقة سنتين على الأقل · الحد الأدنى للكراء 3 أيام</span>
+          </p>
+        </div>
+      </section>
+
+      {/* ===================== OVERLAPPING SEARCH CARD ===================== */}
+      <div className="relative z-20 max-w-5xl mx-auto px-4 sm:px-6 -mt-16 sm:-mt-20">
+        <form
+          onSubmit={handleDiscoverClick}
+          className="bg-white rounded-2xl shadow-xl shadow-[#0F2942]/10 border border-slate-100 p-4 sm:p-6 space-y-4"
+          aria-label="بحث عن سيارة للإيجار"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+            <div>
               <label
                 htmlFor="hero-city-select"
-                className="block text-[11px] sm:text-xs font-semibold text-white/90 mb-1.5"
+                className="block text-xs font-bold text-[#0F2942] mb-1.5"
               >
-                اختر مدينتك
+                مدينة الاستلام
               </label>
               <div className="relative">
-                <MapPin className="w-4 h-4 text-[#2563EB] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <MapPin className="w-4 h-4 text-[#0D9488] absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <select
                   id="hero-city-select"
                   value={selectedCity}
                   onChange={(e) => setSelectedCity(e.target.value)}
-                  className={`${inputBase} appearance-none pr-9 pl-8`}
+                  className={`${fieldClasses} appearance-none pr-10 pl-8`}
                 >
                   {MOROCCAN_CITIES.map((city) => (
                     <option key={city.slug} value={city.nameFr}>
@@ -311,117 +291,83 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
                     </option>
                   ))}
                 </select>
-                <ChevronDown className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <ChevronDown className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
             </div>
 
-            {/* Date */}
-            <div className="col-span-2 sm:col-span-3">
+            <div>
               <label
                 htmlFor="hero-pickup-date"
-                className="block text-[11px] sm:text-xs font-semibold text-white/90 mb-1.5"
+                className="block text-xs font-bold text-[#0F2942] mb-1.5"
               >
                 تاريخ الاستلام
               </label>
               <div className="relative">
-                <Calendar className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none hidden sm:block" />
+                <Calendar className="w-4 h-4 text-[#0F2942]/60 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   id="hero-pickup-date"
                   type="date"
                   value={searchPickupDate}
                   min={getTodayLocalDate()}
                   onChange={(e) => setSearchPickupDate(e.target.value)}
-                  className={`${inputBase} text-xs sm:text-sm font-mono-tabular sm:pr-9`}
+                  className={`${fieldClasses} font-mono-tabular pr-10`}
                 />
               </div>
             </div>
 
-            {/* Days (Min 3 days) */}
-            <div className="col-span-1 sm:col-span-2">
+            <div>
               <label
                 htmlFor="hero-days"
-                className="block text-[11px] sm:text-xs font-semibold text-white/90 mb-1.5"
+                className="block text-xs font-bold text-[#0F2942] mb-1.5"
               >
-                المدة (3 أيام+)
+                مدة الكراء (الأيام)
               </label>
-              <select
-                id="hero-days"
-                value={searchDays}
-                onChange={(e) => setSearchDays(Number(e.target.value))}
-                className={`${inputBase} appearance-none px-2`}
-              >
-                {[3, 4, 5, 7, 10, 14, 30].map((d) => (
-                  <option key={d} value={d}>
-                    {formatDays(d)}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <Clock className="w-4 h-4 text-[#0F2942]/60 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <select
+                  id="hero-days"
+                  value={searchDays}
+                  onChange={(e) => setSearchDays(Number(e.target.value))}
+                  className={`${fieldClasses} appearance-none pr-10 pl-8`}
+                >
+                  {[3, 4, 5, 7, 10, 14, 30].map((d) => (
+                    <option key={d} value={d}>
+                      {formatDays(d)}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
             </div>
+          </div>
 
-            {/* Search button */}
-            <div className="col-span-1 sm:col-span-2">
-              <button
-                type="submit"
-                className="w-full min-h-[48px] rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] active:bg-[#1E40AF] text-white px-4 py-2.5 font-bold text-sm shadow-lg transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
-                aria-label="بحث عن السيارات"
-              >
-                <Search className="w-4 h-4" aria-hidden="true" />
-                <span className="hidden sm:inline">بحث</span>
-              </button>
-            </div>
-          </form>
+          <button
+            type="submit"
+            className="w-full min-h-[50px] rounded-xl bg-[#0D9488] hover:bg-[#0F766E] active:scale-[0.99] text-white px-6 py-3 font-extrabold text-sm sm:text-base shadow-md shadow-teal-600/20 transition-all flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] focus-visible:ring-offset-2"
+          >
+            <Search className="w-4 h-4" aria-hidden="true" />
+            <span>ابحث عن السيارات</span>
+          </button>
+        </form>
+      </div>
 
-          {/* Trust micro-copy */}
-          <p className="flex items-center gap-1.5 text-[11px] sm:text-xs text-slate-300/90">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" aria-hidden="true" />
-            بدون ضمان (0 درهم كفالة) · يشترط أقدمية رخصة السياقة سنتين على الأقل
-          </p>
-        </div>
-      </section>
+      {/* ===================== SCREEN 7: CITY SELECTION COMPONENT ===================== */}
+      <CitySelector
+        selectedCity={selectedCity}
+        onSelectCity={handleSelectQuickCity}
+      />
 
-      {/* ===================== POPULAR LOCAL CITIES ===================== */}
-      <section
-        className="max-w-6xl mx-auto px-4 sm:px-6 pt-5 pb-2"
-        aria-label="المدن المغربية الرئيسية"
-      >
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
-          {POPULAR_CITIES.map((item) => {
-            const active = selectedCity.toLowerCase() === item.cityFr.toLowerCase();
-            return (
-              <button
-                key={item.cityFr}
-                type="button"
-                onClick={() => handleSelectQuickCity(item.cityFr)}
-                aria-pressed={active}
-                className={`text-right rounded-xl border px-3 py-2.5 transition-all duration-150 flex items-center justify-between gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB] focus-visible:ring-offset-2 ${
-                  active
-                    ? 'bg-blue-50/80 border-[#2563EB] text-slate-900 shadow-sm'
-                    : 'bg-white border-slate-200 hover:border-[#2563EB]/40 hover:shadow-sm text-slate-800'
-                }`}
-              >
-                <div className="min-w-0">
-                  <div className="text-xs font-bold truncate">{item.cityAr}</div>
-                  <div className="text-[11px] text-slate-500 truncate">{item.subtitle}</div>
-                </div>
-                <MapPin className="w-3.5 h-3.5 text-[#2563EB] shrink-0" aria-hidden="true" />
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* ===================== FLEET ===================== */}
+      {/* ===================== SCREEN 5: FLEET LISTING ===================== */}
       <section
         id="fleet-offers"
-        className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-6 scroll-mt-4"
+        className="max-w-6xl mx-auto px-4 sm:px-6 py-7 sm:py-9 space-y-6 scroll-mt-4"
       >
-        {/* Section header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div className="space-y-1">
-            <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
-              السيارات الاقتصادية المتاحة في {getCityLabelAr(selectedCity)}
+            <h2 className="text-xl sm:text-2xl font-extrabold text-[#0F2942]">
+              السيارات المتاحة في {getCityLabelAr(selectedCity)}
             </h2>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs sm:text-sm text-slate-600">
               {loadingCars ? (
                 'جارٍ تحميل العروض...'
               ) : (
@@ -429,19 +375,21 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
                   {availableFilteredCount} سيارة متاحة
                   {bookedFilteredCount > 0 ? ` · ${bookedFilteredCount} محجوزة` : ''} ·{' '}
                   {formatDays(searchDays)} · استلام{' '}
-                  <span className="font-mono-tabular">{searchPickupDate}</span>
+                  <span className="font-mono-tabular font-semibold text-[#0F2942]">
+                    {searchPickupDate}
+                  </span>
                 </span>
               )}
               {!dbConnected && cars.length > 0 && (
                 <>
                   {' '}·{' '}
-                  <span className="text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
+                  <span className="text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-1.5 py-0.5 text-xs">
                     عروض توضيحية
                   </span>{' '}
                   <button
                     type="button"
                     onClick={onGoToAgency}
-                    className="font-semibold text-[#2563EB] hover:underline"
+                    className="font-bold text-[#0D9488] hover:underline"
                   >
                     سجل وكالتك الآن
                   </button>
@@ -450,11 +398,10 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
             </p>
           </div>
 
-          {/* Filters */}
           <div className="flex flex-col gap-2.5 md:flex-row md:items-center">
             {availableBrands.length > 1 && (
               <div
-                className="flex items-center gap-1 p-1 bg-white border border-slate-200 rounded-xl overflow-x-auto no-scrollbar"
+                className="flex items-center gap-1 p-1 bg-white border border-slate-200/80 rounded-xl overflow-x-auto no-scrollbar shadow-xs"
                 role="tablist"
                 aria-label="تصفية حسب الماركة"
               >
@@ -463,10 +410,10 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
                   role="tab"
                   aria-selected={brandFilter === 'all'}
                   onClick={() => setBrandFilter('all')}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB] ${
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors whitespace-nowrap shrink-0 ${
                     brandFilter === 'all'
-                      ? 'bg-[#2563EB] text-white shadow-sm'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                      ? 'bg-[#0F2942] text-white'
+                      : 'text-slate-600 hover:text-[#0F2942] hover:bg-slate-50'
                   }`}
                 >
                   كل الماركات
@@ -478,10 +425,10 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
                     role="tab"
                     aria-selected={brandFilter === brand}
                     onClick={() => setBrandFilter(brand)}
-                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB] ${
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors whitespace-nowrap shrink-0 ${
                       brandFilter === brand
-                        ? 'bg-[#2563EB] text-white shadow-sm'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                        ? 'bg-[#0F2942] text-white'
+                        : 'text-slate-600 hover:text-[#0F2942] hover:bg-slate-50'
                     }`}
                   >
                     {brand}
@@ -491,7 +438,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
             )}
 
             <div
-              className="flex items-center gap-1 p-1 bg-white border border-slate-200 rounded-xl"
+              className="flex items-center gap-1 p-1 bg-white border border-slate-200/80 rounded-xl shadow-xs"
               role="tablist"
               aria-label="تصفية حسب ناقل الحركة"
             >
@@ -508,10 +455,10 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
                   role="tab"
                   aria-selected={transmissionFilter === key}
                   onClick={() => setTransmissionFilter(key)}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 ${
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors whitespace-nowrap shrink-0 ${
                     transmissionFilter === key
-                      ? 'bg-slate-900 text-white shadow-sm'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                      ? 'bg-[#0D9488] text-white'
+                      : 'text-slate-600 hover:text-[#0F2942] hover:bg-slate-50'
                   }`}
                 >
                   {label}
@@ -521,32 +468,35 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
           </div>
         </div>
 
-        {/* Results */}
         {loadingCars ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[1, 2, 3].map((n) => (
               <div
                 key={n}
-                className="bg-white rounded-2xl border border-slate-200/75 overflow-hidden animate-pulse"
+                className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden animate-pulse shadow-sm"
                 aria-hidden="true"
               >
                 <div className="aspect-[4/3] bg-slate-200" />
                 <div className="p-5 space-y-3">
                   <div className="h-5 bg-slate-200 rounded w-1/2" />
                   <div className="h-4 bg-slate-100 rounded w-2/3" />
-                  <div className="h-3 bg-slate-100 rounded w-1/3" />
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="h-8 bg-slate-100 rounded-xl" />
+                    <div className="h-8 bg-slate-100 rounded-xl" />
+                    <div className="h-8 bg-slate-100 rounded-xl" />
+                  </div>
                   <div className="flex justify-between items-center pt-3 border-t border-slate-100">
                     <div className="h-6 bg-slate-200 rounded w-1/3" />
-                    <div className="h-9 bg-slate-200 rounded-xl w-1/4" />
+                    <div className="h-10 bg-slate-200 rounded-xl w-1/3" />
                   </div>
                 </div>
               </div>
             ))}
           </div>
         ) : filteredCars.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-slate-200/75 p-12 text-center space-y-3">
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-12 text-center space-y-3">
             <CarFront className="w-10 h-10 text-slate-300 mx-auto" aria-hidden="true" />
-            <h3 className="font-bold text-lg text-slate-900">لا توجد سيارات مطابقة حالياً</h3>
+            <h3 className="font-bold text-lg text-[#0F2942]">لا توجد سيارات مطابقة حالياً</h3>
             <p className="text-sm text-slate-500">
               جرّب إزالة أحد الفلاتر أو اختيار مدينة أخرى.
             </p>
@@ -556,166 +506,25 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
                 setBrandFilter('all');
                 setTransmissionFilter('all');
               }}
-              className="inline-flex items-center gap-1.5 mt-2 px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition-colors"
+              className="inline-flex items-center gap-1.5 mt-2 px-5 py-2.5 rounded-xl bg-[#0F2942] text-white text-sm font-bold hover:bg-[#173B5E] transition-colors"
             >
               إعادة تعيين الفلاتر
             </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredCars.map((car) => {
-              const total = car.daily_price * searchDays;
-              const isBooked = Boolean(car.is_booked);
-              const bookedUntilText = formatBookedUntil(car.booked_until);
-
-              return (
-                <article
-                  key={car.id}
-                  className={`group bg-white rounded-2xl border overflow-hidden flex flex-col transition-all duration-200 ${
-                    isBooked
-                      ? 'border-slate-200/80 opacity-90'
-                      : 'border-slate-200/80 hover:border-slate-300 hover:shadow-lg hover:-translate-y-0.5'
-                  }`}
-                >
-                  {/* Image */}
-                  <button
-                    type="button"
-                    disabled={isBooked}
-                    onClick={() => {
-                      if (!isBooked) setSelectedCar(car);
-                    }}
-                    className={`aspect-[4/3] bg-slate-100 overflow-hidden block w-full text-right relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#2563EB] ${
-                      isBooked ? 'cursor-not-allowed' : 'cursor-pointer'
-                    }`}
-                    aria-label={
-                      isBooked
-                        ? `${car.brand} ${car.model} — محجوزة حالياً`
-                        : `عرض تفاصيل ${car.brand} ${car.model}`
-                    }
-                  >
-                    <img
-                      src={car.primary_image_url}
-                      alt={`${car.brand} ${car.model}`}
-                      referrerPolicy="no-referrer"
-                      loading="lazy"
-                      className={`w-full h-full object-cover transition-transform duration-500 ease-out ${
-                        isBooked ? 'opacity-70 grayscale-[25%]' : 'group-hover:scale-[1.03]'
-                      }`}
-                    />
-                    {car.model_year && (
-                      <span className="absolute top-3 right-3 inline-flex items-center rounded-full bg-white/95 backdrop-blur-sm text-slate-800 text-[11px] font-bold px-2.5 py-1 shadow-sm">
-                        {car.model_year}
-                      </span>
-                    )}
-                    {isBooked && (
-                      <div className="absolute inset-0 bg-slate-950/45 backdrop-blur-[1px] flex flex-col items-center justify-center gap-1.5 p-3 text-center">
-                        <span className="inline-flex items-center rounded-xl bg-red-600 text-white px-4 py-1.5 text-xs font-extrabold shadow-lg">
-                          محجوزة حالياً
-                        </span>
-                        {bookedUntilText && (
-                          <span className="rounded-lg bg-slate-900/90 text-white px-2.5 py-1 text-[11px] font-semibold">
-                            تتوفر بعد {bookedUntilText}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </button>
-
-                  {/* Content */}
-                  <div className="p-5 flex-1 flex flex-col">
-                    {/* Title row */}
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <h3 className="font-bold text-base sm:text-lg text-slate-900 leading-snug truncate">
-                          {car.brand} {car.model}
-                        </h3>
-                        <p className="text-xs text-slate-500 mt-0.5 truncate">
-                          {car.agency_name}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1 text-xs font-bold text-slate-700 shrink-0 pt-1">
-                        <Star
-                          className="w-3.5 h-3.5 fill-amber-400 text-amber-400"
-                          aria-hidden="true"
-                        />
-                        <span className="font-mono-tabular">
-                          {car.agency_rating.toFixed(1)}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Specs strip */}
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-slate-600 mt-3.5 pt-3.5 border-t border-slate-100">
-                      <span className="inline-flex items-center gap-1.5">
-                        <Fuel className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
-                        {getFuelLabel(car.fuel_type)}
-                      </span>
-                      <span className="w-px h-3 bg-slate-200" aria-hidden="true" />
-                      <span className="inline-flex items-center gap-1.5">
-                        <Users className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
-                        {car.seats} مقاعد
-                      </span>
-                      <span className="w-px h-3 bg-slate-200" aria-hidden="true" />
-                      <span className="inline-flex items-center gap-1.5">
-                        <Gauge className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
-                        {car.transmission === 'automatic' ? 'أوتوماتيك' : 'يدوي'}
-                      </span>
-                    </div>
-
-                    <div className="text-[11px] font-semibold text-emerald-700 mt-2.5 flex items-center gap-1">
-                      <ShieldCheck className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-                      <span>بدون ضمان (0 DH كفالة)</span>
-                    </div>
-
-                    {/* Price + CTA */}
-                    <div className="mt-auto pt-3 flex items-end justify-between gap-3">
-                      <div>
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-2xl font-extrabold text-slate-900 font-mono-tabular leading-none">
-                            {car.daily_price}
-                          </span>
-                          <span className="text-xs font-semibold text-slate-500">
-                            درهم / يوم
-                          </span>
-                        </div>
-                        {total > 0 && (
-                          <p className="text-[11px] text-slate-500 mt-1.5 font-mono-tabular">
-                            ≈ <span className="font-bold text-slate-700">{total}</span> درهم
-                            لـ {formatDays(searchDays)}
-                          </p>
-                        )}
-                      </div>
-                      <button
-                        type="button"
-                        disabled={isBooked}
-                        onClick={() => {
-                          if (!isBooked) setSelectedCar(car);
-                        }}
-                        className={`shrink-0 inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB] focus-visible:ring-offset-2 ${
-                          isBooked
-                            ? 'bg-slate-200 text-slate-500 cursor-not-allowed'
-                            : 'bg-[#2563EB] hover:bg-[#1D4ED8] active:bg-[#1E40AF] text-white shadow-sm'
-                        }`}
-                      >
-                        {isBooked ? (
-                          <span>محجوزة</span>
-                        ) : (
-                          <>
-                            احجز
-                            <ArrowLeft className="w-4 h-4" aria-hidden="true" />
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
+            {filteredCars.map((car) => (
+              <CarOfferCard
+                key={car.id}
+                car={car}
+                searchDays={searchDays}
+                onSelect={setSelectedCar}
+              />
+            ))}
           </div>
         )}
       </section>
 
-      {/* Booking modal */}
       {selectedCar && (
         <BookingModal
           car={selectedCar}
