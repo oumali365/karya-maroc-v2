@@ -14,7 +14,6 @@ import {
   Hash,
 } from 'lucide-react';
 import { supabase, formatDH, getCityLabelAr } from '../lib/supabase';
-import { resolveCatalogImage } from '../data/starterData';
 import type { BookingStatus, CreatedBooking } from '../types/karya';
 
 interface MyBookingsViewProps {
@@ -22,45 +21,6 @@ interface MyBookingsViewProps {
   onUpdateBookingStatus: (bookingCode: string, nextStatus: BookingStatus) => void;
   onBrowseCars: () => void;
 }
-
-const PREVIEW_SAMPLE_BOOKINGS: CreatedBooking[] = [
-  {
-    booking_id: 'preview-citroen-c3',
-    booking_code: 'KRY-842910',
-    car_label: 'Citroën C3',
-    car_image: resolveCatalogImage('Citroën', 'C3'),
-    agency_name: 'أطلس كار الدار البيضاء',
-    city: 'Casablanca',
-    pickup_location: 'شارع الزرقطوني، الدار البيضاء',
-    days: 4,
-    daily_price: 260,
-    total_amount: 1040,
-    commission_amount: 104,
-    agency_payout_amount: 936,
-    delivery_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-    status: 'payment_verified',
-    agency_ack_status: 'available',
-    is_demo: true,
-  },
-  {
-    booking_id: 'preview-dacia-duster',
-    booking_code: 'KRY-519044',
-    car_label: 'Dacia Duster',
-    car_image: resolveCatalogImage('Dacia', 'Duster'),
-    agency_name: 'نخيل موبيليتي مراكش',
-    city: 'Marrakech',
-    pickup_location: 'كليز، مراكش',
-    days: 3,
-    daily_price: 320,
-    total_amount: 960,
-    commission_amount: 96,
-    agency_payout_amount: 864,
-    delivery_at: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
-    status: 'payment_uploaded',
-    agency_ack_status: 'pending',
-    is_demo: true,
-  },
-];
 
 function getStatusBadge(status: BookingStatus): {
   label: string;
@@ -369,9 +329,7 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
   for (const b of recentBookings) mergedMap.set(b.booking_code, b);
   for (const b of accountBookings) mergedMap.set(b.booking_code, b);
   for (const b of lookupBookings) mergedMap.set(b.booking_code, b);
-  const realBookings = Array.from(mergedMap.values());
-  const showingPreview = realBookings.length === 0;
-  const displayedBookings = showingPreview ? PREVIEW_SAMPLE_BOOKINGS : realBookings;
+  const displayedBookings = Array.from(mergedMap.values());
 
   const openRefundForBooking = (booking: CreatedBooking) => {
     setRefundTarget(booking);
@@ -521,17 +479,25 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
         </div>
       )}
 
-      {showingPreview && (
-        <div className="flex flex-wrap items-center justify-between gap-2 px-1">
-          <p className="text-xs font-semibold text-slate-500">
-            لا توجد حجوزات مسجلة على هذا الجهاز بعد — أدناه أمثلة توضيحية لشكل بطاقات الحجز:
-          </p>
-        </div>
-      )}
-
       {/* ===================== SCREEN 3: BOOKING CARDS ===================== */}
-      <div className="space-y-4">
-        {displayedBookings.map((booking) => {
+      {displayedBookings.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-10 text-center space-y-3">
+          <CarFront className="w-10 h-10 text-slate-300 mx-auto" aria-hidden="true" />
+          <h2 className="font-bold text-lg text-[#0F2942]">لا توجد حجوزات مسجلة حالياً</h2>
+          <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
+            يمكنك تتبع أي حجز عبر إدخال رمز الطلب ورقم الهاتف أعلاه، أو تصفح السيارات المتاحة لإجراء حجز جديد.
+          </p>
+          <button
+            type="button"
+            onClick={onBrowseCars}
+            className="inline-flex items-center justify-center mt-2 px-5 py-2.5 rounded-xl bg-[#0D9488] hover:bg-[#0F766E] text-white text-xs sm:text-sm font-extrabold transition-colors"
+          >
+            تصفح السيارات المتاحة
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {displayedBookings.map((booking) => {
           const badge = getStatusBadge(booking.status);
           const refundEligibility = getRefundEligibility(booking);
           const formattedDate = (() => {
@@ -565,11 +531,6 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
                   <div className="w-full h-full flex items-center justify-center text-slate-400">
                     <CarFront className="w-10 h-10" />
                   </div>
-                )}
-                {showingPreview && (
-                  <span className="absolute top-3 right-3 rounded-lg bg-[#0F2942]/85 text-white px-2.5 py-1 text-[10px] font-bold">
-                    مثال توضيحي
-                  </span>
                 )}
               </div>
 
@@ -651,43 +612,42 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
                 </div>
 
                 {/* Refund Eligibility / Action Row */}
-                {!showingPreview && (
-                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-                    <span className="text-[11px] text-slate-400">
-                      أي تمديد خارج المنصة لا تشمله حماية التسبيق.
-                    </span>
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                  <span className="text-[11px] text-slate-400">
+                    أي تمديد خارج المنصة لا تشمله حماية التسبيق.
+                  </span>
 
-                    {booking.agency_ack_status === 'unavailable' &&
-                      (booking.status === 'payment_uploaded' ||
-                        booking.status === 'payment_verified') && (
-                        <div className="w-full rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-xs font-semibold text-red-800">
-                          اعتذرت الوكالة عن توفر السيارة — يمكنك استرجاع تسبيقك كاملاً الآن.
-                        </div>
-                      )}
-
-                    {refundEligibility.eligible ? (
-                      <button
-                        type="button"
-                        onClick={() => openRefundForBooking(booking)}
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 px-4 py-2 text-xs font-extrabold transition-colors whitespace-nowrap"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                        <span>طلب استرجاع التسبيق</span>
-                      </button>
-                    ) : (
-                      refundEligibility.blockedMessage && (
-                        <div className="text-[11px] text-slate-500 leading-relaxed">
-                          {refundEligibility.blockedMessage}
-                        </div>
-                      )
+                  {booking.agency_ack_status === 'unavailable' &&
+                    (booking.status === 'payment_uploaded' ||
+                      booking.status === 'payment_verified') && (
+                      <div className="w-full rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-xs font-semibold text-red-800">
+                        اعتذرت الوكالة عن توفر السيارة — يمكنك استرجاع تسبيقك كاملاً الآن.
+                      </div>
                     )}
-                  </div>
-                )}
+
+                  {refundEligibility.eligible ? (
+                    <button
+                      type="button"
+                      onClick={() => openRefundForBooking(booking)}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 px-4 py-2 text-xs font-extrabold transition-colors whitespace-nowrap"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>طلب استرجاع التسبيق</span>
+                    </button>
+                  ) : (
+                    refundEligibility.blockedMessage && (
+                      <div className="text-[11px] text-slate-500 leading-relaxed">
+                        {refundEligibility.blockedMessage}
+                      </div>
+                    )
+                  )}
+                </div>
               </div>
             </article>
           );
         })}
-      </div>
+        </div>
+      )}
 
       {/* Refund Request Panel */}
       {refundTarget && (
