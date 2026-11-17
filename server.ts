@@ -186,8 +186,11 @@ async function startServer() {
     const distPath = path.resolve(__dirname, 'dist');
     if (fs.existsSync(distPath)) {
       app.use(express.static(distPath));
-      app.get('*', (_req, res) => {
-        res.sendFile(path.join(distPath, 'index.html'));
+      app.get('*', (req, res) => {
+        if (req.path.startsWith('/api/')) {
+          return res.status(404).json({ error: 'Not found' });
+        }
+        return res.sendFile(path.join(distPath, 'index.html'));
       });
     }
   }
