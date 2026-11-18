@@ -18,6 +18,8 @@ import {
   AlertTriangle,
   FileText,
   X,
+  RefreshCw,
+  Search,
 } from 'lucide-react';
 import { supabase, formatDH, getCityLabelAr } from '../lib/supabase';
 import {
@@ -68,15 +70,32 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
   const [resettingPin, setResettingPin] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
   const [resetFeedback, setResetFeedback] = useState<string | null>(null);
-  const [bookingFilter, setBookingFilter] = useState<'all' | 'pending' | 'unavailable' | 'verified'>('all');
+  const [bookingFilter, setBookingFilter] = useState<
+    'all' | 'pending' | 'unavailable' | 'disputes' | 'verified'
+  >('all');
+  const [bookingSearch, setBookingSearch] = useState('');
+  const [payoutFilter, setPayoutFilter] = useState<'all' | 'pending' | 'sent'>('all');
+  const [agencyFilter, setAgencyFilter] = useState<'all' | 'pending' | 'verified' | 'suspended'>('all');
+  const [agencySearch, setAgencySearch] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
   const [receiptPreview, setReceiptPreview] = useState<{
+    bookingId: string;
     bookingCode: string;
+    customerName: string;
+    bankCode?: string | null;
+    commissionAmount: number;
+    status: string;
     url: string;
     isPdf: boolean;
   } | null>(null);
 
-  const loadAdminData = async () => {
-    setLoading(true);
+  const loadAdminData = async (silent = false) => {
+    if (silent) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     setErrorMsg(null);
 
     try {
@@ -106,7 +125,9 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
             ? payload.catalog.map((r) => mapCatalogRow(r))
             : STARTER_CATALOG,
         );
+        setLastRefreshedAt(new Date());
         setLoading(false);
+        setRefreshing(false);
         return;
       }
 
@@ -140,10 +161,12 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
           ? cRes.data.map((r) => mapCatalogRow(r as Record<string, any>))
           : STARTER_CATALOG,
       );
+      setLastRefreshedAt(new Date());
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'تعذر تحميل بيانات الإدارة من قاعدة البيانات.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -313,7 +336,8 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
     setTimeout(() => setCopiedId(null), 1800);
   };
 
-  const openReceiptPreview = (bookingCode: string, receiptPath?: string | null) => {
+  const openReceiptPreview = (b: AgencyBookingRecord) => {
+    const receiptPath = b.receipt_url;
     if (!receiptPath || receiptPath.startsWith('local://')) return;
     const isPdf = receiptPath.toLowerCase().endsWith('.pdf');
     let resolvedUrl = receiptPath;
@@ -322,7 +346,12 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
       resolvedUrl = data.publicUrl;
     }
     setReceiptPreview({
-      bookingCode,
+      bookingId: b.id,
+      bookingCode: b.booking_code,
+      customerName: b.customer_name,
+      bankCode: b.selected_bank_code,
+      commissionAmount: Number(b.commission_amount || 0),
+      status: b.status,
       url: resolvedUrl,
       isPdf,
     });
@@ -344,8 +373,23 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
     .filter((b) => ['payment_verified', 'car_delivered', 'completed'].includes(b.status))
     .reduce((sum, b) => sum + Number(b.commission_amount || 0), 0);
 
+  const totalAgencyPayoutsVolume = bookings
+    .filter((b) => ['payment_verified', 'car_delivered', 'completed'].includes(b.status))
+    .reduce((sum, b) => sum + Number(b.agency_payout_amount || 0), 0);
+
   const pendingReceiptsCount = bookings.filter((b) => b.status === 'payment_uploaded').length;
+  const unavailableBookingsCount = bookings.filter((b) => b.agency_ack_status === 'unavailable').length;
+  const disputeBookingsCount = bookings.filter((b) => Boolean(b.dispute_flag)).length;
   const pendingPayoutsCount = payouts.filter((p) => p.status === 'pending').length;
+  const pendingAgenciesCount = agencies.filter((a) => a.verification_status === 'pending').length;
+  const verifiedAgenciesCount = agencies.filter((a) => a.verification_status === 'verified').length;
+  const urgentActionsTotal =
+    pendingReceiptsCount + unavailableBookingsCount + pendingPayoutsCount + pendingAgenciesCount;
+
+  const availableCarCountByAgency = availableCars.reduce<Record<string, number>>((acc, car) => {
+    acc[car.agency_id] = (acc[car.agency_id] || 0) + 1;
+    return acc;
+  }, {});
 
   const getBookingStatusMeta = (status: string) => {
     switch (status) {
@@ -386,14 +430,31 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="self-start sm:self-auto min-h-[42px] rounded-xl border border-[var(--karya-border)] bg-[var(--karya-surface)] hover:bg-red-50 hover:border-red-200 text-[var(--karya-text-muted)] hover:text-red-700 px-3.5 py-2 text-xs font-bold transition-colors flex items-center gap-1.5 shadow-xs"
-        >
-          <LogOut className="w-4 h-4" />
-          <span>قفل الإدارة</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          {lastRefreshedAt && (
+            <span className="text-[11px] text-[var(--karya-text-muted)] font-mono-tabular hidden sm:inline">
+              آخر تحديث:{' '}
+              {lastRefreshedAt.toLocaleTimeString('ar-MA', { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          )}
+          <button
+            type="button"
+            disabled={refreshing}
+            onClick={() => loadAdminData(true)}
+            className="min-h-[42px] rounded-xl border border-[var(--karya-border)] bg-[var(--karya-surface)] hover:bg-[var(--karya-surface-muted)] text-[var(--karya-primary)] px-3.5 py-2 text-xs font-bold transition-colors flex items-center gap-1.5 shadow-xs"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            <span>تحديث البيانات</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="min-h-[42px] rounded-xl border border-[var(--karya-border)] bg-[var(--karya-surface)] hover:bg-red-50 hover:border-red-200 text-[var(--karya-text-muted)] hover:text-red-700 px-3.5 py-2 text-xs font-bold transition-colors flex items-center gap-1.5 shadow-xs"
+          >
+            <LogOut className="w-4 h-4" />
+            <span>قفل الإدارة</span>
+          </button>
+        </div>
       </div>
 
       {/* 3-Column KPI Strip */}
@@ -403,20 +464,113 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
           <div className="font-mono-tabular font-extrabold text-2xl text-[var(--karya-action)] mt-1">
             {formatDH(totalCommission)}
           </div>
-        </div>
-        <div className="bg-[var(--karya-surface)] rounded-xl border border-[var(--karya-border)] shadow-xs p-5">
-          <div className="text-xs font-semibold text-[var(--karya-text-muted)]">وصولات بانتظار المراجعة</div>
-          <div className="font-mono-tabular font-extrabold text-2xl text-[var(--karya-primary)] mt-1">
-            {pendingReceiptsCount}
+          <div className="text-[11px] text-[var(--karya-text-muted)] mt-1 font-mono-tabular">
+            حجم تسليم الوكالات (90%): {formatDH(totalAgencyPayoutsVolume)}
           </div>
         </div>
-        <div className="bg-[var(--karya-surface)] rounded-xl border border-[var(--karya-border)] shadow-xs p-5">
-          <div className="text-xs font-semibold text-[var(--karya-text-muted)]">الكتالوج المركزي للسيارات</div>
+
+        <button
+          type="button"
+          onClick={() => {
+            if (pendingReceiptsCount > 0) {
+              setTab('receipts');
+              setBookingFilter('pending');
+            } else if (unavailableBookingsCount > 0) {
+              setTab('receipts');
+              setBookingFilter('unavailable');
+            } else if (pendingPayoutsCount > 0) {
+              setTab('payouts');
+              setPayoutFilter('pending');
+            } else if (pendingAgenciesCount > 0) {
+              setTab('agencies');
+              setAgencyFilter('pending');
+            }
+          }}
+          className="text-right bg-[var(--karya-surface)] rounded-xl border border-[var(--karya-border)] hover:border-[var(--karya-action)]/45 shadow-xs p-5 transition-colors"
+        >
+          <div className="text-xs font-semibold text-[var(--karya-text-muted)]">مهام تحتاج تدخلك الآن</div>
+          <div className="font-mono-tabular font-extrabold text-2xl text-[var(--karya-primary)] mt-1">
+            {urgentActionsTotal}
+          </div>
+          <div className="text-[11px] text-[var(--karya-action)] font-semibold mt-1">
+            وصولات ({pendingReceiptsCount}) · وكالات جديدة ({pendingAgenciesCount}) · استرجاع ({pendingPayoutsCount})
+          </div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setTab('catalog')}
+          className="text-right bg-[var(--karya-surface)] rounded-xl border border-[var(--karya-border)] hover:border-[var(--karya-action)]/45 shadow-xs p-5 transition-colors"
+        >
+          <div className="text-xs font-semibold text-[var(--karya-text-muted)]">الكتالوج والوكالات الموثقة</div>
           <div className="font-mono-tabular font-extrabold text-2xl text-[var(--karya-primary)] mt-1">
             {catalog.length} / {MAX_CATALOG_CARS}
           </div>
-        </div>
+          <div className="text-[11px] text-[var(--karya-text-muted)] mt-1">
+            وكالات موثقة: <strong className="font-mono-tabular text-[var(--karya-primary)]">{verifiedAgenciesCount}</strong> من أصل <span className="font-mono-tabular">{agencies.length}</span>
+          </div>
+        </button>
       </div>
+
+      {/* Urgent Action Queue Bar */}
+      {urgentActionsTotal > 0 && (
+        <div className="rounded-xl border border-[var(--karya-action)]/30 bg-[var(--karya-action-soft)] px-4 py-3 flex flex-wrap items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2 text-xs font-extrabold text-[var(--karya-primary)]">
+            <AlertTriangle className="w-4 h-4 text-[var(--karya-accent)] shrink-0" />
+            <span>صندوق المهام العاجلة:</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {pendingReceiptsCount > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setTab('receipts');
+                  setBookingFilter('pending');
+                }}
+                className="rounded-lg bg-[var(--karya-action)] hover:bg-[var(--karya-action-hover)] text-white px-3 py-1.5 text-xs font-bold transition-colors"
+              >
+                وصولات للمراجعة ({pendingReceiptsCount})
+              </button>
+            )}
+            {unavailableBookingsCount > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setTab('receipts');
+                  setBookingFilter('unavailable');
+                }}
+                className="rounded-lg bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 text-xs font-bold transition-colors"
+              >
+                تحتاج تحويل بديل ({unavailableBookingsCount})
+              </button>
+            )}
+            {pendingPayoutsCount > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setTab('payouts');
+                  setPayoutFilter('pending');
+                }}
+                className="rounded-lg bg-amber-600 hover:bg-amber-700 text-white px-3 py-1.5 text-xs font-bold transition-colors"
+              >
+                استرجاعات معلقة ({pendingPayoutsCount})
+              </button>
+            )}
+            {pendingAgenciesCount > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setTab('agencies');
+                  setAgencyFilter('pending');
+                }}
+                className="rounded-lg bg-[var(--karya-primary)] hover:bg-[var(--karya-primary-hover)] text-white px-3 py-1.5 text-xs font-bold transition-colors"
+              >
+                وكالات بانتظار التوثيق ({pendingAgenciesCount})
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {errorMsg && (
         <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
@@ -495,34 +649,51 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
           )}
 
           {bookings.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5">
-              {(
-                [
-                  { key: 'all', label: `الكل (${bookings.length})` },
-                  { key: 'pending', label: `وصولات للمراجعة (${pendingReceiptsCount})` },
-                  {
-                    key: 'unavailable',
-                    label: `تحتاج تحويل (${bookings.filter((b) => b.agency_ack_status === 'unavailable').length})`,
-                  },
-                  {
-                    key: 'verified',
-                    label: `مؤكدة (${bookings.filter((b) => b.status === 'payment_verified').length})`,
-                  },
-                ] as const
-              ).map((f) => (
-                <button
-                  key={f.key}
-                  type="button"
-                  onClick={() => setBookingFilter(f.key)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                    bookingFilter === f.key
-                      ? 'bg-[var(--karya-primary)] text-white'
-                      : 'bg-[var(--karya-surface)] border border-[var(--karya-border)] text-[var(--karya-text-muted)] hover:text-[var(--karya-primary)]'
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-1.5">
+                {(
+                  [
+                    { key: 'all', label: `الكل (${bookings.length})` },
+                    { key: 'pending', label: `وصولات للمراجعة (${pendingReceiptsCount})` },
+                    {
+                      key: 'unavailable',
+                      label: `تحتاج تحويل (${unavailableBookingsCount})`,
+                    },
+                    {
+                      key: 'disputes',
+                      label: `نزاعات (${disputeBookingsCount})`,
+                    },
+                    {
+                      key: 'verified',
+                      label: `مؤكدة (${bookings.filter((b) => b.status === 'payment_verified').length})`,
+                    },
+                  ] as const
+                ).map((f) => (
+                  <button
+                    key={f.key}
+                    type="button"
+                    onClick={() => setBookingFilter(f.key)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                      bookingFilter === f.key
+                        ? 'bg-[var(--karya-primary)] text-white'
+                        : 'bg-[var(--karya-surface)] border border-[var(--karya-border)] text-[var(--karya-text-muted)] hover:text-[var(--karya-primary)]'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="relative w-full md:w-72">
+                <Search className="w-4 h-4 text-[var(--karya-text-muted)] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="بحث برمز الحجز، العميل، أو الوكالة..."
+                  value={bookingSearch}
+                  onChange={(e) => setBookingSearch(e.target.value)}
+                  className="w-full min-h-[40px] rounded-lg border border-[var(--karya-border)] bg-[var(--karya-surface)] pr-9 pl-3 py-1.5 text-xs sm:text-sm text-[var(--karya-text)] focus:border-[var(--karya-action)] focus:outline-none"
+                />
+              </div>
             </div>
           )}
 
@@ -535,9 +706,15 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
               <div className="divide-y divide-[var(--karya-border)]">
                 {bookings
                   .filter((b) => {
-                    if (bookingFilter === 'pending') return b.status === 'payment_uploaded';
-                    if (bookingFilter === 'unavailable') return b.agency_ack_status === 'unavailable';
-                    if (bookingFilter === 'verified') return b.status === 'payment_verified';
+                    if (bookingFilter === 'pending' && b.status !== 'payment_uploaded') return false;
+                    if (bookingFilter === 'unavailable' && b.agency_ack_status !== 'unavailable') return false;
+                    if (bookingFilter === 'disputes' && !b.dispute_flag) return false;
+                    if (bookingFilter === 'verified' && b.status !== 'payment_verified') return false;
+                    const q = bookingSearch.trim().toLowerCase();
+                    if (q) {
+                      const hay = `${b.booking_code} ${b.customer_name} ${b.customer_phone} ${b.agency_name || ''} ${b.car_brand || ''} ${b.car_model || ''}`.toLowerCase();
+                      if (!hay.includes(q)) return false;
+                    }
                     return true;
                   })
                   .map((b) => {
@@ -656,7 +833,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
                           {b.receipt_url && !b.receipt_url.startsWith('local://') && (
                             <button
                               type="button"
-                              onClick={() => openReceiptPreview(b.booking_code, b.receipt_url)}
+                              onClick={() => openReceiptPreview(b)}
                               className="min-h-[38px] rounded-lg border border-[var(--karya-border)] bg-[var(--karya-surface)] hover:bg-[var(--karya-surface-muted)] text-[var(--karya-primary)] px-3 py-2 text-xs font-bold transition-colors inline-flex items-center gap-1.5"
                             >
                               <FileText className="w-3.5 h-3.5 text-[var(--karya-action)]" />
@@ -813,67 +990,100 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
       )}
 
       {tab === 'payouts' && (
-        <div className="bg-[var(--karya-surface)] rounded-xl border border-[var(--karya-border)] shadow-xs overflow-hidden">
-          {payouts.length === 0 ? (
-            <div className="p-10 text-center text-sm text-[var(--karya-text-muted)]">
-              لا توجد طلبات استرجاع مسجلة حالياً.
-            </div>
-          ) : (
-            <div className="divide-y divide-[var(--karya-border)]">
-              {payouts.map((p) => (
-                <div
-                  key={p.id}
-                  className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-[var(--karya-surface-muted)] transition-colors"
+        <div className="space-y-4">
+          {payouts.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {(
+                [
+                  { key: 'all', label: `الكل (${payouts.length})` },
+                  { key: 'pending', label: `بانتظار التحويل (${pendingPayoutsCount})` },
+                  { key: 'sent', label: `تم التحويل (${payouts.length - pendingPayoutsCount})` },
+                ] as const
+              ).map((f) => (
+                <button
+                  key={f.key}
+                  type="button"
+                  onClick={() => setPayoutFilter(f.key)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                    payoutFilter === f.key
+                      ? 'bg-[var(--karya-primary)] text-white'
+                      : 'bg-[var(--karya-surface)] border border-[var(--karya-border)] text-[var(--karya-text-muted)] hover:text-[var(--karya-primary)]'
+                  }`}
                 >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-[var(--karya-primary)]">استرجاع مبلغ تأكيد الحجز للعميل</span>
-                      <span className="text-[var(--karya-text-muted)]">·</span>
-                      <span className="text-sm text-[var(--karya-text)]">{p.recipient_name}</span>
-                    </div>
-                    <div className="text-xs text-[var(--karya-text-muted)] flex flex-wrap items-center gap-2">
-                      <span>{p.recipient_bank}</span>
-                      <span dir="ltr" className="font-mono text-[var(--karya-text)]">
-                        {p.recipient_rib}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => copyText(p.id, p.recipient_rib)}
-                        className="inline-flex items-center gap-1 text-[var(--karya-action)] font-semibold hover:underline"
-                      >
-                        {copiedId === p.id ? (
-                          <Check className="w-3 h-3" />
-                        ) : (
-                          <Copy className="w-3 h-3" />
-                        )}
-                        <span>{copiedId === p.id ? 'نُسخ' : 'نسخ الحساب / الهاتف'}</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono-tabular font-extrabold text-base text-[var(--karya-primary)]">
-                      {formatDH(Number(p.amount))}
-                    </span>
-                    {p.status === 'pending' ? (
-                      <button
-                        type="button"
-                        onClick={() => handleMarkPayoutSent(p.id)}
-                        className="min-h-[38px] rounded-lg bg-[var(--karya-action)] hover:bg-[var(--karya-action-hover)] text-white px-3.5 py-2 text-xs font-bold transition-colors"
-                      >
-                        تأكيد إرسال الاسترجاع
-                      </button>
-                    ) : (
-                      <span className="text-xs font-bold text-emerald-700 flex items-center gap-1">
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>تم التحويل</span>
-                      </span>
-                    )}
-                  </div>
-                </div>
+                  {f.label}
+                </button>
               ))}
             </div>
           )}
+
+          <div className="bg-[var(--karya-surface)] rounded-xl border border-[var(--karya-border)] shadow-xs overflow-hidden">
+            {payouts.length === 0 ? (
+              <div className="p-10 text-center text-sm text-[var(--karya-text-muted)]">
+                لا توجد طلبات استرجاع مسجلة حالياً.
+              </div>
+            ) : (
+              <div className="divide-y divide-[var(--karya-border)]">
+                {payouts
+                  .filter((p) => {
+                    if (payoutFilter === 'pending') return p.status === 'pending';
+                    if (payoutFilter === 'sent') return p.status !== 'pending';
+                    return true;
+                  })
+                  .map((p) => (
+                    <div
+                      key={p.id}
+                      className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-[var(--karya-surface-muted)] transition-colors"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-[var(--karya-primary)]">استرجاع مبلغ تأكيد الحجز للعميل</span>
+                          <span className="text-[var(--karya-text-muted)]">·</span>
+                          <span className="text-sm text-[var(--karya-text)]">{p.recipient_name}</span>
+                        </div>
+                        <div className="text-xs text-[var(--karya-text-muted)] flex flex-wrap items-center gap-2">
+                          <span>{p.recipient_bank}</span>
+                          <span dir="ltr" className="font-mono text-[var(--karya-text)]">
+                            {p.recipient_rib}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => copyText(p.id, p.recipient_rib)}
+                            className="inline-flex items-center gap-1 text-[var(--karya-action)] font-semibold hover:underline"
+                          >
+                            {copiedId === p.id ? (
+                              <Check className="w-3 h-3" />
+                            ) : (
+                              <Copy className="w-3 h-3" />
+                            )}
+                            <span>{copiedId === p.id ? 'نُسخ' : 'نسخ الحساب / الهاتف'}</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <span className="font-mono-tabular font-extrabold text-base text-[var(--karya-primary)]">
+                          {formatDH(Number(p.amount))}
+                        </span>
+                        {p.status === 'pending' ? (
+                          <button
+                            type="button"
+                            onClick={() => handleMarkPayoutSent(p.id)}
+                            className="min-h-[38px] rounded-lg bg-[var(--karya-action)] hover:bg-[var(--karya-action-hover)] text-white px-3.5 py-2 text-xs font-bold transition-colors"
+                          >
+                            تأكيد إرسال الاسترجاع
+                          </button>
+                        ) : (
+                          <span className="text-xs font-bold text-emerald-700 flex items-center gap-1">
+                            <CheckCircle2 className="w-4 h-4" />
+                            <span>تم التحويل</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -892,6 +1102,48 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
             </div>
           )}
 
+          {agencies.length > 0 && (
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-1.5">
+                {(
+                  [
+                    { key: 'all', label: `الكل (${agencies.length})` },
+                    { key: 'pending', label: `بانتظار التوثيق (${pendingAgenciesCount})` },
+                    { key: 'verified', label: `موثقة (${verifiedAgenciesCount})` },
+                    {
+                      key: 'suspended',
+                      label: `موقوفة (${agencies.filter((a) => a.verification_status === 'suspended').length})`,
+                    },
+                  ] as const
+                ).map((f) => (
+                  <button
+                    key={f.key}
+                    type="button"
+                    onClick={() => setAgencyFilter(f.key)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                      agencyFilter === f.key
+                        ? 'bg-[var(--karya-primary)] text-white'
+                        : 'bg-[var(--karya-surface)] border border-[var(--karya-border)] text-[var(--karya-text-muted)] hover:text-[var(--karya-primary)]'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="relative w-full md:w-72">
+                <Search className="w-4 h-4 text-[var(--karya-text-muted)] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="بحث باسم الوكالة، المدينة، أو الهاتف..."
+                  value={agencySearch}
+                  onChange={(e) => setAgencySearch(e.target.value)}
+                  className="w-full min-h-[40px] rounded-lg border border-[var(--karya-border)] bg-[var(--karya-surface)] pr-9 pl-3 py-1.5 text-xs sm:text-sm text-[var(--karya-text)] focus:border-[var(--karya-action)] focus:outline-none"
+                />
+              </div>
+            </div>
+          )}
+
           <div className="bg-[var(--karya-surface)] rounded-xl border border-[var(--karya-border)] shadow-xs overflow-hidden">
             {agencies.length === 0 ? (
               <div className="p-10 text-center text-sm text-[var(--karya-text-muted)]">
@@ -899,7 +1151,22 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
               </div>
             ) : (
               <div className="divide-y divide-[var(--karya-border)]">
-                {agencies.map((ag) => (
+                {[...agencies]
+                  .sort((a, b) => {
+                    const order = (s: AgencyProfile['verification_status']) =>
+                      s === 'pending' ? 0 : s === 'verified' ? 1 : 2;
+                    return order(a.verification_status) - order(b.verification_status);
+                  })
+                  .filter((ag) => {
+                    if (agencyFilter !== 'all' && ag.verification_status !== agencyFilter) return false;
+                    const q = agencySearch.trim().toLowerCase();
+                    if (q) {
+                      const hay = `${ag.name} ${ag.phone} ${ag.city} ${getCityLabelAr(ag.city)}`.toLowerCase();
+                      if (!hay.includes(q)) return false;
+                    }
+                    return true;
+                  })
+                  .map((ag) => (
                   <div
                     key={ag.id}
                     className="p-4 space-y-3 hover:bg-[var(--karya-surface-muted)] transition-colors"
@@ -924,6 +1191,9 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
                               : ag.verification_status === 'suspended'
                                 ? 'موقوفة'
                                 : 'قيد المراجعة'}
+                          </span>
+                          <span className="text-[11px] font-semibold text-[var(--karya-text-muted)] bg-[var(--karya-bg)] border border-[var(--karya-border)] px-2 py-0.5 rounded">
+                            سيارات نشطة: <span className="font-mono-tabular font-bold text-[var(--karya-primary)]">{availableCarCountByAgency[ag.id] || 0}</span>
                           </span>
                         </div>
                         <div className="text-xs text-[var(--karya-text-muted)] flex flex-wrap items-center gap-2">
@@ -1048,22 +1318,37 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
           dir="rtl"
           role="dialog"
           aria-modal="true"
+          onClick={() => setReceiptPreview(null)}
         >
-          <div className="bg-[var(--karya-surface)] rounded-xl max-w-2xl w-full overflow-hidden shadow-2xl border border-[var(--karya-border)]">
+          <div
+            className="bg-[var(--karya-surface)] rounded-xl max-w-2xl w-full overflow-hidden shadow-2xl border border-[var(--karya-border)]"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--karya-border)]">
-              <div className="font-extrabold text-sm text-[var(--karya-primary)]">
-                وصل التحويل البنكي — {receiptPreview.bookingCode}
+              <div className="space-y-0.5 min-w-0">
+                <div className="font-extrabold text-sm text-[var(--karya-primary)] truncate">
+                  وصل التحويل البنكي — <span className="font-mono-tabular">{receiptPreview.bookingCode}</span>
+                </div>
+                <div className="text-xs text-[var(--karya-text-muted)] flex flex-wrap items-center gap-2">
+                  <span>{receiptPreview.customerName}</span>
+                  <span>·</span>
+                  <span>{receiptPreview.bankCode || 'بنك غير محدد'}</span>
+                  <span>·</span>
+                  <span className="font-mono-tabular font-extrabold text-[var(--karya-action)]">
+                    المبلغ المطلوب (10%): {formatDH(receiptPreview.commissionAmount)}
+                  </span>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => setReceiptPreview(null)}
                 aria-label="إغلاق المعاينة"
-                className="p-1.5 rounded-lg text-[var(--karya-text-muted)] hover:bg-[var(--karya-bg)] hover:text-[var(--karya-primary)]"
+                className="p-1.5 rounded-lg text-[var(--karya-text-muted)] hover:bg-[var(--karya-bg)] hover:text-[var(--karya-primary)] shrink-0"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="p-4 bg-[var(--karya-bg)] flex flex-col items-center justify-center gap-3 max-h-[75vh] overflow-auto">
+            <div className="p-4 bg-[var(--karya-bg)] flex flex-col items-center justify-center gap-3 max-h-[68vh] overflow-auto">
               {receiptPreview.isPdf ? (
                 <a
                   href={receiptPreview.url}
@@ -1078,7 +1363,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
                 <img
                   src={receiptPreview.url}
                   alt={`وصل التحويل ${receiptPreview.bookingCode}`}
-                  className="max-h-[65vh] w-auto rounded-xl object-contain border border-[var(--karya-border)] bg-[var(--karya-surface)]"
+                  className="max-h-[58vh] w-auto rounded-xl object-contain border border-[var(--karya-border)] bg-[var(--karya-surface)]"
                 />
               )}
               <a
@@ -1089,6 +1374,30 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
               >
                 فتح في نافذة مستقلة
               </a>
+            </div>
+
+            <div className="px-5 py-3.5 border-t border-[var(--karya-border)] bg-[var(--karya-surface)] flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => setReceiptPreview(null)}
+                className="min-h-[40px] rounded-lg border border-[var(--karya-border)] px-4 py-2 text-xs font-bold text-[var(--karya-text-muted)] hover:text-[var(--karya-primary)]"
+              >
+                إغلاق
+              </button>
+              {receiptPreview.status === 'payment_uploaded' && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const idToVerify = receiptPreview.bookingId;
+                    setReceiptPreview(null);
+                    await handleVerifyPayment(idToVerify);
+                  }}
+                  className="min-h-[40px] rounded-lg bg-[var(--karya-action)] hover:bg-[var(--karya-action-hover)] text-white px-5 py-2 text-xs sm:text-sm font-extrabold inline-flex items-center gap-1.5 transition-colors"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>تأكيد استلام الوصل الآن</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1104,7 +1413,9 @@ const AdminCatalogManager: React.FC<{
   catalog: CatalogCar[];
   onRefresh: () => void;
 }> = ({ catalog, onRefresh }) => {
+  const [showAddModal, setShowAddModal] = useState(false);
   const [brandFilter, setBrandFilter] = useState<string>('all');
+  const [catalogSearch, setCatalogSearch] = useState('');
   const [brand, setBrand] = useState('Dacia');
   const [model, setModel] = useState('');
   const [category, setCategory] = useState('Économique');
@@ -1126,10 +1437,17 @@ const AdminCatalogManager: React.FC<{
     [catalog],
   );
 
-  const filtered = useMemo(
-    () => (brandFilter === 'all' ? catalog : catalog.filter((c) => c.brand === brandFilter)),
-    [catalog, brandFilter],
-  );
+  const filtered = useMemo(() => {
+    const q = catalogSearch.trim().toLowerCase();
+    return catalog.filter((c) => {
+      if (brandFilter !== 'all' && c.brand !== brandFilter) return false;
+      if (q) {
+        const hay = `${c.brand} ${c.model} ${c.category}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [catalog, brandFilter, catalogSearch]);
 
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawFile = e.target.files?.[0];
@@ -1137,7 +1455,6 @@ const AdminCatalogManager: React.FC<{
 
     setCompressing(true);
     setErrorMsg(null);
-    setFeedback(null);
 
     try {
       const result = await compressImageFile(rawFile, {
@@ -1151,6 +1468,18 @@ const AdminCatalogManager: React.FC<{
     } finally {
       setCompressing(false);
     }
+  };
+
+  const openAddModal = () => {
+    setErrorMsg(null);
+    setFeedback(null);
+    setShowAddModal(true);
+  };
+
+  const closeAddModal = () => {
+    if (saving) return;
+    setShowAddModal(false);
+    setErrorMsg(null);
   };
 
   const handleAddModel = async (e: React.FormEvent) => {
@@ -1203,6 +1532,7 @@ const AdminCatalogManager: React.FC<{
       setImageFile(null);
       setImagePreview(null);
       setImageUrlInput('');
+      setShowAddModal(false);
       setFeedback('تمت إضافة الموديل إلى الكتالوج المركزي بنجاح.');
       onRefresh();
     } catch (err) {
@@ -1214,6 +1544,7 @@ const AdminCatalogManager: React.FC<{
 
   const handleDeleteModel = async (item: CatalogCar) => {
     setErrorMsg(null);
+    setFeedback(null);
     const { error } = await supabase.rpc('admin_delete_catalog_car', {
       p_catalog_id: item.id,
       p_admin_pin: getAdminSessionPin(),
@@ -1222,166 +1553,87 @@ const AdminCatalogManager: React.FC<{
       setErrorMsg(error.message);
       return;
     }
+    setFeedback(`تم حذف ${item.brand} ${item.model} من الكتالوج.`);
     onRefresh();
   };
 
+  const previewImageSrc = imagePreview || imageUrlInput.trim() || null;
+
   return (
-    <div className="space-y-6">
-      {/* Add Catalog Model Form */}
-      <form
-        onSubmit={handleAddModel}
-        className="bg-[var(--karya-surface)] rounded-xl border border-[var(--karya-border)] shadow-xs p-5 space-y-4"
-      >
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h2 className="font-extrabold text-[var(--karya-primary)]">إضافة سيارة اقتصادية للكتالوج المركزي</h2>
-            <p className="text-xs text-[var(--karya-text-muted)]">
-              الكتالوج يضم من 30 إلى {MAX_CATALOG_CARS} صورة عالية الجودة تختار منها الوكالات سياراتها
-            </p>
+    <div className="space-y-5">
+      {/* Clean Header Bar */}
+      <div className="bg-[var(--karya-surface)] rounded-xl border border-[var(--karya-border)] shadow-xs p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <h2 className="text-base sm:text-lg font-extrabold text-[var(--karya-primary)]">
+              الكتالوج المركزي للسيارات
+            </h2>
+            <span className="font-mono-tabular text-xs font-bold rounded-lg bg-[var(--karya-bg)] border border-[var(--karya-border)] text-[var(--karya-action)] px-2.5 py-0.5">
+              {catalog.length} / {MAX_CATALOG_CARS}
+            </span>
           </div>
-          <span className="font-mono-tabular text-xs font-bold text-[var(--karya-action)]">
-            {catalog.length} / {MAX_CATALOG_CARS}
-          </span>
+          <p className="text-xs text-[var(--karya-text-muted)] mt-0.5">
+            مكتبة صور موحدة عالية الجودة تختار منها الوكالات سياراتها مباشرة
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-          <div>
-            <label className="block text-xs font-semibold text-[var(--karya-text)] mb-1">الشركة (Brand)</label>
-            <input
-              required
-              list="known-economic-brands"
-              value={brand}
-              onChange={(e) => setBrand(e.target.value)}
-              placeholder="Dacia, Renault, Peugeot..."
-              className="w-full min-h-[42px] rounded-lg border border-[var(--karya-border)] px-3 py-2 text-sm text-[var(--karya-text)] focus:border-[var(--karya-action)] focus:outline-none"
-            />
-            <datalist id="known-economic-brands">
-              {KNOWN_ECONOMIC_BRANDS.map((b) => (
-                <option key={b} value={b} />
-              ))}
-            </datalist>
-          </div>
+        <button
+          type="button"
+          onClick={openAddModal}
+          disabled={catalog.length >= MAX_CATALOG_CARS}
+          className="min-h-[42px] rounded-xl bg-[var(--karya-action)] hover:bg-[var(--karya-action-hover)] disabled:opacity-60 text-white px-4 py-2 text-xs sm:text-sm font-bold inline-flex items-center gap-1.5 transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          <span>إضافة موديل للكتالوج</span>
+        </button>
+      </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-[var(--karya-text)] mb-1">الموديل (Model)</label>
-            <input
-              required
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              placeholder="Sandero Stepway, Clio 5..."
-              className="w-full min-h-[42px] rounded-lg border border-[var(--karya-border)] px-3 py-2 text-sm text-[var(--karya-text)] focus:border-[var(--karya-action)] focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-[var(--karya-text)] mb-1">الفئة</label>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full min-h-[42px] rounded-lg border border-[var(--karya-border)] px-3 py-2 text-sm text-[var(--karya-text)] bg-[var(--karya-surface)] focus:border-[var(--karya-action)] focus:outline-none"
-            >
-              <option value="Économique">اقتصادية (Économique)</option>
-              <option value="Citadine">مدينية صغيرة (Citadine)</option>
-              <option value="SUV Économique">SUV اقتصادية</option>
-              <option value="Berline Économique">سيدان اقتصادية</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-[var(--karya-text)] mb-1">المقاعد</label>
-            <input
-              type="number"
-              min={2}
-              max={9}
-              value={seats}
-              onChange={(e) => setSeats(Number(e.target.value))}
-              className="w-full min-h-[42px] rounded-lg border border-[var(--karya-border)] px-3 py-2 text-sm font-mono-tabular text-[var(--karya-text)] focus:border-[var(--karya-action)] focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-[var(--karya-text)] mb-1">الوقود الافتراضي</label>
-            <select
-              value={defaultFuel}
-              onChange={(e) => setDefaultFuel(e.target.value as FuelType)}
-              className="w-full min-h-[42px] rounded-lg border border-[var(--karya-border)] px-3 py-2 text-sm text-[var(--karya-text)] bg-[var(--karya-surface)] focus:border-[var(--karya-action)] focus:outline-none"
-            >
-              <option value="diesel">ديزل</option>
-              <option value="essence">بنزين</option>
-              <option value="hybrid">هجين</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-[var(--karya-text)] mb-1">ناقل الحركة</label>
-            <select
-              value={defaultTransmission}
-              onChange={(e) => setDefaultTransmission(e.target.value as TransmissionType)}
-              className="w-full min-h-[42px] rounded-lg border border-[var(--karya-border)] px-3 py-2 text-sm text-[var(--karya-text)] bg-[var(--karya-surface)] focus:border-[var(--karya-action)] focus:outline-none"
-            >
-              <option value="manual">يدوي</option>
-              <option value="automatic">أوتوماتيك</option>
-            </select>
-          </div>
-
-          <div className="sm:col-span-2">
-            <label className="block text-xs font-semibold text-[var(--karya-text)] mb-1">
-              صورة الموديل (رفع صورة أو رابط URL)
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                type="url"
-                dir="ltr"
-                placeholder="https://... (اختياري إذا تم رفع ملف)"
-                value={imageUrlInput}
-                onChange={(e) => setImageUrlInput(e.target.value)}
-                className="flex-1 min-h-[42px] rounded-lg border border-[var(--karya-border)] px-3 py-2 text-xs font-mono text-[var(--karya-text)] focus:border-[var(--karya-action)] focus:outline-none"
-              />
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                onChange={handlePhotoSelect}
-                className="hidden"
-              />
-              <button
-                type="button"
-                disabled={compressing}
-                onClick={() => fileRef.current?.click()}
-                className="min-h-[42px] rounded-lg border border-[var(--karya-border)] bg-[var(--karya-surface-muted)] hover:bg-[var(--karya-bg)] px-3 py-2 text-xs font-bold text-[var(--karya-text)] flex items-center gap-1.5 shrink-0 transition-colors"
-              >
-                <Upload className="w-3.5 h-3.5 text-[var(--karya-text-muted)]" />
-                <span>{imagePreview ? 'تغيير الصورة' : 'رفع صورة'}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {errorMsg && (
-          <div className="rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
-            {errorMsg}
-          </div>
-        )}
-        {feedback && (
-          <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs text-emerald-800">
-            {feedback}
-          </div>
-        )}
-
-        <div className="flex justify-end">
+      {/* Feedback / Error Banner outside modal */}
+      {!showAddModal && errorMsg && (
+        <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-2.5 text-xs text-red-700 flex items-center justify-between gap-2">
+          <span>{errorMsg}</span>
           <button
-            type="submit"
-            disabled={saving || compressing || catalog.length >= MAX_CATALOG_CARS}
-            className="min-h-[42px] rounded-xl bg-[var(--karya-action)] hover:bg-[var(--karya-action-hover)] disabled:opacity-60 text-white px-5 py-2.5 text-xs font-bold flex items-center gap-1.5 transition-colors"
+            type="button"
+            onClick={() => setErrorMsg(null)}
+            aria-label="إخفاء التنبيه"
+            className="text-red-500 hover:text-red-700 p-1"
           >
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-            <span>إضافة للكتالوج</span>
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
-      </form>
+      )}
+      {!showAddModal && feedback && (
+        <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-2.5 text-xs text-emerald-800 flex items-center justify-between gap-2">
+          <span>{feedback}</span>
+          <button
+            type="button"
+            onClick={() => setFeedback(null)}
+            aria-label="إخفاء التنبيه"
+            className="text-emerald-600 hover:text-emerald-800 p-1"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
-      {/* Catalog Grid Grouped/Filtered by Brand */}
-      <div className="space-y-4">
+      {/* Search & Brand Filter Bar */}
+      <div className="space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="relative flex-1 max-w-md">
+            <Search className="w-4 h-4 text-[var(--karya-text-muted)] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={catalogSearch}
+              onChange={(e) => setCatalogSearch(e.target.value)}
+              placeholder="ابحث بالماركة أو الموديل (مثال: Clio, Sandero...)"
+              className="w-full min-h-[40px] rounded-lg border border-[var(--karya-border)] bg-[var(--karya-surface)] pr-9 pl-3 py-2 text-xs text-[var(--karya-text)] focus:border-[var(--karya-action)] focus:outline-none"
+            />
+          </div>
+          <div className="text-xs text-[var(--karya-text-muted)] font-mono-tabular">
+            عرض {filtered.length} من {catalog.length} موديل
+          </div>
+        </div>
+
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
           <button
             type="button"
@@ -1410,41 +1662,244 @@ const AdminCatalogManager: React.FC<{
           ))}
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-          {filtered.map((item) => (
-            <div
-              key={item.id}
-              className="bg-[var(--karya-surface)] rounded-xl border border-[var(--karya-border)] shadow-xs overflow-hidden flex flex-col"
-            >
-              <div className="aspect-[16/10] bg-[var(--karya-surface-muted)]">
-                <img
-                  src={item.image_url}
-                  alt={`${item.brand} ${item.model}`}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <div className="p-3.5 flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="text-xs font-bold text-[var(--karya-primary)] truncate">
-                    {item.brand} {item.model}
+        {filtered.length === 0 ? (
+          <div className="bg-[var(--karya-surface)] rounded-xl border border-[var(--karya-border)] p-10 text-center text-sm text-[var(--karya-text-muted)]">
+            لا توجد موديلات مطابقة للبحث الحالي في الكتالوج.
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+            {filtered.map((item) => (
+              <div
+                key={item.id}
+                className="bg-[var(--karya-surface)] rounded-xl border border-[var(--karya-border)] shadow-xs overflow-hidden flex flex-col"
+              >
+                <div className="aspect-[16/10] bg-[var(--karya-surface-muted)]">
+                  <img
+                    src={item.image_url}
+                    alt={`${item.brand} ${item.model}`}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="p-3.5 flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-[var(--karya-primary)] truncate">
+                      {item.brand} {item.model}
+                    </div>
+                    <div className="text-[11px] text-[var(--karya-text-muted)] truncate">
+                      {item.category} · {item.seats} مقاعد
+                    </div>
                   </div>
-                  <div className="text-[11px] text-[var(--karya-text-muted)] truncate">
-                    {item.category} · {item.seats} مقاعد
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteModel(item)}
+                    aria-label={`حذف ${item.brand} ${item.model}`}
+                    className="p-1.5 rounded-lg text-[var(--karya-text-muted)] hover:text-red-600 hover:bg-red-50 transition-colors shrink-0"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Add Catalog Model Modal / Bottom-Sheet */}
+      {showAddModal && (
+        <div
+          className="fixed inset-0 z-50 bg-[#173B57]/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4"
+          dir="rtl"
+          role="dialog"
+          aria-modal="true"
+          onClick={closeAddModal}
+        >
+          <div
+            className="bg-[var(--karya-surface)] w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl border border-[var(--karya-border)] shadow-2xl max-h-[92vh] flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--karya-border)]">
+              <div>
+                <h3 className="text-base font-extrabold text-[var(--karya-primary)]">
+                  إضافة سيارة اقتصادية للكتالوج المركزي
+                </h3>
+                <p className="text-xs text-[var(--karya-text-muted)] mt-0.5">
+                  متاح إضافة حتى {MAX_CATALOG_CARS} موديلاً ({catalog.length} / {MAX_CATALOG_CARS})
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeAddModal}
+                aria-label="إغلاق النافذة"
+                className="p-1.5 rounded-lg text-[var(--karya-text-muted)] hover:bg-[var(--karya-bg)] hover:text-[var(--karya-primary)]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddModel} className="overflow-y-auto p-5 space-y-4">
+              {/* Live Image Preview */}
+              <div className="rounded-xl border border-[var(--karya-border)] bg-[var(--karya-bg)] p-3 flex flex-col sm:flex-row items-center gap-3">
+                <div className="w-full sm:w-44 aspect-[16/10] rounded-lg overflow-hidden bg-[var(--karya-surface-muted)] border border-[var(--karya-border)] flex items-center justify-center shrink-0">
+                  {previewImageSrc ? (
+                    <img
+                      src={previewImageSrc}
+                      alt="معاينة صورة الموديل"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-[11px] text-[var(--karya-text-muted)] px-2 text-center">
+                      معاينة الصورة ستظهر هنا
+                    </span>
+                  )}
+                </div>
+                <div className="flex-1 w-full space-y-2">
+                  <label className="block text-xs font-semibold text-[var(--karya-text)]">
+                    صورة الموديل (رفع صورة أو رابط URL)
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="url"
+                      dir="ltr"
+                      placeholder="https://... (اختياري إذا تم رفع ملف)"
+                      value={imageUrlInput}
+                      onChange={(e) => setImageUrlInput(e.target.value)}
+                      className="flex-1 min-h-[42px] rounded-lg border border-[var(--karya-border)] bg-[var(--karya-surface)] px-3 py-2 text-xs font-mono text-[var(--karya-text)] focus:border-[var(--karya-action)] focus:outline-none"
+                    />
+                    <input
+                      ref={fileRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={handlePhotoSelect}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      disabled={compressing}
+                      onClick={() => fileRef.current?.click()}
+                      className="min-h-[42px] rounded-lg border border-[var(--karya-border)] bg-[var(--karya-surface)] hover:bg-[var(--karya-surface-muted)] px-3 py-2 text-xs font-bold text-[var(--karya-text)] flex items-center gap-1.5 shrink-0 transition-colors"
+                    >
+                      <Upload className="w-3.5 h-3.5 text-[var(--karya-text-muted)]" />
+                      <span>{imagePreview ? 'تغيير الصورة' : 'رفع صورة'}</span>
+                    </button>
                   </div>
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--karya-text)] mb-1">الشركة (Brand)</label>
+                  <input
+                    required
+                    list="known-economic-brands"
+                    value={brand}
+                    onChange={(e) => setBrand(e.target.value)}
+                    placeholder="Dacia, Renault, Peugeot..."
+                    className="w-full min-h-[42px] rounded-lg border border-[var(--karya-border)] px-3 py-2 text-sm text-[var(--karya-text)] focus:border-[var(--karya-action)] focus:outline-none"
+                  />
+                  <datalist id="known-economic-brands">
+                    {KNOWN_ECONOMIC_BRANDS.map((b) => (
+                      <option key={b} value={b} />
+                    ))}
+                  </datalist>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--karya-text)] mb-1">الموديل (Model)</label>
+                  <input
+                    required
+                    value={model}
+                    onChange={(e) => setModel(e.target.value)}
+                    placeholder="Sandero Stepway, Clio 5..."
+                    className="w-full min-h-[42px] rounded-lg border border-[var(--karya-border)] px-3 py-2 text-sm text-[var(--karya-text)] focus:border-[var(--karya-action)] focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--karya-text)] mb-1">الفئة</label>
+                  <select
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    className="w-full min-h-[42px] rounded-lg border border-[var(--karya-border)] px-3 py-2 text-sm text-[var(--karya-text)] bg-[var(--karya-surface)] focus:border-[var(--karya-action)] focus:outline-none"
+                  >
+                    <option value="Économique">اقتصادية (Économique)</option>
+                    <option value="Citadine">مدينية صغيرة (Citadine)</option>
+                    <option value="SUV Économique">SUV اقتصادية</option>
+                    <option value="Berline Économique">سيدان اقتصادية</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--karya-text)] mb-1">المقاعد</label>
+                  <input
+                    type="number"
+                    min={2}
+                    max={9}
+                    value={seats}
+                    onChange={(e) => setSeats(Number(e.target.value))}
+                    className="w-full min-h-[42px] rounded-lg border border-[var(--karya-border)] px-3 py-2 text-sm font-mono-tabular text-[var(--karya-text)] focus:border-[var(--karya-action)] focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--karya-text)] mb-1">الوقود الافتراضي</label>
+                  <select
+                    value={defaultFuel}
+                    onChange={(e) => setDefaultFuel(e.target.value as FuelType)}
+                    className="w-full min-h-[42px] rounded-lg border border-[var(--karya-border)] px-3 py-2 text-sm text-[var(--karya-text)] bg-[var(--karya-surface)] focus:border-[var(--karya-action)] focus:outline-none"
+                  >
+                    <option value="diesel">ديزل</option>
+                    <option value="essence">بنزين</option>
+                    <option value="hybrid">هجين</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--karya-text)] mb-1">ناقل الحركة</label>
+                  <select
+                    value={defaultTransmission}
+                    onChange={(e) => setDefaultTransmission(e.target.value as TransmissionType)}
+                    className="w-full min-h-[42px] rounded-lg border border-[var(--karya-border)] px-3 py-2 text-sm text-[var(--karya-text)] bg-[var(--karya-surface)] focus:border-[var(--karya-action)] focus:outline-none"
+                  >
+                    <option value="manual">يدوي</option>
+                    <option value="automatic">أوتوماتيك</option>
+                  </select>
+                </div>
+              </div>
+
+              {errorMsg && (
+                <div className="rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
+                  {errorMsg}
+                </div>
+              )}
+              {feedback && (
+                <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs text-emerald-800">
+                  {feedback}
+                </div>
+              )}
+
+              <div className="pt-2 border-t border-[var(--karya-border)] flex items-center justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => handleDeleteModel(item)}
-                  aria-label={`حذف ${item.brand} ${item.model}`}
-                  className="p-1.5 rounded-lg text-[var(--karya-text-muted)] hover:text-red-600 hover:bg-red-50 transition-colors shrink-0"
+                  onClick={closeAddModal}
+                  disabled={saving}
+                  className="min-h-[42px] rounded-xl border border-[var(--karya-border)] px-4 py-2 text-xs font-bold text-[var(--karya-text-muted)] hover:text-[var(--karya-primary)]"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving || compressing || catalog.length >= MAX_CATALOG_CARS}
+                  className="min-h-[42px] rounded-xl bg-[var(--karya-action)] hover:bg-[var(--karya-action-hover)] disabled:opacity-60 text-white px-5 py-2 text-xs font-bold flex items-center gap-1.5 transition-colors"
+                >
+                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                  <span>إضافة للكتالوج</span>
                 </button>
               </div>
-            </div>
-          ))}
+            </form>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
+

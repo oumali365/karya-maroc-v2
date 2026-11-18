@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Building2,
   CarFront,
@@ -30,7 +30,9 @@ import {
   MapPin,
   TrendingUp,
   ChevronDown,
+  ChevronRight,
   HelpCircle,
+  Search,
 } from 'lucide-react';
 import { supabase, MOROCCAN_CITIES, formatDH, getCityLabelAr } from '../lib/supabase';
 import {
@@ -593,15 +595,17 @@ export const AgencyPortal: React.FC<AgencyPortalProps> = ({ onGoToCustomer }) =>
               </div>
             </section>
 
-            {/* Full-Width Primary Button for Manage Fleet */}
-            <button
-              type="button"
-              onClick={() => selectView('cars')}
-              className="w-full min-h-[50px] rounded-xl bg-[var(--karya-action)] hover:bg-[var(--karya-action-hover)] active:scale-[0.99] text-white px-6 py-3.5 text-sm sm:text-base font-extrabold transition-all flex items-center justify-center gap-2 shadow-xs"
-            >
-              <CarFront className="w-5 h-5" />
-              <span>إدارة الأسطول</span>
-            </button>
+            {/* Fleet directly visible on the main workspace */}
+            <AgencyFleetManager
+              creds={sessionCreds}
+              agency={agency}
+              catalog={catalog}
+              cars={cars}
+              bookings={bookings}
+              onRefresh={() => fetchCars(sessionCreds, agency.name)}
+              sectionTitle="أسطولي الحالي"
+              sectionSubtitle="تظهر سياراتك هنا مباشرة بمجرد إضافتها مع حالة الحجوزات النشطة"
+            />
 
             <AgencyBookingsManager
               creds={sessionCreds}
@@ -618,6 +622,7 @@ export const AgencyPortal: React.FC<AgencyPortalProps> = ({ onGoToCustomer }) =>
             agency={agency}
             catalog={catalog}
             cars={cars}
+            bookings={bookings}
             onRefresh={() => fetchCars(sessionCreds, agency.name)}
           />
         )}
@@ -1111,26 +1116,43 @@ const AgencyFleetManager: React.FC<{
   agency: AgencyProfile;
   catalog: CatalogCar[];
   cars: CarOffer[];
+  bookings: AgencyBookingRecord[];
   onRefresh: () => void;
-}> = ({ creds, catalog, cars, onRefresh }) => {
-  const [showAddForm, setShowAddForm] = useState(false);
+  sectionTitle?: string;
+  sectionSubtitle?: string;
+}> = ({
+  creds,
+  catalog,
+  cars,
+  bookings,
+  onRefresh,
+  sectionTitle = 'أسطول السيارات الاقتصادية',
+  sectionSubtitle = 'اختر سياراتك من الكتالوج المركزي وحدد السعر اليومي بحرية (بدون ضمانة مالية)',
+}) => {
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addStep, setAddStep] = useState<'select' | 'configure'>('select');
+  const [catalogSearch, setCatalogSearch] = useState('');
+  const [fleetFilter, setFleetFilter] = useState<'all' | 'available' | 'booked' | 'unavailable'>('all');
+  const modalBodyRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (showAddModal && modalBodyRef.current) {
+      modalBodyRef.current.scrollTop = 0;
+    }
+  }, [addStep, showAddModal]);
 
   const brands = useMemo(
     () => Array.from(new Set(catalog.map((c) => c.brand))).sort(),
     [catalog],
   );
   const [selectedBrand, setSelectedBrand] = useState<string>('all');
-  const [selectedModel, setSelectedModel] = useState<CatalogCar | null>(
-    () => catalog[0] || null,
-  );
+  const [selectedModel, setSelectedModel] = useState<CatalogCar | null>(null);
 
-  const [fuelType, setFuelType] = useState<FuelType>(catalog[0]?.default_fuel || 'diesel');
-  const [transmission, setTransmission] = useState<TransmissionType>(
-    catalog[0]?.default_transmission || 'manual',
-  );
+  const [fuelType, setFuelType] = useState<FuelType>('diesel');
+  const [transmission, setTransmission] = useState<TransmissionType>('manual');
   const [modelYear, setModelYear] = useState<number>(2025);
   const [color, setColor] = useState<string>('');
-  const [dailyPrice, setDailyPrice] = useState<number>(280);
+  const [dailyPrice, setDailyPrice] = useState<string>('');
   const [saving, setSaving] = useState(false);
   const [errMsg, setErrMsg] = useState<string | null>(null);
 
@@ -1142,14 +1164,75 @@ const AgencyFleetManager: React.FC<{
   const [actionError, setActionError] = useState<string | null>(null);
 
   const filteredCatalog = useMemo(() => {
-    if (selectedBrand === 'all') return catalog;
-    return catalog.filter((c) => c.brand === selectedBrand);
-  }, [catalog, selectedBrand]);
+    const q = catalogSearch.trim().toLowerCase();
+    return catalog.filter((c) => {
+      if (selectedBrand !== 'all' && c.brand !== selectedBrand) return false;
+      if (q) {
+        const hay = `${c.brand} ${c.model} ${c.category}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [catalog, selectedBrand, catalogSearch]);
+
+  // Match active bookings (payment_uploaded / payment_verified / car_delivered) 1-to-1 to fleet cars
+  const activeBookingByCarId = useMemo(() => {
+    const map = new Map<string, AgencyBookingRecord>();
+    const now = Date.now();
+    const activeList = bookings.filter((b) => {
+      if (!['payment_uploaded', 'payment_verified', 'car_delivered'].includes(b.status)) {
+        return false;
+      }
+      if (b.agency_ack_status === 'unavailable' || b.dispute_flag) return false;
+      if (b.status === 'car_delivered') return true;
+      const startMs = new Date(b.delivery_at).getTime();
+      if (Number.isNaN(startMs)) return true;
+      const endMs = startMs + Math.max(1, b.days) * 24 * 60 * 60 * 1000;
+      return endMs > now;
+    });
+
+    const usedBookingIds = new Set<string>();
+    for (const car of cars) {
+      const carKey = `${car.brand} ${car.model}`.trim().toLowerCase();
+      const matched = activeList.find((b) => {
+        if (usedBookingIds.has(b.id)) return false;
+        const bKey = `${b.car_brand || ''} ${b.car_model || ''}`.trim().toLowerCase();
+        return bKey && bKey === carKey;
+      });
+      if (matched) {
+        usedBookingIds.add(matched.id);
+        map.set(car.id, matched);
+      }
+    }
+    return map;
+  }, [cars, bookings]);
+
+  const filteredCars = useMemo(() => {
+    return cars.filter((car) => {
+      const isBooked = activeBookingByCarId.has(car.id);
+      if (fleetFilter === 'booked') return isBooked;
+      if (fleetFilter === 'available') return car.status === 'available' && !isBooked;
+      if (fleetFilter === 'unavailable') return car.status === 'unavailable';
+      return true;
+    });
+  }, [cars, fleetFilter, activeBookingByCarId]);
+
+  const openAddCarModal = () => {
+    setErrMsg(null);
+    setCatalogSearch('');
+    setSelectedBrand('all');
+    setSelectedModel(null);
+    setDailyPrice('');
+    setColor('');
+    setAddStep('select');
+    setShowAddModal(true);
+  };
 
   const handleSelectCatalogModel = (item: CatalogCar) => {
     setSelectedModel(item);
     setFuelType(item.default_fuel);
     setTransmission(item.default_transmission);
+    setErrMsg(null);
   };
 
   const handleAddCar = async (e: React.FormEvent) => {
@@ -1158,8 +1241,9 @@ const AgencyFleetManager: React.FC<{
       setErrMsg('يرجى اختيار موديل من الكتالوج المركزي أولاً.');
       return;
     }
-    if (!dailyPrice || dailyPrice <= 0) {
-      setErrMsg('يرجى إدخال السعر اليومي بالدرهم.');
+    const parsedPrice = Number(dailyPrice);
+    if (!dailyPrice.trim() || Number.isNaN(parsedPrice) || parsedPrice <= 0) {
+      setErrMsg('يرجى تحديد السعر اليومي بالدرهم.');
       return;
     }
 
@@ -1181,7 +1265,7 @@ const AgencyFleetManager: React.FC<{
         p_image_url: selectedModel.image_url,
         p_fuel_type: fuelType,
         p_transmission: transmission,
-        p_daily_price: dailyPrice,
+        p_daily_price: parsedPrice,
         p_model_year: modelYear || 2025,
         p_seats: selectedModel.seats || 5,
         p_color: color.trim() || null,
@@ -1189,7 +1273,10 @@ const AgencyFleetManager: React.FC<{
 
       if (error) throw new Error(error.message);
 
-      setShowAddForm(false);
+      setShowAddModal(false);
+      setAddStep('select');
+      setSelectedModel(null);
+      setDailyPrice('');
       setColor('');
       onRefresh();
     } catch (err) {
@@ -1255,27 +1342,56 @@ const AgencyFleetManager: React.FC<{
     setBusyCarId(null);
   };
 
+  const bookedCount = activeBookingByCarId.size;
+  const freeAvailableCount = cars.filter(
+    (c) => c.status === 'available' && !activeBookingByCarId.has(c.id),
+  ).length;
+  const unavailableCount = cars.filter((c) => c.status === 'unavailable').length;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-extrabold text-[var(--karya-primary)]">أسطول السيارات الاقتصادية</h2>
-          <p className="text-xs text-[var(--karya-text-muted)] mt-0.5">
-            اختر سياراتك من الكتالوج المركزي وحدد السعر اليومي بحرية (بدون ضمانة مالية)
-          </p>
+          <h2 className="text-lg sm:text-xl font-extrabold text-[var(--karya-primary)]">
+            {sectionTitle}
+          </h2>
+          <p className="text-xs text-[var(--karya-text-muted)] mt-0.5">{sectionSubtitle}</p>
         </div>
         <button
           type="button"
-          onClick={() => {
-            if (!selectedModel && catalog.length > 0) handleSelectCatalogModel(catalog[0]);
-            setShowAddForm(!showAddForm);
-          }}
-          className="inline-flex items-center gap-2 min-h-[44px] rounded-xl bg-[var(--karya-action)] hover:bg-[var(--karya-action-hover)] text-white px-4 py-2.5 text-sm font-bold transition-colors"
+          onClick={openAddCarModal}
+          className="inline-flex items-center gap-2 min-h-[44px] rounded-xl bg-[var(--karya-action)] hover:bg-[var(--karya-action-hover)] text-white px-4 py-2.5 text-sm font-extrabold shadow-xs transition-colors"
         >
           <Plus className="w-4 h-4" />
           <span>إضافة سيارة من الكتالوج</span>
         </button>
       </div>
+
+      {cars.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {(
+            [
+              { key: 'all', label: `الكل (${cars.length})` },
+              { key: 'available', label: `متاح الآن (${freeAvailableCount})` },
+              { key: 'booked', label: `محجوز حالياً (${bookedCount})` },
+              { key: 'unavailable', label: `غير متاح (${unavailableCount})` },
+            ] as const
+          ).map((f) => (
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => setFleetFilter(f.key)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                fleetFilter === f.key
+                  ? 'bg-[var(--karya-primary)] text-white'
+                  : 'bg-[var(--karya-surface)] border border-[var(--karya-border)] text-[var(--karya-text-muted)] hover:text-[var(--karya-primary)]'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {actionError && (
         <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-2.5 text-xs sm:text-sm text-red-700">
@@ -1283,255 +1399,54 @@ const AgencyFleetManager: React.FC<{
         </div>
       )}
 
-      {showAddForm && (
-        <form
-          onSubmit={handleAddCar}
-          className="bg-[var(--karya-surface)] rounded-xl border border-[var(--karya-border)] shadow-xs p-5 space-y-5"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h3 className="font-bold text-[var(--karya-primary)]">1. اختر الموديل من الكتالوج المركزي</h3>
-              <p className="text-xs text-[var(--karya-text-muted)]">
-                تظهر صور موحدة وعالية الجودة لجميع السيارات الاقتصادية
-              </p>
-            </div>
-            <div className="flex items-center gap-1 overflow-x-auto max-w-full pb-1">
-              <button
-                type="button"
-                onClick={() => setSelectedBrand('all')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${
-                  selectedBrand === 'all'
-                    ? 'bg-[var(--karya-primary)] text-white'
-                    : 'bg-[var(--karya-surface-muted)] text-[var(--karya-text-muted)] hover:text-[var(--karya-primary)]'
-                }`}
-              >
-                الكل
-              </button>
-              {brands.map((brand) => (
-                <button
-                  key={brand}
-                  type="button"
-                  onClick={() => setSelectedBrand(brand)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${
-                    selectedBrand === brand
-                      ? 'bg-[var(--karya-primary)] text-white'
-                      : 'bg-[var(--karya-surface-muted)] text-[var(--karya-text-muted)] hover:text-[var(--karya-primary)]'
-                  }`}
-                >
-                  {brand}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-72 overflow-y-auto p-1">
-            {filteredCatalog.map((item) => {
-              const active = selectedModel?.id === item.id;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => handleSelectCatalogModel(item)}
-                  className={`text-right rounded-xl border overflow-hidden transition-all flex flex-col ${
-                    active
-                      ? 'border-[var(--karya-action)] ring-2 ring-[var(--karya-action)]/20 bg-[var(--karya-action-soft)]'
-                      : 'border-[var(--karya-border)] bg-[var(--karya-surface)] hover:border-[var(--karya-action)]/40'
-                  }`}
-                >
-                  <div className="aspect-[16/10] bg-[var(--karya-surface-muted)] w-full overflow-hidden">
-                    <img
-                      src={item.image_url}
-                      alt={`${item.brand} ${item.model}`}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div className="p-2.5">
-                    <div className="text-xs font-bold text-[var(--karya-primary)] truncate">
-                      {item.brand} {item.model}
-                    </div>
-                    <div className="text-[11px] text-[var(--karya-text-muted)] truncate">{item.category}</div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          {selectedModel && (
-            <div className="pt-4 border-t border-[var(--karya-border)] space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h4 className="font-bold text-sm text-[var(--karya-primary)]">
-                  2. مواصفات وسعر: {selectedModel.brand} {selectedModel.model}
-                </h4>
-                <span className="text-xs font-bold text-[var(--karya-action)]">
-                  الضمانة المطلوبة: بدون ضمانة مالية (0 درهم)
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-[var(--karya-text)] mb-1">
-                    السعر اليومي (DH)
-                  </label>
-                  <input
-                    required
-                    type="number"
-                    min={1}
-                    value={dailyPrice}
-                    onChange={(e) => setDailyPrice(Number(e.target.value))}
-                    className="w-full min-h-[42px] rounded-lg border border-[var(--karya-border)] px-3 py-2 text-sm font-mono-tabular text-[var(--karya-text)] focus:border-[var(--karya-action)] focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-[var(--karya-text)] mb-1">
-                    سنة الصنع
-                  </label>
-                  <input
-                    type="number"
-                    min={2015}
-                    max={2027}
-                    value={modelYear}
-                    onChange={(e) => setModelYear(Number(e.target.value))}
-                    className="w-full min-h-[42px] rounded-lg border border-[var(--karya-border)] px-3 py-2 text-sm font-mono-tabular text-[var(--karya-text)] focus:border-[var(--karya-action)] focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-[var(--karya-text)] mb-1">
-                    الوقود
-                  </label>
-                  <select
-                    value={fuelType}
-                    onChange={(e) => setFuelType(e.target.value as FuelType)}
-                    className="w-full min-h-[42px] rounded-lg border border-[var(--karya-border)] px-3 py-2 text-sm text-[var(--karya-text)] bg-[var(--karya-surface)] focus:border-[var(--karya-action)] focus:outline-none"
-                  >
-                    <option value="diesel">ديزل (Diesel)</option>
-                    <option value="essence">بنزين (Essence)</option>
-                    <option value="hybrid">هجين (Hybrid)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-[var(--karya-text)] mb-1">
-                    ناقل الحركة
-                  </label>
-                  <select
-                    value={transmission}
-                    onChange={(e) => setTransmission(e.target.value as TransmissionType)}
-                    className="w-full min-h-[42px] rounded-lg border border-[var(--karya-border)] px-3 py-2 text-sm text-[var(--karya-text)] bg-[var(--karya-surface)] focus:border-[var(--karya-action)] focus:outline-none"
-                  >
-                    <option value="manual">يدوي (Manuelle)</option>
-                    <option value="automatic">أوتوماتيك (Auto)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-[var(--karya-text)] mb-1">
-                    اللون (اختياري)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="أبيض، رمادي..."
-                    value={color}
-                    onChange={(e) => setColor(e.target.value)}
-                    className="w-full min-h-[42px] rounded-lg border border-[var(--karya-border)] px-3 py-2 text-sm text-[var(--karya-text)] focus:border-[var(--karya-action)] focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Smart Pricing Hint & Live 90% Net Handover Calculator */}
-              <div className="rounded-xl bg-[var(--karya-bg)] border border-[var(--karya-border)] p-3.5 sm:p-4 space-y-2.5">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
-                  <div>
-                    <div className="text-[11px] font-semibold text-[var(--karya-text-muted)]">
-                      صافي ما تقبضه يومياً عند التسليم (90%)
-                    </div>
-                    <div className="text-base sm:text-lg font-extrabold text-[var(--karya-action)] font-mono-tabular mt-0.5">
-                      {formatDH(Math.max(0, dailyPrice || 0) * 0.9)}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[11px] font-semibold text-[var(--karya-text-muted)]">
-                      صافي أقل حجز (3 أيام — 90%)
-                    </div>
-                    <div className="text-base sm:text-lg font-extrabold text-[var(--karya-primary)] font-mono-tabular mt-0.5">
-                      {formatDH(Math.max(0, dailyPrice || 0) * 3 * 0.9)}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[11px] font-semibold text-[var(--karya-text-muted)]">
-                      مبلغ تأكيد الحجز للمنصة (3 أيام — 10%)
-                    </div>
-                    <div className="text-sm font-bold text-[var(--karya-text)] font-mono-tabular mt-0.5">
-                      {formatDH(Math.max(0, dailyPrice || 0) * 3 * 0.1)}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2 pt-2 border-t border-[var(--karya-border)] text-xs text-[var(--karya-text-muted)] leading-relaxed">
-                  <TrendingUp className="w-4 h-4 text-[var(--karya-accent)] shrink-0 mt-0.5" />
-                  <span>
-                    <strong className="text-[var(--karya-text)]">نصيحة تسعير بدون ضمانة مالية:</strong> الزبائن المعفيون من ترك مبلغ مالي كضمانة يتقبلون عادةً فارقاً يومياً معقولاً لتغطية التأمين ومصاريف التشغيل — حدد سعرك بحرية لتحصيل صافي الربح المناسب عند التسليم.
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {errMsg && (
-            <div className="rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
-              {errMsg}
-            </div>
-          )}
-
-          <div className="flex items-center justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={() => setShowAddForm(false)}
-              className="px-4 py-2 text-sm font-semibold text-[var(--karya-text-muted)] hover:text-[var(--karya-primary)]"
-            >
-              إلغاء
-            </button>
-            <button
-              type="submit"
-              disabled={saving || !selectedModel}
-              className="min-h-[44px] rounded-xl bg-[var(--karya-action)] hover:bg-[var(--karya-action-hover)] disabled:opacity-60 text-white px-5 py-2.5 text-sm font-bold flex items-center gap-2 transition-colors"
-            >
-              {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-              <span>نشر السيارة في أسطولي</span>
-            </button>
-          </div>
-        </form>
-      )}
-
       {cars.length === 0 ? (
-        <div className="bg-[var(--karya-surface)] rounded-xl border border-[var(--karya-border)] shadow-xs p-10 text-center space-y-3">
-          <CarFront className="w-9 h-9 text-[var(--karya-text-muted)] mx-auto" />
-          <p className="font-bold text-[var(--karya-primary)]">لم تقم بإضافة أي سيارة بعد</p>
-          <p className="text-xs text-[var(--karya-text-muted)]">
-            اختر موديل سياراتك من الكتالوج المركزي وحدد سعرك اليومي لتظهر للعملاء.
+        <div className="bg-[var(--karya-surface)] rounded-xl border border-[var(--karya-border)] shadow-xs p-8 sm:p-10 text-center space-y-3">
+          <div className="w-12 h-12 rounded-xl bg-[var(--karya-action-soft)] text-[var(--karya-action)] flex items-center justify-center mx-auto">
+            <CarFront className="w-6 h-6" />
+          </div>
+          <p className="font-extrabold text-base text-[var(--karya-primary)]">
+            لم تقم بإضافة أي سيارة بعد
           </p>
-          {!showAddForm && (
-            <button
-              type="button"
-              onClick={() => setShowAddForm(true)}
-              className="inline-flex items-center gap-1.5 min-h-[42px] rounded-xl bg-[var(--karya-action)] hover:bg-[var(--karya-action-hover)] text-white px-4 py-2 text-xs font-bold transition-colors"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>إضافة سيارة الآن</span>
-            </button>
-          )}
+          <p className="text-xs sm:text-sm text-[var(--karya-text-muted)] max-w-md mx-auto leading-relaxed">
+            اختر موديل سياراتك من الكتالوج المركزي وحدد سعرك اليومي في أقل من دقيقة لتظهر فوراً للعملاء.
+          </p>
+          <button
+            type="button"
+            onClick={openAddCarModal}
+            className="inline-flex items-center gap-2 min-h-[44px] rounded-xl bg-[var(--karya-action)] hover:bg-[var(--karya-action-hover)] text-white px-5 py-2.5 text-xs sm:text-sm font-extrabold transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            <span>إضافة أول سيارة الآن</span>
+          </button>
+        </div>
+      ) : filteredCars.length === 0 ? (
+        <div className="bg-[var(--karya-surface)] rounded-xl border border-[var(--karya-border)] shadow-xs p-8 text-center text-xs sm:text-sm text-[var(--karya-text-muted)]">
+          لا توجد سيارات مطابقة لهذا التصنيف حالياً.
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {cars.map((car) => {
+          {filteredCars.map((car) => {
             const isEditingPrice = editingPriceId === car.id;
             const isDeleting = confirmDeleteId === car.id;
             const isBusy = busyCarId === car.id;
+            const activeBooking = activeBookingByCarId.get(car.id);
+
+            const bookedUntilLabel = (() => {
+              if (!activeBooking) return null;
+              const startMs = new Date(activeBooking.delivery_at).getTime();
+              if (Number.isNaN(startMs)) return null;
+              const endDt = new Date(startMs + Math.max(1, activeBooking.days) * 24 * 60 * 60 * 1000);
+              return endDt.toLocaleDateString('ar-MA', { month: 'short', day: 'numeric' });
+            })();
 
             return (
               <div
                 key={car.id}
-                className="bg-[var(--karya-surface)] rounded-xl border border-[var(--karya-border)] shadow-xs overflow-hidden flex flex-col"
+                className={`bg-[var(--karya-surface)] rounded-xl shadow-xs overflow-hidden flex flex-col transition-colors ${
+                  activeBooking
+                    ? 'border border-[var(--karya-action)]/45'
+                    : 'border border-[var(--karya-border)]'
+                }`}
               >
                 <div className="aspect-[16/10] bg-[var(--karya-surface-muted)] relative">
                   <img
@@ -1540,6 +1455,26 @@ const AgencyFleetManager: React.FC<{
                     referrerPolicy="no-referrer"
                     className="w-full h-full object-cover"
                   />
+                  {activeBooking && (
+                    <div
+                      className={`absolute top-2.5 right-2.5 inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-extrabold shadow-xs ${
+                        activeBooking.status === 'payment_uploaded' &&
+                        activeBooking.agency_ack_status === 'pending'
+                          ? 'bg-amber-500 text-white'
+                          : 'bg-[var(--karya-primary)] text-white'
+                      }`}
+                    >
+                      <CalendarCheck2 className="w-3.5 h-3.5 shrink-0" />
+                      <span>
+                        {activeBooking.status === 'payment_uploaded' &&
+                        activeBooking.agency_ack_status === 'pending'
+                          ? `طلب جديد (${activeBooking.booking_code})`
+                          : bookedUntilLabel
+                            ? `محجوزة · إلى ${bookedUntilLabel}`
+                            : 'محجوزة حالياً'}
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <div className="p-4 flex-1 flex flex-col justify-between gap-3">
                   <div className="space-y-2">
@@ -1555,6 +1490,21 @@ const AgencyFleetManager: React.FC<{
                         {car.status === 'available' ? 'متاح' : 'غير متاح'}
                       </span>
                     </div>
+
+                    {activeBooking && (
+                      <div className="rounded-lg bg-[var(--karya-action-soft)] border border-[var(--karya-action)]/20 px-2.5 py-1.5 text-[11px] font-semibold text-[var(--karya-primary)] flex items-center justify-between gap-2">
+                        <span>
+                          {activeBooking.status === 'car_delivered'
+                            ? 'تم تسليمها للعميل'
+                            : activeBooking.status === 'payment_verified'
+                              ? 'حجز مؤكد'
+                              : 'بانتظار التأكيد'}
+                        </span>
+                        <span className="font-mono-tabular font-extrabold text-[var(--karya-action)]">
+                          {activeBooking.booking_code}
+                        </span>
+                      </div>
+                    )}
 
                     {isEditingPrice ? (
                       <div className="space-y-1.5">
@@ -1671,6 +1621,420 @@ const AgencyFleetManager: React.FC<{
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Professional 2-Step Add Car From Catalog Modal */}
+      {showAddModal && (
+        <div
+          className="fixed inset-0 z-50 bg-[#173B57]/60 backdrop-blur-xs flex items-end sm:items-center justify-center sm:p-4"
+          dir="rtl"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="add-catalog-car-title"
+          onClick={() => !saving && setShowAddModal(false)}
+        >
+          <form
+            noValidate
+            onSubmit={handleAddCar}
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[var(--karya-surface)] w-full sm:max-w-3xl h-[92dvh] sm:h-auto sm:max-h-[90vh] rounded-t-2xl sm:rounded-xl shadow-2xl border border-[var(--karya-border)] flex flex-col overflow-hidden"
+          >
+            {/* Modal Header */}
+            <div className="px-4 sm:px-6 py-4 border-b border-[var(--karya-border)] flex items-center justify-between gap-3 shrink-0 bg-[var(--karya-surface)]">
+              <div className="space-y-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <h3
+                    id="add-catalog-car-title"
+                    className="text-base sm:text-lg font-extrabold text-[var(--karya-primary)] truncate"
+                  >
+                    إضافة سيارة من الكتالوج المركزي
+                  </h3>
+                  <span className="inline-flex items-center rounded-md bg-[var(--karya-action-soft)] text-[var(--karya-action)] px-2 py-0.5 text-[11px] font-extrabold whitespace-nowrap">
+                    {addStep === 'select' ? 'الخطوة 1 من 2' : 'الخطوة 2 من 2'}
+                  </span>
+                </div>
+                <p className="text-xs text-[var(--karya-text-muted)] truncate">
+                  {addStep === 'select'
+                    ? 'اختر الموديل المناسب من الكتالوج ليتم تعبئة المواصفات والصور تلقائياً'
+                    : 'حدد السعر اليومي ومواصفات السيارة لنشرها فوراً في أسطولك'}
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => setShowAddModal(false)}
+                aria-label="إغلاق نافذة إضافة سيارة"
+                className="w-9 h-9 rounded-lg flex items-center justify-center text-[var(--karya-text-muted)] hover:text-[var(--karya-primary)] hover:bg-[var(--karya-bg)] shrink-0"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Scrollable Body */}
+            <div
+              ref={modalBodyRef}
+              className="flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6 py-4 space-y-4"
+            >
+              {addStep === 'select' ? (
+                <>
+                  {/* Search & Brand Filter */}
+                  <div className="space-y-2.5">
+                    <div className="relative">
+                      <Search className="w-4 h-4 text-[var(--karya-text-muted)] absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <input
+                        type="text"
+                        placeholder="ابحث باسم الموديل أو الماركة (مثال: Logan, Clio, Duster...)"
+                        value={catalogSearch}
+                        onChange={(e) => setCatalogSearch(e.target.value)}
+                        className="w-full min-h-[44px] rounded-lg border border-[var(--karya-border)] bg-[var(--karya-bg)] pr-10 pl-3.5 py-2 text-sm text-[var(--karya-text)] focus:bg-white focus:border-[var(--karya-action)] focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedBrand('all')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${
+                          selectedBrand === 'all'
+                            ? 'bg-[var(--karya-primary)] text-white'
+                            : 'bg-[var(--karya-bg)] border border-[var(--karya-border)] text-[var(--karya-text-muted)] hover:text-[var(--karya-primary)]'
+                        }`}
+                      >
+                        الكل ({catalog.length})
+                      </button>
+                      {brands.map((brand) => (
+                        <button
+                          key={brand}
+                          type="button"
+                          onClick={() => setSelectedBrand(brand)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${
+                            selectedBrand === brand
+                              ? 'bg-[var(--karya-primary)] text-white'
+                              : 'bg-[var(--karya-bg)] border border-[var(--karya-border)] text-[var(--karya-text-muted)] hover:text-[var(--karya-primary)]'
+                          }`}
+                        >
+                          {brand}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Catalog Models Grid */}
+                  {filteredCatalog.length === 0 ? (
+                    <div className="rounded-xl border border-[var(--karya-border)] bg-[var(--karya-bg)] p-8 text-center text-xs sm:text-sm text-[var(--karya-text-muted)]">
+                      لا توجد سيارات مطابقة لبحثك. جرّب كلمة أخرى أو اختر «الكل».
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {filteredCatalog.map((item) => {
+                        const active = selectedModel?.id === item.id;
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => handleSelectCatalogModel(item)}
+                            className={`group text-right rounded-xl border overflow-hidden transition-all flex flex-col ${
+                              active
+                                ? 'border-[var(--karya-action)] ring-2 ring-[var(--karya-action)]/20 bg-[var(--karya-action-soft)]'
+                                : 'border-[var(--karya-border)] bg-[var(--karya-surface)] hover:border-[var(--karya-action)]/50 hover:shadow-xs'
+                            }`}
+                          >
+                            <div className="aspect-[16/10] bg-[var(--karya-surface-muted)] w-full overflow-hidden relative">
+                              <img
+                                src={item.image_url}
+                                alt={`${item.brand} ${item.model}`}
+                                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                              />
+                              {active && (
+                                <span className="absolute top-2 left-2 w-6 h-6 rounded-full bg-[var(--karya-action)] text-white flex items-center justify-center shadow-xs">
+                                  <Check className="w-3.5 h-3.5" />
+                                </span>
+                              )}
+                            </div>
+                            <div className="p-2.5 sm:p-3 space-y-0.5">
+                              <div className="text-xs sm:text-sm font-extrabold text-[var(--karya-primary)] truncate">
+                                {item.brand} {item.model}
+                              </div>
+                              <div className="text-[11px] text-[var(--karya-text-muted)] truncate">
+                                {item.category} · {item.seats} مقاعد
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              ) : (
+                selectedModel && (
+                  <div className="space-y-4">
+                    {/* Selected Model Preview Strip */}
+                    <div className="rounded-xl border border-[var(--karya-border)] bg-[var(--karya-bg)] p-3 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <img
+                          src={selectedModel.image_url}
+                          alt={`${selectedModel.brand} ${selectedModel.model}`}
+                          className="w-20 h-14 rounded-lg object-cover border border-[var(--karya-border)] bg-white shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <div className="text-sm sm:text-base font-extrabold text-[var(--karya-primary)] truncate">
+                            {selectedModel.brand} {selectedModel.model}
+                          </div>
+                          <div className="text-xs text-[var(--karya-text-muted)]">
+                            {selectedModel.category} · {selectedModel.seats} مقاعد · بدون ضمانة مالية
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setAddStep('select')}
+                        className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-[var(--karya-border)] bg-white hover:bg-[var(--karya-surface-muted)] text-[var(--karya-primary)] px-3 py-1.5 text-xs font-bold transition-colors"
+                      >
+                        <ChevronRight className="w-3.5 h-3.5" />
+                        <span>تغيير الموديل</span>
+                      </button>
+                    </div>
+
+                    {/* Daily Price + Quick Chips */}
+                    <div className="space-y-2.5">
+                      <label
+                        htmlFor="modal-daily-price"
+                        className="block text-xs sm:text-sm font-extrabold text-[var(--karya-primary)]"
+                      >
+                        السعر اليومي للكراء (بالدرهم)
+                      </label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {[250, 300, 350, 400, 450, 500].map((preset) => (
+                          <button
+                            key={preset}
+                            type="button"
+                            onClick={() => setDailyPrice(String(preset))}
+                            className={`min-h-[40px] px-2.5 py-1.5 rounded-lg text-xs font-mono-tabular font-bold border transition-colors ${
+                              Number(dailyPrice) === preset
+                                ? 'border-[var(--karya-action)] bg-[var(--karya-action-soft)] text-[var(--karya-primary)] ring-1 ring-[var(--karya-action)]/30'
+                                : 'border-[var(--karya-border)] bg-[var(--karya-bg)] text-[var(--karya-text-muted)] hover:text-[var(--karya-primary)]'
+                            }`}
+                          >
+                            {preset} DH
+                          </button>
+                        ))}
+                      </div>
+                      <input
+                        id="modal-daily-price"
+                        required
+                        type="number"
+                        min={1}
+                        placeholder="حدد سعراً آخر مناسباً لك (درهم/يوم)"
+                        value={dailyPrice}
+                        onChange={(e) => setDailyPrice(e.target.value)}
+                        className="w-full min-h-[46px] rounded-lg border border-[var(--karya-border)] bg-white px-3.5 py-2 text-sm sm:text-base font-mono-tabular font-extrabold text-[var(--karya-primary)] placeholder:text-xs placeholder:font-sans placeholder:font-normal placeholder:text-[var(--karya-text-muted)] focus:border-[var(--karya-action)] focus:outline-none"
+                      />
+                    </div>
+
+                    {/* Fuel & Transmission Segmented Controls + Year & Color */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      <div>
+                        <span className="block text-xs font-bold text-[var(--karya-primary)] mb-1.5">
+                          نوع الوقود
+                        </span>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {(
+                            [
+                              { value: 'diesel', label: 'ديزل' },
+                              { value: 'essence', label: 'بنزين' },
+                              { value: 'hybrid', label: 'هجين' },
+                            ] as const
+                          ).map((opt) => (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              onClick={() => setFuelType(opt.value)}
+                              className={`min-h-[42px] rounded-lg border text-xs font-bold transition-colors ${
+                                fuelType === opt.value
+                                  ? 'border-[var(--karya-action)] bg-[var(--karya-action-soft)] text-[var(--karya-primary)]'
+                                  : 'border-[var(--karya-border)] bg-[var(--karya-bg)] text-[var(--karya-text-muted)] hover:text-[var(--karya-primary)]'
+                              }`}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <span className="block text-xs font-bold text-[var(--karya-primary)] mb-1.5">
+                          ناقل الحركة
+                        </span>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {(
+                            [
+                              { value: 'manual', label: 'يدوي (Manuelle)' },
+                              { value: 'automatic', label: 'أوتوماتيك (Auto)' },
+                            ] as const
+                          ).map((opt) => (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              onClick={() => setTransmission(opt.value)}
+                              className={`min-h-[42px] rounded-lg border text-xs font-bold transition-colors ${
+                                transmission === opt.value
+                                  ? 'border-[var(--karya-action)] bg-[var(--karya-action-soft)] text-[var(--karya-primary)]'
+                                  : 'border-[var(--karya-border)] bg-[var(--karya-bg)] text-[var(--karya-text-muted)] hover:text-[var(--karya-primary)]'
+                              }`}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label
+                          htmlFor="modal-model-year"
+                          className="block text-xs font-bold text-[var(--karya-primary)] mb-1.5"
+                        >
+                          سنة الصنع
+                        </label>
+                        <input
+                          id="modal-model-year"
+                          type="number"
+                          min={2015}
+                          max={2027}
+                          value={modelYear}
+                          onChange={(e) => setModelYear(Number(e.target.value))}
+                          className="w-full min-h-[42px] rounded-lg border border-[var(--karya-border)] bg-white px-3.5 py-2 text-sm font-mono-tabular text-[var(--karya-text)] focus:border-[var(--karya-action)] focus:outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label
+                          htmlFor="modal-car-color"
+                          className="block text-xs font-bold text-[var(--karya-primary)] mb-1.5"
+                        >
+                          اللون (اختياري)
+                        </label>
+                        <input
+                          id="modal-car-color"
+                          type="text"
+                          placeholder="أبيض، رمادي، أسود..."
+                          value={color}
+                          onChange={(e) => setColor(e.target.value)}
+                          className="w-full min-h-[42px] rounded-lg border border-[var(--karya-border)] bg-white px-3.5 py-2 text-sm text-[var(--karya-text)] focus:border-[var(--karya-action)] focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Live 90% Net Handover Calculator */}
+                    <div className="rounded-xl bg-[var(--karya-bg)] border border-[var(--karya-border)] p-3.5 sm:p-4 space-y-2.5">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
+                        <div>
+                          <div className="text-[11px] font-semibold text-[var(--karya-text-muted)]">
+                            صافي ما تقبضه يومياً عند التسليم (90%)
+                          </div>
+                          <div className="text-base sm:text-lg font-extrabold text-[var(--karya-action)] font-mono-tabular mt-0.5">
+                            {formatDH(Math.max(0, Number(dailyPrice) || 0) * 0.9)}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-[11px] font-semibold text-[var(--karya-text-muted)]">
+                            صافي أقل حجز (3 أيام — 90%)
+                          </div>
+                          <div className="text-base sm:text-lg font-extrabold text-[var(--karya-primary)] font-mono-tabular mt-0.5">
+                            {formatDH(Math.max(0, Number(dailyPrice) || 0) * 3 * 0.9)}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-[11px] font-semibold text-[var(--karya-text-muted)]">
+                            مبلغ تأكيد الحجز للمنصة (3 أيام — 10%)
+                          </div>
+                          <div className="text-sm font-bold text-[var(--karya-text)] font-mono-tabular mt-0.5">
+                            {formatDH(Math.max(0, Number(dailyPrice) || 0) * 3 * 0.1)}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-2 pt-2 border-t border-[var(--karya-border)] text-xs text-[var(--karya-text-muted)] leading-relaxed">
+                        <TrendingUp className="w-4 h-4 text-[var(--karya-accent)] shrink-0 mt-0.5" />
+                        <span>
+                          <strong className="text-[var(--karya-text)]">نصيحة تسعير بدون ضمانة مالية:</strong>{' '}
+                          حدد سعرك بحرية لتغطية التأمين ومصاريف التشغيل وتحصيل صافي الربح المناسب عند التسليم.
+                        </span>
+                      </div>
+                    </div>
+
+                    {errMsg && (
+                      <div className="rounded-xl bg-red-50 border border-red-200 px-3.5 py-2.5 text-xs text-red-700 font-semibold">
+                        {errMsg}
+                      </div>
+                    )}
+                  </div>
+                )
+              )}
+            </div>
+
+            {/* Modal Sticky Footer */}
+            <div className="px-4 sm:px-6 py-3.5 border-t border-[var(--karya-border)] bg-[var(--karya-surface)] flex items-center justify-between gap-3 shrink-0">
+              {addStep === 'select' ? (
+                <>
+                  <button
+                    key="btn-step-select-cancel"
+                    type="button"
+                    onClick={() => setShowAddModal(false)}
+                    className="min-h-[44px] px-4 py-2 text-xs sm:text-sm font-bold text-[var(--karya-text-muted)] hover:text-[var(--karya-primary)]"
+                  >
+                    إلغاء
+                  </button>
+                  <button
+                    key="btn-step-select-continue"
+                    type="button"
+                    disabled={!selectedModel}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (!selectedModel) return;
+                      if (document.activeElement instanceof HTMLElement) {
+                        document.activeElement.blur();
+                      }
+                      setAddStep('configure');
+                    }}
+                    className="min-h-[44px] rounded-xl bg-[var(--karya-action)] hover:bg-[var(--karya-action-hover)] disabled:opacity-50 disabled:cursor-not-allowed text-white px-5 py-2.5 text-xs sm:text-sm font-extrabold inline-flex items-center gap-2 transition-colors"
+                  >
+                    <span>
+                      {selectedModel
+                        ? `متابعة مع ${selectedModel.brand} ${selectedModel.model}`
+                        : 'اختر سيارة للمتابعة'}
+                    </span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    key="btn-step-configure-back"
+                    type="button"
+                    disabled={saving}
+                    onClick={() => {
+                      if (document.activeElement instanceof HTMLElement) {
+                        document.activeElement.blur();
+                      }
+                      setAddStep('select');
+                    }}
+                    className="min-h-[44px] rounded-xl border border-[var(--karya-border)] bg-[var(--karya-surface)] hover:bg-[var(--karya-bg)] text-[var(--karya-primary)] px-4 py-2 text-xs sm:text-sm font-bold inline-flex items-center gap-1.5 transition-colors"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                    <span>رجوع</span>
+                  </button>
+                  <button
+                    key="btn-step-configure-submit"
+                    type="submit"
+                    disabled={saving || !selectedModel}
+                    className="min-h-[44px] rounded-xl bg-[var(--karya-action)] hover:bg-[var(--karya-action-hover)] disabled:opacity-60 text-white px-5 py-2.5 text-xs sm:text-sm font-extrabold inline-flex items-center gap-2 transition-colors"
+                  >
+                    {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                    <span>نشر السيارة في أسطولي</span>
+                  </button>
+                </>
+              )}
+            </div>
+          </form>
         </div>
       )}
     </div>
