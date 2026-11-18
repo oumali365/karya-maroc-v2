@@ -728,7 +728,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                 <div className="pt-3 border-t border-[var(--karya-border)] space-y-1.5 text-xs">
                   <div className="flex items-center justify-between text-[var(--karya-text-muted)]">
                     <span>
-                      الإجمالي ({days} × {car.daily_price} DH)
+                      السعر اليومي {car.daily_price} DH × {days} {days <= 10 ? 'أيام' : 'يوماً'}
                     </span>
                     <span className="font-mono-tabular font-bold text-[var(--karya-text)]">
                       {formatDH(totalAmount)}
@@ -987,7 +987,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                   </div>
                 )}
                 <div className="text-xs font-bold text-[var(--karya-action)]">
-                  بدون ضمانة مالية (0 درهم)
+                  بدون ضمانة مالية
                 </div>
 
                 <div className="text-xs text-[var(--karya-text-muted)] pt-2 border-t border-[var(--karya-border)] flex items-center justify-between">

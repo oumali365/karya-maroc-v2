@@ -565,7 +565,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
                 const isSelected = brandFilter.toLowerCase() === brand.toLowerCase();
                 const subtitle =
                   count === 0
-                    ? 'غير متوفرة حالياً'
+                    ? 'غير متاحة حالياً'
                     : count === 1
                       ? 'سيارة واحدة'
                       : count === 2

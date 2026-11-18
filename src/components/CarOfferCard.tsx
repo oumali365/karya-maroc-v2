@@ -163,6 +163,9 @@ export const CarOfferCard: React.FC<CarOfferCardProps> = ({
         {/* Prominent Daily Price & Booking CTA */}
         <div className="mt-auto pt-3.5 border-t border-[var(--karya-border)] flex items-center justify-between gap-3">
           <div className="min-w-0">
+            <div className="text-[11px] font-semibold text-[var(--karya-text-muted)] mb-0.5">
+              السعر اليومي
+            </div>
             <div className="flex items-baseline gap-1">
               <span className="text-2xl font-extrabold text-[var(--karya-primary)] font-mono-tabular leading-none">
                 {car.daily_price}
@@ -190,7 +193,7 @@ export const CarOfferCard: React.FC<CarOfferCardProps> = ({
             }`}
           >
             {isBooked ? (
-              <span>غير متوفرة</span>
+              <span>غير متاحة</span>
             ) : (
               <>
                 <span>احجز الآن</span>

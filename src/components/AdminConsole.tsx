@@ -465,7 +465,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
             {formatDH(totalCommission)}
           </div>
           <div className="text-[11px] text-[var(--karya-text-muted)] mt-1 font-mono-tabular">
-            حجم تسليم الوكالات (90%): {formatDH(totalAgencyPayoutsVolume)}
+            مستحقات الوكالات عند التسليم (90%): {formatDH(totalAgencyPayoutsVolume)}
           </div>
         </div>
 
@@ -784,7 +784,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
                             </span>
                             <span>·</span>
                             <span>
-                              للوكالة (90%):{' '}
+                              مستحقات الوكالة (90%):{' '}
                               <span className="font-mono-tabular font-bold text-[var(--karya-primary)]">
                                 {formatDH(Number(b.agency_payout_amount))}
                               </span>
@@ -802,9 +802,9 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
                               }`}
                             >
                               {b.agency_ack_status === 'available'
-                                ? 'الوكالة أكدت توفر السيارة'
+                                ? 'الوكالة أكدت: السيارة متاحة'
                                 : b.agency_ack_status === 'unavailable'
-                                  ? 'الوكالة اعتذرت: غير متوفرة (يُرجى التحويل!)'
+                                  ? 'الوكالة اعتذرت: غير متاحة (يُرجى التحويل!)'
                                   : 'بانتظار رد الوكالة على التوفر'}
                             </span>
 
@@ -1193,7 +1193,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
                                 : 'قيد المراجعة'}
                           </span>
                           <span className="text-[11px] font-semibold text-[var(--karya-text-muted)] bg-[var(--karya-bg)] border border-[var(--karya-border)] px-2 py-0.5 rounded">
-                            سيارات نشطة: <span className="font-mono-tabular font-bold text-[var(--karya-primary)]">{availableCarCountByAgency[ag.id] || 0}</span>
+                            سيارات متاحة: <span className="font-mono-tabular font-bold text-[var(--karya-primary)]">{availableCarCountByAgency[ag.id] || 0}</span>
                           </span>
                         </div>
                         <div className="text-xs text-[var(--karya-text-muted)] flex flex-wrap items-center gap-2">

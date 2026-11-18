@@ -550,7 +550,7 @@ export const AgencyPortal: React.FC<AgencyPortalProps> = ({ onGoToCustomer }) =>
 
               <div className="rounded-xl bg-[var(--karya-bg)] border border-[var(--karya-border)] px-4 py-3 shrink-0">
                 <div className="text-[11px] font-semibold text-[var(--karya-text-muted)]">
-                  يُستخلص عند التسليم (90%)
+                  مستحقات الوكالة عند التسليم (90%)
                 </div>
                 <div className="text-xl font-extrabold text-[var(--karya-primary)] font-mono-tabular mt-0.5">
                   {formatDH(totalPayoutExpected)}
@@ -1372,9 +1372,9 @@ const AgencyFleetManager: React.FC<{
           {(
             [
               { key: 'all', label: `الكل (${cars.length})` },
-              { key: 'available', label: `متاح الآن (${freeAvailableCount})` },
-              { key: 'booked', label: `محجوز حالياً (${bookedCount})` },
-              { key: 'unavailable', label: `غير متاح (${unavailableCount})` },
+              { key: 'available', label: `متاحة الآن (${freeAvailableCount})` },
+              { key: 'booked', label: `محجوزة حالياً (${bookedCount})` },
+              { key: 'unavailable', label: `غير متاحة (${unavailableCount})` },
             ] as const
           ).map((f) => (
             <button
@@ -1487,7 +1487,7 @@ const AgencyFleetManager: React.FC<{
                           car.status === 'available' ? 'text-emerald-700' : 'text-[var(--karya-text-muted)]'
                         }`}
                       >
-                        {car.status === 'available' ? 'متاح' : 'غير متاح'}
+                        {car.status === 'available' ? 'متاحة' : 'غير متاحة'}
                       </span>
                     </div>
 
@@ -1508,10 +1508,14 @@ const AgencyFleetManager: React.FC<{
 
                     {isEditingPrice ? (
                       <div className="space-y-1.5">
+                        <div className="text-[11px] font-semibold text-[var(--karya-text-muted)]">
+                          السعر اليومي
+                        </div>
                         <div className="flex items-center gap-1.5">
                           <input
                             type="number"
                             min={1}
+                            aria-label="السعر اليومي"
                             value={priceDraft}
                             onChange={(e) => setPriceDraft(Number(e.target.value))}
                             className="w-28 rounded-lg border border-[var(--karya-action)] px-2.5 py-1 text-sm font-mono-tabular text-[var(--karya-text)] focus:outline-none"
@@ -1522,7 +1526,7 @@ const AgencyFleetManager: React.FC<{
                             disabled={isBusy}
                             onClick={() => handleSavePrice(car.id)}
                             className="p-1.5 rounded-lg bg-[var(--karya-action)] text-white hover:bg-[var(--karya-action-hover)]"
-                            aria-label="حفظ السعر"
+                            aria-label="حفظ السعر اليومي"
                           >
                             <Check className="w-3.5 h-3.5" />
                           </button>
@@ -1536,14 +1540,19 @@ const AgencyFleetManager: React.FC<{
                           </button>
                         </div>
                         <div className="text-[11px] font-semibold text-[var(--karya-action)] font-mono-tabular">
-                          صافي التسليم (90%): {formatDH(Math.max(0, priceDraft || 0) * 0.9)} / يوم
+                          مستحقات الوكالة (90%): {formatDH(Math.max(0, priceDraft || 0) * 0.9)} / يوم
                         </div>
                       </div>
                     ) : (
                       <div className="space-y-0.5">
-                        <div className="flex items-center justify-between">
-                          <div className="font-mono-tabular font-extrabold text-sm text-[var(--karya-primary)]">
-                            {formatDH(car.daily_price)} / يوم
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <div className="text-[11px] font-semibold text-[var(--karya-text-muted)]">
+                              السعر اليومي
+                            </div>
+                            <div className="font-mono-tabular font-extrabold text-sm text-[var(--karya-primary)]">
+                              {formatDH(car.daily_price)} / يوم
+                            </div>
                           </div>
                           <button
                             type="button"
@@ -1551,14 +1560,14 @@ const AgencyFleetManager: React.FC<{
                               setEditingPriceId(car.id);
                               setPriceDraft(car.daily_price);
                             }}
-                            className="text-xs font-semibold text-[var(--karya-text-muted)] hover:text-[var(--karya-action)] inline-flex items-center gap-1 transition-colors"
+                            className="text-xs font-semibold text-[var(--karya-text-muted)] hover:text-[var(--karya-action)] inline-flex items-center gap-1 transition-colors mt-0.5"
                           >
                             <Pencil className="w-3 h-3" />
                             <span>تعديل السعر</span>
                           </button>
                         </div>
                         <div className="text-[11px] font-semibold text-[var(--karya-action)] font-mono-tabular">
-                          صافي التسليم (90%): {formatDH(car.daily_price * 0.9)} / يوم
+                          مستحقات الوكالة (90%): {formatDH(car.daily_price * 0.9)} / يوم
                         </div>
                       </div>
                     )}
@@ -1578,12 +1587,12 @@ const AgencyFleetManager: React.FC<{
                       {car.status === 'available' ? (
                         <>
                           <EyeOff className="w-3.5 h-3.5" />
-                          <span>تغيير إلى غير متاح</span>
+                          <span>إيقاف إتاحة السيارة</span>
                         </>
                       ) : (
                         <>
                           <Eye className="w-3.5 h-3.5" />
-                          <span>تفعيل كـ متاح</span>
+                          <span>إتاحة السيارة للحجز</span>
                         </>
                       )}
                     </button>
@@ -1613,7 +1622,7 @@ const AgencyFleetManager: React.FC<{
                         className="w-full min-h-[38px] rounded-lg py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 flex items-center justify-center gap-1 transition-colors"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
-                        <span>حذف من الأسطول</span>
+                        <span>حذف السيارة من الأسطول</span>
                       </button>
                     )}
                   </div>
@@ -1802,7 +1811,7 @@ const AgencyFleetManager: React.FC<{
                         htmlFor="modal-daily-price"
                         className="block text-xs sm:text-sm font-extrabold text-[var(--karya-primary)]"
                       >
-                        السعر اليومي للكراء (بالدرهم)
+                        السعر اليومي (بالدرهم)
                       </label>
                       <div className="grid grid-cols-3 gap-2">
                         {[250, 300, 350, 400, 450, 500].map((preset) => (
@@ -1930,7 +1939,7 @@ const AgencyFleetManager: React.FC<{
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
                         <div>
                           <div className="text-[11px] font-semibold text-[var(--karya-text-muted)]">
-                            صافي ما تقبضه يومياً عند التسليم (90%)
+                            مستحقات الوكالة يومياً (90%)
                           </div>
                           <div className="text-base sm:text-lg font-extrabold text-[var(--karya-action)] font-mono-tabular mt-0.5">
                             {formatDH(Math.max(0, Number(dailyPrice) || 0) * 0.9)}
@@ -1938,7 +1947,7 @@ const AgencyFleetManager: React.FC<{
                         </div>
                         <div>
                           <div className="text-[11px] font-semibold text-[var(--karya-text-muted)]">
-                            صافي أقل حجز (3 أيام — 90%)
+                            مستحقات الوكالة لأقل حجز (3 أيام — 90%)
                           </div>
                           <div className="text-base sm:text-lg font-extrabold text-[var(--karya-primary)] font-mono-tabular mt-0.5">
                             {formatDH(Math.max(0, Number(dailyPrice) || 0) * 3 * 0.9)}
@@ -1956,8 +1965,8 @@ const AgencyFleetManager: React.FC<{
                       <div className="flex items-start gap-2 pt-2 border-t border-[var(--karya-border)] text-xs text-[var(--karya-text-muted)] leading-relaxed">
                         <TrendingUp className="w-4 h-4 text-[var(--karya-accent)] shrink-0 mt-0.5" />
                         <span>
-                          <strong className="text-[var(--karya-text)]">نصيحة تسعير بدون ضمانة مالية:</strong>{' '}
-                          حدد سعرك بحرية لتغطية التأمين ومصاريف التشغيل وتحصيل صافي الربح المناسب عند التسليم.
+                          <strong className="text-[var(--karya-text)]">بدون ضمانة مالية:</strong>{' '}
+                          حدد السعر اليومي بحرية بما يغطي التأمين ومصاريف التشغيل ويضمن مستحقات الوكالة المناسبة عند التسليم.
                         </span>
                       </div>
                     </div>
@@ -2238,7 +2247,7 @@ const AgencyBookingsManager: React.FC<{
                           ? 'تنبيه عاجل: تغيب العميل عن موعد استلام السيارة'
                           : b.dispute_flag === 'invalid_license'
                             ? 'تنبيه عاجل: رخصة العميل غير مطابقة (أقل من 3 سنوات)'
-                            : 'تم الإبلاغ عن عدم توفر السيارة — بانتظار التحويل'}
+                            : 'السيارة غير متاحة — بانتظار التحويل'}
                       </span>
                     </span>
                     <span className="font-mono-tabular text-[11px] bg-white/20 px-2 py-0.5 rounded">
@@ -2296,7 +2305,7 @@ const AgencyBookingsManager: React.FC<{
                     {/* Prominent Payout at Pickup */}
                     <div className="rounded-xl bg-[var(--karya-bg)] border border-[var(--karya-border)] px-3.5 py-2 text-right sm:text-left shrink-0">
                       <div className="text-[11px] font-semibold text-[var(--karya-text-muted)]">
-                        يُحصّل عند التسليم (90%)
+                        مستحقات الوكالة (90%)
                       </div>
                       <div className="text-lg font-extrabold text-[var(--karya-primary)] font-mono-tabular">
                         {formatDH(b.agency_payout_amount)}
@@ -2370,7 +2379,7 @@ const AgencyBookingsManager: React.FC<{
                             className="flex-1 min-h-[46px] rounded-xl bg-[var(--karya-action)] hover:bg-[var(--karya-action-hover)] disabled:opacity-60 text-white px-4 py-2.5 text-sm font-extrabold transition-colors flex items-center justify-center gap-2"
                           >
                             <Check className="w-4 h-4" />
-                            <span>السيارة متوفرة</span>
+                            <span>السيارة متاحة</span>
                           </button>
                           <button
                             type="button"
@@ -2379,7 +2388,7 @@ const AgencyBookingsManager: React.FC<{
                             className="min-h-[46px] rounded-xl border border-red-200 bg-white hover:bg-red-50 disabled:opacity-60 text-red-700 px-4 py-2.5 text-xs sm:text-sm font-bold transition-colors flex items-center justify-center gap-1.5"
                           >
                             <Ban className="w-4 h-4" />
-                            <span>غير متوفرة</span>
+                            <span>غير متاحة</span>
                           </button>
                         </div>
                       )}
