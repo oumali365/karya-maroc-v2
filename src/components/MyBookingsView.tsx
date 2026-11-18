@@ -12,9 +12,92 @@ import {
   ShieldCheck,
   Phone,
   Hash,
+  ClipboardCheck,
+  X,
+  Copy,
+  Check,
+  Fuel,
+  Gauge,
 } from 'lucide-react';
 import { supabase, formatDH, getCityLabelAr } from '../lib/supabase';
 import type { BookingStatus, CreatedBooking } from '../types/karya';
+
+const PICKUP_CHECKLIST_STORAGE_KEY = 'karya_pickup_checklist_v1';
+
+interface PickupChecklistItemDef {
+  id: string;
+  title: string;
+  hint: string;
+}
+
+const PICKUP_CHECKLIST_ITEMS: PickupChecklistItemDef[] = [
+  {
+    id: 'exterior_glass',
+    title: 'الهيكل الخارجي والزجاج',
+    hint: 'فحص الصدامات، الأبواب، المرايا والزجاج الأمامي، وتصوير أي خدوش سابقة أمام مسؤول الوكالة.',
+  },
+  {
+    id: 'tires_spare',
+    title: 'الإطارات والعجلة الاحتياطية',
+    hint: 'التأكد من حالة الإطارات الأربعة ووجود العجلة الاحتياطية والرافعة ومفتاح العجلات.',
+  },
+  {
+    id: 'lights_ac',
+    title: 'الأضواء والمسّاحات والتكييف',
+    hint: 'تجربة المصابيح الأمامية والخلفية، إشارات الانعطاف، المسّاحات، وعمل المكيف.',
+  },
+  {
+    id: 'car_papers',
+    title: 'الوثائق القانونية للسيارة',
+    hint: 'التحقق من وجود البطاقة الرمادية، شهادة التأمين سارية المفعول، والفحص التقني داخل السيارة.',
+  },
+  {
+    id: 'safety_kit',
+    title: 'تجهيزات السلامة القانونية',
+    hint: 'التأكد من توفر مثلث التحذير وسترة السلامة داخل الصندوق الخلفي.',
+  },
+  {
+    id: 'contract_docs',
+    title: 'العقد الرسمي والوثائق الشخصية',
+    hint: 'تقديم البطاقة الوطنية ورخصة السياقة (3 سنوات+) وتوقيع عقد الكراء الرسمي مع الاحتفاظ بنسخة.',
+  },
+  {
+    id: 'fuel_remaining_pay',
+    title: 'تثبيت العداد والوقود ودفع الـ 90%',
+    hint: 'تأكيد مستوى الوقود وقراءة العداد، وتسليم المبلغ المتبقي (90%) للوكالة بعد المعاينة.',
+  },
+];
+
+type FuelLevelOption = '1/4' | '1/2' | '3/4' | '4/4';
+
+interface PickupInspectionRecord {
+  checkedIds: string[];
+  odometerKm: string;
+  fuelLevel: FuelLevelOption | '';
+  notes: string;
+  savedAt: string;
+}
+
+function loadAllChecklists(): Record<string, PickupInspectionRecord> {
+  try {
+    const raw = window.localStorage.getItem(PICKUP_CHECKLIST_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveChecklistForCode(code: string, record: PickupInspectionRecord): void {
+  try {
+    const all = loadAllChecklists();
+    all[code] = record;
+    window.localStorage.setItem(PICKUP_CHECKLIST_STORAGE_KEY, JSON.stringify(all));
+  } catch {
+    // Ignore storage quota errors
+  }
+}
 
 interface MyBookingsViewProps {
   recentBookings: CreatedBooking[];
@@ -183,6 +266,17 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
   const [refundFeedback, setRefundFeedback] = useState<string | null>(null);
   const [refundError, setRefundError] = useState<string | null>(null);
 
+  const [checklistsByCode, setChecklistsByCode] = useState<Record<string, PickupInspectionRecord>>(() =>
+    loadAllChecklists(),
+  );
+  const [checklistTarget, setChecklistTarget] = useState<CreatedBooking | null>(null);
+  const [draftCheckedIds, setDraftCheckedIds] = useState<string[]>([]);
+  const [draftOdometer, setDraftOdometer] = useState('');
+  const [draftFuelLevel, setDraftFuelLevel] = useState<FuelLevelOption | ''>('');
+  const [draftNotes, setDraftNotes] = useState('');
+  const [checklistSavedMsg, setChecklistSavedMsg] = useState<string | null>(null);
+  const [checklistCopied, setChecklistCopied] = useState(false);
+
   useEffect(() => {
     let active = true;
 
@@ -339,6 +433,76 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
     window.setTimeout(() => {
       document.getElementById('refund-request-panel')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 80);
+  };
+
+  const openChecklistForBooking = (booking: CreatedBooking) => {
+    const existing = checklistsByCode[booking.booking_code];
+    setChecklistTarget(booking);
+    setDraftCheckedIds(existing?.checkedIds ?? []);
+    setDraftOdometer(existing?.odometerKm ?? '');
+    setDraftFuelLevel(existing?.fuelLevel ?? '');
+    setDraftNotes(existing?.notes ?? '');
+    setChecklistSavedMsg(null);
+    setChecklistCopied(false);
+  };
+
+  const toggleChecklistItem = (itemId: string) => {
+    setDraftCheckedIds((prev) =>
+      prev.includes(itemId) ? prev.filter((id) => id !== itemId) : [...prev, itemId],
+    );
+    setChecklistSavedMsg(null);
+  };
+
+  const handleSaveChecklist = () => {
+    if (!checklistTarget) return;
+    const record: PickupInspectionRecord = {
+      checkedIds: draftCheckedIds,
+      odometerKm: draftOdometer.trim(),
+      fuelLevel: draftFuelLevel,
+      notes: draftNotes.trim(),
+      savedAt: new Date().toISOString(),
+    };
+    saveChecklistForCode(checklistTarget.booking_code, record);
+    setChecklistsByCode((prev) => ({
+      ...prev,
+      [checklistTarget.booking_code]: record,
+    }));
+    setChecklistSavedMsg('تم حفظ قائمة الفحص وحالة السيارة على جهازك بنجاح.');
+  };
+
+  const handleCopyChecklistSummary = async () => {
+    if (!checklistTarget) return;
+    const checkedTitles = PICKUP_CHECKLIST_ITEMS.filter((item) =>
+      draftCheckedIds.includes(item.id),
+    ).map((item) => `✓ ${item.title}`);
+    const fuelLabels: Record<FuelLevelOption, string> = {
+      '1/4': 'ربع (1/4)',
+      '1/2': 'نصف (1/2)',
+      '3/4': 'ثلاثة أرباع (3/4)',
+      '4/4': 'ممتلئ (4/4)',
+    };
+    const summaryLines = [
+      `توثيق استلام سيارة — منصة Karya`,
+      `• رمز الحجز: ${checklistTarget.booking_code}`,
+      `• السيارة: ${checklistTarget.car_label}`,
+      `• الوكالة: ${checklistTarget.agency_name} (${getCityLabelAr(checklistTarget.city)})`,
+      `• المبلغ المتبقي عند الاستلام (90%): ${formatDH(checklistTarget.agency_payout_amount)}`,
+      draftOdometer.trim() ? `• قراءة العداد عند الاستلام: ${draftOdometer.trim()} كم` : '',
+      draftFuelLevel ? `• مستوى الوقود: ${fuelLabels[draftFuelLevel]}` : '',
+      `• البنود المفحوصة (${checkedTitles.length}/${PICKUP_CHECKLIST_ITEMS.length}):`,
+      ...(checkedTitles.length > 0 ? checkedTitles : ['- لم يتم تأشير بنود بعد']),
+      draftNotes.trim() ? `• ملاحظات الحالة: ${draftNotes.trim()}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    try {
+      await navigator.clipboard.writeText(summaryLines);
+      setChecklistCopied(true);
+      window.setTimeout(() => setChecklistCopied(false), 2000);
+    } catch {
+      // Ignore clipboard failure
+    }
   };
 
   const handleSubmitRefund = async (e: React.FormEvent) => {
@@ -619,21 +783,59 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
                         </div>
                       )}
 
-                    {refundEligibility.eligible ? (
-                      <button
-                        type="button"
-                        onClick={() => openRefundForBooking(booking)}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 px-4 py-2 text-xs font-extrabold transition-colors whitespace-nowrap"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                        <span>طلب استرجاع مبلغ التأكيد</span>
-                      </button>
-                    ) : (
-                      refundEligibility.blockedMessage && (
-                        <div className="text-[11px] text-[var(--karya-text-muted)] leading-relaxed">
-                          {refundEligibility.blockedMessage}
-                        </div>
-                      )
+                    <div className="flex flex-wrap items-center gap-2">
+                      {!['cancelled', 'refund_requested', 'refunded'].includes(booking.status) && (() => {
+                        const savedChecklist = checklistsByCode[booking.booking_code];
+                        const checkedCount = savedChecklist?.checkedIds.length ?? 0;
+                        const totalItems = PICKUP_CHECKLIST_ITEMS.length;
+                        const isComplete = checkedCount === totalItems;
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => openChecklistForBooking(booking)}
+                            className={`inline-flex items-center gap-1.5 rounded-lg border px-3.5 py-2 min-h-[38px] text-xs font-bold transition-colors whitespace-nowrap ${
+                              isComplete
+                                ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                                : 'border-[var(--karya-action)]/30 bg-[var(--karya-action-soft)] text-[var(--karya-primary)] hover:bg-blue-100/60'
+                            }`}
+                          >
+                            <ClipboardCheck
+                              className={`w-3.5 h-3.5 ${
+                                isComplete ? 'text-emerald-700' : 'text-[var(--karya-action)]'
+                              }`}
+                            />
+                            <span>قائمة التحقق عند الاستلام</span>
+                            {checkedCount > 0 && (
+                              <span
+                                className={`font-mono-tabular text-[11px] px-1.5 py-0.5 rounded ${
+                                  isComplete
+                                    ? 'bg-emerald-600 text-white'
+                                    : 'bg-[var(--karya-primary)] text-white'
+                                }`}
+                              >
+                                {checkedCount}/{totalItems}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })()}
+
+                      {refundEligibility.eligible && (
+                        <button
+                          type="button"
+                          onClick={() => openRefundForBooking(booking)}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 px-4 py-2 min-h-[38px] text-xs font-extrabold transition-colors whitespace-nowrap"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>طلب استرجاع مبلغ التأكيد</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {!refundEligibility.eligible && refundEligibility.blockedMessage && (
+                      <div className="w-full text-[11px] text-[var(--karya-text-muted)] leading-relaxed">
+                        {refundEligibility.blockedMessage}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -733,6 +935,241 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
             <span>إرسال طلب الاسترجاع</span>
           </button>
         </form>
+      )}
+
+      {/* Pickup Inspection Checklist Modal */}
+      {checklistTarget && (
+        <div
+          className="fixed inset-0 z-50 bg-[#173B57]/60 backdrop-blur-xs flex items-end sm:items-center justify-center sm:p-4"
+          dir="rtl"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="pickup-checklist-title"
+          onClick={() => setChecklistTarget(null)}
+        >
+          <div
+            className="bg-[var(--karya-surface)] w-full sm:max-w-xl h-[92dvh] sm:h-auto sm:max-h-[90vh] rounded-t-2xl sm:rounded-xl shadow-2xl border border-[var(--karya-border)] flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="px-4 sm:px-6 py-4 border-b border-[var(--karya-border)] flex items-start justify-between gap-3 bg-[var(--karya-surface)] shrink-0">
+              <div className="space-y-1 min-w-0">
+                <h2
+                  id="pickup-checklist-title"
+                  className="text-base sm:text-lg font-extrabold text-[var(--karya-primary)] flex items-center gap-2"
+                >
+                  <ClipboardCheck className="w-5 h-5 text-[var(--karya-action)] shrink-0" />
+                  <span>قائمة التحقق عند الاستلام</span>
+                </h2>
+                <p className="text-xs text-[var(--karya-text-muted)] truncate">
+                  {checklistTarget.car_label} · <span className="font-mono-tabular font-bold">{checklistTarget.booking_code}</span> · {checklistTarget.agency_name}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setChecklistTarget(null)}
+                aria-label="إغلاق قائمة التحقق"
+                className="w-9 h-9 rounded-lg flex items-center justify-center text-[var(--karya-text-muted)] hover:text-[var(--karya-primary)] hover:bg-[var(--karya-bg)] shrink-0"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6 py-4 space-y-4">
+              {/* Progress Bar */}
+              <div className="rounded-lg bg-[var(--karya-bg)] border border-[var(--karya-border)] p-3 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-[var(--karya-primary)]">
+                    تقدم فحص السيارة وتوثيق الحالة
+                  </span>
+                  <span className="font-mono-tabular font-extrabold text-[var(--karya-action)]">
+                    {draftCheckedIds.length} / {PICKUP_CHECKLIST_ITEMS.length}
+                  </span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-slate-200 overflow-hidden">
+                  <div
+                    className={`h-full transition-all duration-300 ${
+                      draftCheckedIds.length === PICKUP_CHECKLIST_ITEMS.length
+                        ? 'bg-emerald-600'
+                        : 'bg-[var(--karya-action)]'
+                    }`}
+                    style={{
+                      width: `${Math.round((draftCheckedIds.length / PICKUP_CHECKLIST_ITEMS.length) * 100)}%`,
+                    }}
+                  />
+                </div>
+                <p className="text-[11px] text-[var(--karya-text-muted)] leading-relaxed">
+                  افحص السيارة مع مسؤول الوكالة قبل تسليم المبلغ المتبقي (<strong className="text-[var(--karya-primary)] font-mono-tabular">{formatDH(checklistTarget.agency_payout_amount)}</strong>) وتوقيع العقد، لتفادي أي خلاف عند الإرجاع.
+                </p>
+              </div>
+
+              {/* Checklist Items */}
+              <div className="divide-y divide-[var(--karya-border)] rounded-xl border border-[var(--karya-border)] bg-[var(--karya-surface)] overflow-hidden">
+                {PICKUP_CHECKLIST_ITEMS.map((item) => {
+                  const checked = draftCheckedIds.includes(item.id);
+                  return (
+                    <label
+                      key={item.id}
+                      className={`flex items-start gap-3 p-3.5 cursor-pointer select-none transition-colors ${
+                        checked ? 'bg-emerald-50/50' : 'hover:bg-[var(--karya-surface-muted)]'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleChecklistItem(item.id)}
+                        className="mt-0.5 w-4.5 h-4.5 rounded border-slate-300 text-emerald-600 focus:ring-[var(--karya-action)] shrink-0"
+                      />
+                      <div className="min-w-0 space-y-0.5">
+                        <div
+                          className={`text-xs sm:text-sm font-bold ${
+                            checked ? 'text-emerald-900' : 'text-[var(--karya-primary)]'
+                          }`}
+                        >
+                          {item.title}
+                        </div>
+                        <p className="text-[11px] text-[var(--karya-text-muted)] leading-relaxed">
+                          {item.hint}
+                        </p>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+
+              {/* Odometer & Fuel Snapshot */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+                <div>
+                  <label
+                    htmlFor="pickup-odometer-input"
+                    className="flex items-center gap-1.5 text-xs font-bold text-[var(--karya-primary)] mb-1.5"
+                  >
+                    <Gauge className="w-3.5 h-3.5 text-[var(--karya-text-muted)]" />
+                    <span>قراءة العداد عند الاستلام (كم)</span>
+                  </label>
+                  <input
+                    id="pickup-odometer-input"
+                    type="text"
+                    inputMode="numeric"
+                    dir="ltr"
+                    placeholder="مثال: 68420"
+                    value={draftOdometer}
+                    onChange={(e) => {
+                      setDraftOdometer(e.target.value.replace(/[^0-9]/g, ''));
+                      setChecklistSavedMsg(null);
+                    }}
+                    className="w-full min-h-[44px] rounded-lg border border-[var(--karya-border)] bg-[var(--karya-bg)] px-3.5 py-2 text-sm font-mono-tabular focus:bg-white focus:border-[var(--karya-action)] focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <span className="flex items-center gap-1.5 text-xs font-bold text-[var(--karya-primary)] mb-1.5">
+                    <Fuel className="w-3.5 h-3.5 text-[var(--karya-text-muted)]" />
+                    <span>مستوى الوقود عند الاستلام</span>
+                  </span>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {(
+                      [
+                        { value: '1/4', label: '1/4' },
+                        { value: '1/2', label: '1/2' },
+                        { value: '3/4', label: '3/4' },
+                        { value: '4/4', label: 'ممتلئ' },
+                      ] as const
+                    ).map((opt) => {
+                      const active = draftFuelLevel === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => {
+                            setDraftFuelLevel(active ? '' : opt.value);
+                            setChecklistSavedMsg(null);
+                          }}
+                          className={`min-h-[44px] rounded-lg border text-xs font-bold transition-colors ${
+                            active
+                              ? 'border-[var(--karya-action)] bg-[var(--karya-action-soft)] text-[var(--karya-primary)]'
+                              : 'border-[var(--karya-border)] bg-[var(--karya-bg)] text-[var(--karya-text-muted)] hover:text-[var(--karya-primary)]'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Condition / Scratches Notes */}
+              <div>
+                <label
+                  htmlFor="pickup-notes-input"
+                  className="block text-xs font-bold text-[var(--karya-primary)] mb-1.5"
+                >
+                  ملاحظات الحالة أو الخدوش الموجودة مسبقاً (اختياري)
+                </label>
+                <textarea
+                  id="pickup-notes-input"
+                  rows={2}
+                  placeholder="مثال: خدش خفيف في الصدام الأمامي الأيسر تم تصويره بحضور مسؤول الوكالة..."
+                  value={draftNotes}
+                  onChange={(e) => {
+                    setDraftNotes(e.target.value);
+                    setChecklistSavedMsg(null);
+                  }}
+                  className="w-full rounded-lg border border-[var(--karya-border)] bg-[var(--karya-bg)] px-3.5 py-2.5 text-xs sm:text-sm focus:bg-white focus:border-[var(--karya-action)] focus:outline-none"
+                />
+              </div>
+
+              {checklistSavedMsg && (
+                <div
+                  role="status"
+                  className="rounded-lg bg-emerald-50 border border-emerald-200 px-3.5 py-2.5 text-xs font-bold text-emerald-800 flex items-center gap-2"
+                >
+                  <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
+                  <span>{checklistSavedMsg}</span>
+                </div>
+              )}
+
+              {checklistsByCode[checklistTarget.booking_code]?.savedAt && !checklistSavedMsg && (
+                <p className="text-[11px] text-[var(--karya-text-muted)]">
+                  آخر توثيق محفوظ:{' '}
+                  {new Date(checklistsByCode[checklistTarget.booking_code].savedAt).toLocaleString('ar-MA')}
+                </p>
+              )}
+            </div>
+
+            {/* Footer Actions */}
+            <div className="px-4 sm:px-6 py-3.5 border-t border-[var(--karya-border)] bg-[var(--karya-surface)] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 shrink-0">
+              <button
+                type="button"
+                onClick={handleCopyChecklistSummary}
+                className="min-h-[44px] rounded-lg border border-[var(--karya-border)] bg-[var(--karya-surface)] hover:bg-[var(--karya-bg)] text-[var(--karya-primary)] px-4 py-2 text-xs font-bold inline-flex items-center justify-center gap-1.5 transition-colors"
+              >
+                {checklistCopied ? (
+                  <>
+                    <Check className="w-4 h-4 text-emerald-700" />
+                    <span>تم نسخ ملخص الفحص</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4 text-[var(--karya-text-muted)]" />
+                    <span>نسخ ملخص التوثيق</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSaveChecklist}
+                className="min-h-[44px] rounded-lg bg-[var(--karya-action)] hover:bg-[var(--karya-action-hover)] text-white px-5 py-2.5 text-xs sm:text-sm font-extrabold inline-flex items-center justify-center gap-2 transition-colors"
+              >
+                <ClipboardCheck className="w-4 h-4" />
+                <span>حفظ قائمة التحقق</span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </section>
   );

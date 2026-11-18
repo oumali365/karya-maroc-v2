@@ -4,7 +4,7 @@ import {
   Lock,
   Home,
   CalendarCheck2,
-  UserCircle2,
+  Building2,
   HelpCircle,
   ShieldCheck,
   X,
@@ -365,11 +365,11 @@ export function App() {
               aria-hidden="true"
             />
           )}
-          <UserCircle2
+          <Building2
             className="w-5 h-5"
             strokeWidth={route === 'agency' && !showMobileHelpSheet ? 2.25 : 1.75}
           />
-          <span className="text-[11px] whitespace-nowrap">حسابي</span>
+          <span className="text-[11px] whitespace-nowrap">بوابة الوكالات</span>
         </button>
 
         <button
