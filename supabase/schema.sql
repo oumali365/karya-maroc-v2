@@ -6,7 +6,7 @@
 --   3. Rental Agencies (Phone + PIN auth, NO email activation, NO bank RIB,
 --      Mandatory Pledge: Zero Deposit + 10% Platform Commission, Full Cloud Sync)
 --   4. Zero Deposit Mandate (deposit_amount = 0) & Minimum 3-Day Rental (days >= 3)
---   5. Strict 2-Year Driver License Seniority Check + 10% Advance Checkout
+--   5. Strict 3-Year Driver License Seniority Check + 10% Advance Checkout
 -- ============================================================================
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
@@ -293,7 +293,7 @@ CREATE INDEX IF NOT EXISTS idx_agency_cars_city_status ON public.agency_cars(cit
 CREATE INDEX IF NOT EXISTS idx_agency_cars_agency ON public.agency_cars(agency_id);
 
 -- ============================================================================
--- 7. BOOKINGS (الحجوزات: حد أدنى 3 أيام + أقدمية رخصة سنتان + تسبيق 10%)
+-- 7. BOOKINGS (الحجوزات: حد أدنى 3 أيام + أقدمية رخصة 3 سنوات + تسبيق 10%)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS public.bookings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -740,7 +740,7 @@ AS $$
     ORDER BY COALESCE(bk.is_booked, false) ASC, distance_km ASC NULLS LAST, c.created_at DESC;
 $$;
 
--- (ب) إنشاء حجز جديد (الحد الأدنى 3 أيام + أقدمية رخصة سنتين + تسبيق 10%)
+-- (ب) إنشاء حجز جديد (الحد الأدنى 3 أيام + أقدمية رخصة 3 سنوات + تسبيق 10%)
 DROP FUNCTION IF EXISTS public.create_booking(UUID, TEXT, TEXT, TEXT, INTEGER, TIMESTAMPTZ, UUID, TEXT, TEXT);
 DROP FUNCTION IF EXISTS public.create_booking(UUID, TEXT, TEXT, TEXT, INTEGER, TIMESTAMPTZ, UUID, TEXT, TEXT, TEXT, DATE, TEXT);
 CREATE OR REPLACE FUNCTION public.create_booking(
@@ -792,8 +792,8 @@ BEGIN
     END IF;
 
     IF p_customer_license_issue_date IS NULL
-       OR p_customer_license_issue_date > (CURRENT_DATE - INTERVAL '2 years') THEN
-        RAISE EXCEPTION 'تشترط المنصة أقدمية رخصة سياقة لا تقل عن سنتين (24 شهراً) للاستفادة من الكراء بدون ضمان';
+       OR p_customer_license_issue_date > (CURRENT_DATE - INTERVAL '3 years') THEN
+        RAISE EXCEPTION 'تشترط المنصة أقدمية رخصة سياقة لا تقل عن 3 سنوات (36 شهراً) للاستفادة من الكراء بدون ضمان';
     END IF;
 
     -- تنظيف تلقائي للحجوزات منتهية الصلاحية التي لم يُرفع وصلها خلال ساعتين
@@ -1612,7 +1612,7 @@ BEGIN
 END;
 $$;
 
--- التبليغ عن مخالفة من العميل عند التسليم (رخصة أقل من سنتين أو تغيب العميل) لحماية الوكالة
+-- التبليغ عن مخالفة من العميل عند التسليم (رخصة أقل من 3 سنوات أو تغيب العميل) لحماية الوكالة
 CREATE OR REPLACE FUNCTION public.agency_report_customer_issue(
     p_agency_id UUID,
     p_pin TEXT,

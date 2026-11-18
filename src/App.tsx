@@ -432,7 +432,7 @@ export function App() {
               <li className="flex items-start gap-2">
                 <CheckCircle2 className="w-4 h-4 text-[var(--karya-action)] shrink-0 mt-0.5" />
                 <span>
-                  <strong>رخصة السياقة والعقد:</strong> يجب أن تكون لديك رخصة سياقة منذ سنتين على الأقل مع تقديم البطاقة الوطنية وتوقيع عقد الكراء عند الاستلام.
+                  <strong>رخصة السياقة والعقد:</strong> يجب أن تكون لديك رخصة سياقة منذ 3 سنوات على الأقل مع تقديم البطاقة الوطنية وتوقيع عقد الكراء عند الاستلام.
                 </span>
               </li>
               <li className="flex items-start gap-2">

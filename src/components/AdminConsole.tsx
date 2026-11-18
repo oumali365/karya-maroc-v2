@@ -299,7 +299,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
       `• العميل: ${b.customer_name} | الهاتف: ${b.customer_phone}`,
       `• البطاقة الوطنية: ${b.customer_cin}${b.customer_license_number ? ` | الرخصة: ${b.customer_license_number}` : ''}`,
       `• المبلغ المتبقي عند التسليم (90%): ${formatDH(Number(b.agency_payout_amount))}`,
-      `ملاحظة: يرجى التحقق من البطاقة الوطنية ورخصة السياقة (منذ سنتين+) وتوقيع عقد الكراء الرسمي، ثم تأكيد تسليم السيارة في بوابة الوكالات.`,
+      `ملاحظة: يرجى التحقق من البطاقة الوطنية ورخصة السياقة (منذ 3 سنوات+) وتوقيع عقد الكراء الرسمي، ثم تأكيد تسليم السيارة في بوابة الوكالات.`,
     ]
       .filter(Boolean)
       .join('\n');
@@ -635,7 +635,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ onUnauthorized, onLo
                               <span className="bg-red-100 text-red-800 border border-red-200 px-2 py-0.5 rounded-md font-bold">
                                 تبليغ الوكالة:{' '}
                                 {b.dispute_flag === 'invalid_license'
-                                  ? 'رخصة < سنتين'
+                                  ? 'رخصة < 3 سنوات'
                                   : 'تغيب العميل'}
                               </span>
                             )}

@@ -85,24 +85,24 @@ function getLicenseSeniorityInfo(issueDateStr: string): {
     };
   }
 
-  const twoYearsAgo = new Date();
-  twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
-  twoYearsAgo.setHours(23, 59, 59, 999);
+  const threeYearsAgo = new Date();
+  threeYearsAgo.setFullYear(threeYearsAgo.getFullYear() - 3);
+  threeYearsAgo.setHours(23, 59, 59, 999);
 
-  if (parsed > twoYearsAgo) {
+  if (parsed > threeYearsAgo) {
     return {
       valid: false,
       message:
-        'يجب أن تكون لديك رخصة سياقة منذ سنتين على الأقل (24 شهراً) للاستفادة من الكراء بدون ضمانة مالية.',
+        'يجب أن تكون لديك رخصة سياقة منذ 3 سنوات على الأقل (36 شهراً) للاستفادة من الكراء بدون ضمانة مالية.',
     };
   }
 
   const diffYears = (Date.now() - parsed.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
-  const wholeYears = Math.max(2, Math.floor(diffYears));
+  const wholeYears = Math.max(3, Math.floor(diffYears));
 
   return {
     valid: true,
-    message: `رخصة السياقة صادرة منذ ${wholeYears} سنوات (مستوفية للشروط).`,
+    message: `رخصة السياقة صادرة منذ ${wholeYears} ${wholeYears >= 11 ? 'سنة' : 'سنوات'} (مستوفية للشروط).`,
   };
 }
 
@@ -295,14 +295,14 @@ export const BookingModal: React.FC<BookingModalProps> = ({
     if (!licenseInfo || !licenseInfo.valid) {
       setErrorMsg(
         licenseInfo?.message ||
-          'يجب أن تكون لديك رخصة سياقة منذ سنتين على الأقل (24 شهراً) للاستفادة من الكراء بدون ضمانة مالية.',
+          'يجب أن تكون لديك رخصة سياقة منذ 3 سنوات على الأقل (36 شهراً) للاستفادة من الكراء بدون ضمانة مالية.',
       );
       return;
     }
 
     if (!driverPledgeAccepted) {
       setErrorMsg(
-        'يرجى تأكيد الإقرار بصحة تاريخ رخصة السياقة (سنتان+) والبطاقة الوطنية قبل المتابعة.',
+        'يرجى تأكيد الإقرار بصحة تاريخ رخصة السياقة (3 سنوات+) والبطاقة الوطنية قبل المتابعة.',
       );
       return;
     }
@@ -580,7 +580,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                   بدون ضمانة مالية
                 </span>
                 لا تحتاج إلى تقديم شيك ضمان أو ترك مبلغ مالي كضمانة لدى الوكالة. يُوقّع عقد الكراء الرسمي بشكل عادي، مع توفر البطاقة الوطنية ورخصة سياقة منذ{' '}
-                <strong>سنتين على الأقل</strong>.
+                <strong>3 سنوات على الأقل</strong>.
               </div>
             </div>
           )}
@@ -817,7 +817,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
 
                 <FloatingField
                   id="booking-license-date"
-                  label="تاريخ إصدار الرخصة (منذ سنتين+)"
+                  label="تاريخ إصدار الرخصة (منذ 3 سنوات+)"
                   icon={<Calendar className="w-4 h-4" />}
                   value={customerLicenseIssueDate}
                   onChange={setCustomerLicenseIssueDate}
@@ -895,7 +895,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                   className="mt-0.5 w-4 h-4 rounded border-slate-300 text-[var(--karya-action)] focus:ring-[var(--karya-action)] shrink-0"
                 />
                 <span>
-                  أقرّ بصحة تاريخ إصدار رخصة السياقة (منذ سنتين على الأقل)، وأوافق على توقيع عقد الكراء الرسمي وتقديم الوثائق المطلوبة عند الاستلام؛ وفي حال عدم مطابقة الرخصة أو البطاقة الوطنية يحق للوكالة رفض التسليم دون استرجاع مبلغ تأكيد الحجز (10%).
+                  أقرّ بصحة تاريخ إصدار رخصة السياقة (منذ 3 سنوات على الأقل)، وأوافق على توقيع عقد الكراء الرسمي وتقديم الوثائق المطلوبة عند الاستلام؛ وفي حال عدم مطابقة الرخصة أو البطاقة الوطنية يحق للوكالة رفض التسليم دون استرجاع مبلغ تأكيد الحجز (10%).
                 </span>
               </label>
 
