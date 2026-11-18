@@ -1483,11 +1483,31 @@ const AgencyFleetManager: React.FC<{
                         {car.brand} {car.model} {car.model_year ? `(${car.model_year})` : ''}
                       </h3>
                       <span
-                        className={`text-xs font-bold shrink-0 ${
-                          car.status === 'available' ? 'text-emerald-700' : 'text-[var(--karya-text-muted)]'
+                        className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-extrabold border shrink-0 ${
+                          activeBooking
+                            ? 'bg-amber-50 border-amber-200 text-amber-800'
+                            : car.status === 'available'
+                              ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                              : 'bg-slate-100 border-slate-200 text-[var(--karya-text-muted)]'
                         }`}
                       >
-                        {car.status === 'available' ? 'متاحة' : 'غير متاحة'}
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            activeBooking
+                              ? 'bg-amber-500'
+                              : car.status === 'available'
+                                ? 'bg-emerald-600'
+                                : 'bg-slate-400'
+                          }`}
+                          aria-hidden="true"
+                        />
+                        <span>
+                          {activeBooking
+                            ? 'محجوزة حالياً'
+                            : car.status === 'available'
+                              ? 'متاحة الآن'
+                              : 'غير متاحة'}
+                        </span>
                       </span>
                     </div>
 
@@ -1598,28 +1618,34 @@ const AgencyFleetManager: React.FC<{
                     </button>
 
                     {isDeleting ? (
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          disabled={isBusy}
-                          onClick={() => handleDeleteCar(car.id)}
-                          className="flex-1 min-h-[38px] rounded-lg bg-red-600 hover:bg-red-700 text-white py-1.5 text-xs font-bold"
-                        >
-                          تأكيد الحذف
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setConfirmDeleteId(null)}
-                          className="min-h-[38px] rounded-lg border border-[var(--karya-border)] px-3 py-1.5 text-xs font-semibold text-[var(--karya-text-muted)]"
-                        >
-                          إلغاء
-                        </button>
+                      <div className="rounded-lg border border-red-300 bg-red-50/75 p-2.5 space-y-2">
+                        <p className="text-[11px] font-bold text-red-800 text-center">
+                          هل تريد حذف هذه السيارة من الأسطول؟
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            disabled={isBusy}
+                            onClick={() => handleDeleteCar(car.id)}
+                            className="flex-1 min-h-[38px] rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white px-3 py-1.5 text-xs font-extrabold transition-colors"
+                          >
+                            تأكيد الحذف
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isBusy}
+                            onClick={() => setConfirmDeleteId(null)}
+                            className="min-h-[38px] rounded-lg border border-[var(--karya-border)] bg-white hover:bg-[var(--karya-bg)] px-3.5 py-1.5 text-xs font-bold text-[var(--karya-text-muted)] transition-colors"
+                          >
+                            إلغاء
+                          </button>
+                        </div>
                       </div>
                     ) : (
                       <button
                         type="button"
                         onClick={() => setConfirmDeleteId(car.id)}
-                        className="w-full min-h-[38px] rounded-lg py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 flex items-center justify-center gap-1 transition-colors"
+                        className="w-full min-h-[40px] rounded-lg border border-red-200 bg-white hover:bg-red-50 hover:border-red-300 px-3 py-2 text-xs font-bold text-red-600 flex items-center justify-center gap-1.5 transition-colors"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                         <span>حذف السيارة من الأسطول</span>
