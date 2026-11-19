@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Check,
   Copy,
@@ -6,73 +6,57 @@ import {
   ShieldCheck,
   Upload,
   FileText,
-  Loader2,
   AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
-import { supabase, formatDH } from '../lib/supabase';
-import { STARTER_BANKS } from '../data/starterData';
+import { formatDH } from '../lib/supabase';
 import { BankLogo } from './BankLogo';
-import type { CreatedBooking, PlatformBank } from '../types/karya';
+import type { PlatformBank } from '../types/karya';
+
+export const MAX_RECEIPT_BYTES = 5 * 1024 * 1024;
+export const ALLOWED_RECEIPT_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'application/pdf',
+]);
+export const ALLOWED_RECEIPT_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'pdf']);
 
 interface BankTransferCheckoutProps {
-  booking: CreatedBooking;
-  onPaymentSubmitted: (updatedBooking: CreatedBooking) => void;
-  onBack?: () => void;
+  dailyPrice: number;
+  days: number;
+  totalAmount: number;
+  commissionAmount: number;
+  agencyPayoutAmount: number;
+  banks: PlatformBank[];
+  selectedBank: PlatformBank;
+  onSelectBank: (bank: PlatformBank) => void;
+  receiptFile: File | null;
+  receiptPreviewUrl: string | null;
+  fileError: string | null;
+  onReceiptSelected: (file: File | null, previewUrl: string | null) => void;
+  onFileError: (msg: string | null) => void;
 }
 
-const MAX_RECEIPT_BYTES = 5 * 1024 * 1024;
-const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'application/pdf']);
-const ALLOWED_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'pdf']);
-
 export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
-  booking,
-  onPaymentSubmitted,
-  onBack,
+  dailyPrice,
+  days,
+  totalAmount,
+  commissionAmount,
+  agencyPayoutAmount,
+  banks,
+  selectedBank,
+  onSelectBank,
+  receiptFile,
+  receiptPreviewUrl,
+  fileError,
+  onReceiptSelected,
+  onFileError,
 }) => {
-  const [banks, setBanks] = useState<PlatformBank[]>(STARTER_BANKS);
-  const [selectedBank, setSelectedBank] = useState<PlatformBank>(STARTER_BANKS[0]);
   const [copiedRib, setCopiedRib] = useState(false);
-  const [receiptFile, setReceiptFile] = useState<File | null>(null);
-  const [receiptPreviewUrl, setReceiptPreviewUrl] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [fileError, setFileError] = useState<string | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
-  const submittingRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  useEffect(() => {
-    let mounted = true;
-    const loadBanks = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('platform_banks')
-          .select('*')
-          .eq('is_active', true)
-          .order('sort_order', { ascending: true });
-
-        if (!error && data && data.length > 0 && mounted) {
-          setBanks(data as PlatformBank[]);
-          setSelectedBank(data[0] as PlatformBank);
-        }
-      } catch {
-        // Fallback smoothly to STARTER_BANKS
-      }
-    };
-    loadBanks();
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (receiptPreviewUrl) URL.revokeObjectURL(receiptPreviewUrl);
-    };
-  }, [receiptPreviewUrl]);
-
   const handleSelectBank = (bank: PlatformBank) => {
-    setSelectedBank(bank);
+    onSelectBank(bank);
     setCopiedRib(false);
   };
 
@@ -99,145 +83,99 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setErrorMsg(null);
-    setFileError(null);
+    onFileError(null);
 
     const file = event.target.files?.[0];
     if (!file) return;
 
     const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
-    const hasValidMime = file.type ? ALLOWED_MIME_TYPES.has(file.type.toLowerCase()) : false;
-    const hasValidExt = ALLOWED_EXTENSIONS.has(ext);
+    const hasValidMime = file.type
+      ? ALLOWED_RECEIPT_MIME_TYPES.has(file.type.toLowerCase())
+      : false;
+    const hasValidExt = ALLOWED_RECEIPT_EXTENSIONS.has(ext);
 
     if (!hasValidMime && !hasValidExt) {
-      if (receiptPreviewUrl) URL.revokeObjectURL(receiptPreviewUrl);
-      setReceiptFile(null);
-      setReceiptPreviewUrl(null);
+      onReceiptSelected(null, null);
       event.target.value = '';
-      setFileError(
-        'صيغة الملف غير مدعومة. يرجى اختيار صورة بصيغة JPG أو PNG أو ملف PDF فقط.',
+      onFileError(
+        'صيغة الملف غير مدعومة. يرجى اختيار صورة JPG أو PNG أو ملف PDF فقط.',
       );
       return;
     }
 
-    if (file.type && !ALLOWED_MIME_TYPES.has(file.type.toLowerCase())) {
-      if (receiptPreviewUrl) URL.revokeObjectURL(receiptPreviewUrl);
-      setReceiptFile(null);
-      setReceiptPreviewUrl(null);
+    if (file.type && !ALLOWED_RECEIPT_MIME_TYPES.has(file.type.toLowerCase())) {
+      onReceiptSelected(null, null);
       event.target.value = '';
-      setFileError(
-        'صيغة الملف غير مدعومة. يرجى اختيار صورة بصيغة JPG أو PNG أو ملف PDF فقط.',
+      onFileError(
+        'صيغة الملف غير مدعومة. يرجى اختيار صورة JPG أو PNG أو ملف PDF فقط.',
       );
       return;
     }
 
     if (file.size > MAX_RECEIPT_BYTES) {
       const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
-      if (receiptPreviewUrl) URL.revokeObjectURL(receiptPreviewUrl);
-      setReceiptFile(null);
-      setReceiptPreviewUrl(null);
+      onReceiptSelected(null, null);
       event.target.value = '';
-      setFileError(
-        `حجم الملف (${sizeMb} MB) يتجاوز الحد الأقصى المسموح به وهو 5 ميجابايت (5MB).`,
+      onFileError(
+        `حجم الملف (${sizeMb} MB) يتجاوز الحد الأقصى المسموح به وهو 5MB.`,
       );
       return;
     }
 
-    if (receiptPreviewUrl) URL.revokeObjectURL(receiptPreviewUrl);
-    setReceiptFile(file);
-    if (file.type.startsWith('image/') || ext === 'jpg' || ext === 'jpeg' || ext === 'png') {
-      setReceiptPreviewUrl(URL.createObjectURL(file));
-    } else {
-      setReceiptPreviewUrl(null);
-    }
-  };
-
-  const handleConfirmPayment = async () => {
-    if (submittingRef.current || submitting) return;
-
-    if (!receiptFile) {
-      setFileError('يرجى إرفاق وصل التحويل البنكي بصيغة JPG أو PNG أو PDF (الحد الأقصى 5MB).');
-      return;
-    }
-
-    submittingRef.current = true;
-    setSubmitting(true);
-    setErrorMsg(null);
-    setFileError(null);
-
-    try {
-      let storedReceiptPath = `local://${booking.booking_code}/${receiptFile.name}`;
-
-      if (!booking.is_demo) {
-        const ext = receiptFile.name.split('.').pop()?.toLowerCase() || 'jpg';
-        const objectPath = `receipts/${booking.booking_code}_${Date.now()}.${ext}`;
-        const { error: uploadErr } = await supabase.storage
-          .from('payment-receipts')
-          .upload(objectPath, receiptFile, { upsert: true });
-
-        if (!uploadErr) {
-          storedReceiptPath = objectPath;
-        }
-
-        const { error: rpcErr } = await supabase.rpc('submit_payment_receipt', {
-          p_booking_id: booking.booking_id,
-          p_booking_code: booking.booking_code,
-          p_platform_bank_id: selectedBank.id,
-          p_receipt_url: storedReceiptPath,
-        });
-
-        if (rpcErr && !rpcErr.message.includes('Could not find the function')) {
-          throw new Error(rpcErr.message);
-        }
-      }
-
-      onPaymentSubmitted({
-        ...booking,
-        status: 'payment_uploaded',
-        selected_bank_code: selectedBank.short_name,
-        receipt_url: storedReceiptPath,
-      });
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'تعذر إرسال وصل التحويل، حاول مرة أخرى.');
-    } finally {
-      setSubmitting(false);
-      submittingRef.current = false;
-    }
+    const isImg =
+      file.type.startsWith('image/') ||
+      ext === 'jpg' ||
+      ext === 'jpeg' ||
+      ext === 'png';
+    const nextPreview = isImg ? URL.createObjectURL(file) : null;
+    onReceiptSelected(file, nextPreview);
   };
 
   return (
-    <div className="space-y-4" dir="rtl">
-      <div className="rounded-xl bg-[var(--karya-bg)] px-4 py-3 border border-[var(--karya-border)] text-sm space-y-1.5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="text-[var(--karya-text)] text-xs sm:text-sm">
-            <span className="font-extrabold text-[var(--karya-primary)]">{booking.car_label}</span>
-            <span className="mx-1.5 text-slate-400">·</span>
-            <span>{booking.days} أيام</span>
-          </div>
-          <div className="font-mono-tabular text-xs font-bold text-[var(--karya-primary)]">
-            {booking.booking_code}
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-1.5 border-t border-[var(--karya-border)]">
-          <span className="text-[var(--karya-primary)] font-bold">
-            لتأكيد الحجز الآن (10%):{' '}
-            <span dir="ltr" className="font-mono-tabular text-[var(--karya-action)] font-extrabold">
-              {formatDH(booking.commission_amount)}
-            </span>
+    <div className="space-y-5" dir="rtl">
+      {/* Dynamic 5-line Financial Summary */}
+      <div className="rounded-xl border border-[var(--karya-border)] bg-[var(--karya-bg)] p-4 space-y-2 text-xs sm:text-sm">
+        <div className="flex items-center justify-between text-[var(--karya-text-muted)]">
+          <span>السعر اليومي</span>
+          <span className="font-mono-tabular font-bold text-[var(--karya-text)]">
+            {formatDH(dailyPrice)}
           </span>
-          <span className="text-[var(--karya-text-muted)]">
-            المبلغ المتبقي عند الاستلام (90%):{' '}
-            <span dir="ltr" className="font-mono-tabular font-bold text-[var(--karya-primary)]">
-              {formatDH(booking.agency_payout_amount)}
-            </span>
+        </div>
+        <div className="flex items-center justify-between text-[var(--karya-text-muted)]">
+          <span>مدة الكراء</span>
+          <span className="font-mono-tabular font-bold text-[var(--karya-text)]">
+            {days} {days <= 10 ? 'أيام' : 'يوماً'}
+          </span>
+        </div>
+        <div className="flex items-center justify-between text-[var(--karya-text-muted)] pb-2 border-b border-[var(--karya-border)]">
+          <span>الإجمالي الكلي</span>
+          <span className="font-mono-tabular font-bold text-[var(--karya-text)]">
+            {formatDH(totalAmount)}
+          </span>
+        </div>
+        <div className="flex items-center justify-between pt-0.5">
+          <span className="font-extrabold text-[var(--karya-primary)]">
+            مبلغ تأكيد الحجز (10%)
+          </span>
+          <span className="font-mono-tabular text-base sm:text-lg font-extrabold text-[var(--karya-action)]">
+            {formatDH(commissionAmount)}
+          </span>
+        </div>
+        <div className="flex items-center justify-between text-xs text-[var(--karya-text-muted)]">
+          <span>المبلغ المتبقي عند استلام السيارة (90%)</span>
+          <span className="font-mono-tabular font-bold text-[var(--karya-primary)]">
+            {formatDH(agencyPayoutAmount)}
           </span>
         </div>
       </div>
 
-      <div>
-        <div className="flex items-center gap-2 mb-2.5">
-          <Landmark className="w-4 h-4 text-[var(--karya-primary)]" />
-          <h4 className="font-bold text-[var(--karya-primary)] text-sm">اختر البنك للتحويل</h4>
+      {/* Bank Selection */}
+      <div className="space-y-2.5">
+        <div className="flex items-center gap-2">
+          <Landmark className="w-4 h-4 text-[var(--karya-primary)] shrink-0" />
+          <h4 className="font-extrabold text-[var(--karya-primary)] text-sm">
+            اختر الحساب البنكي للتحويل
+          </h4>
         </div>
 
         <div
@@ -254,9 +192,9 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
                 role="radio"
                 aria-checked={isSelected}
                 onClick={() => handleSelectBank(bank)}
-                className={`relative flex items-center gap-2 rounded-lg p-2.5 border text-right transition-all min-h-[58px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--karya-action)] ${
+                className={`relative flex items-center gap-2 rounded-lg p-2.5 border text-right transition-all min-h-[56px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--karya-action)] ${
                   isSelected
-                    ? 'border-[var(--karya-action)] bg-[var(--karya-action-soft)] ring-1 ring-[var(--karya-action)]/20'
+                    ? 'border-[var(--karya-action)] bg-[var(--karya-action-soft)] ring-1 ring-[var(--karya-action)]/25'
                     : 'border-[var(--karya-border)] bg-white hover:border-[var(--karya-action)]/45'
                 }`}
               >
@@ -285,46 +223,70 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
             );
           })}
         </div>
-      </div>
 
-      <div className="rounded-xl border border-[var(--karya-border)] bg-[var(--karya-bg)] p-4 space-y-2.5">
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-[var(--karya-text-muted)]">المستفيد</span>
-          <span className="font-bold text-[var(--karya-primary)]">{selectedBank.account_holder_name}</span>
-        </div>
+        {/* Selected Bank RIB Card */}
+        <div className="rounded-xl border border-[var(--karya-border)] bg-[var(--karya-bg)] p-3.5 sm:p-4 space-y-2.5">
+          <div className="flex items-center justify-between gap-2 text-xs">
+            <span className="text-[var(--karya-text-muted)]">اسم المستفيد</span>
+            <span className="font-bold text-[var(--karya-primary)]">
+              {selectedBank.account_holder_name}
+            </span>
+          </div>
 
-        <div className="flex items-center justify-between gap-3 pt-1">
-          <span className="text-xs text-[var(--karya-text-muted)]">رقم RIB</span>
-          <button
-            type="button"
-            onClick={handleCopyRib}
-            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors whitespace-nowrap shrink-0 min-h-[36px] ${
+          <div className="flex items-center justify-between gap-3 pt-0.5">
+            <span className="text-xs text-[var(--karya-text-muted)]">رقم RIB</span>
+            <button
+              type="button"
+              onClick={handleCopyRib}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors whitespace-nowrap shrink-0 min-h-[36px] ${
+                copiedRib
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-[var(--karya-primary)] hover:bg-[var(--karya-primary-hover)] text-white'
+              }`}
+            >
+              {copiedRib ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+              <span>{copiedRib ? 'تم النسخ' : 'نسخ RIB'}</span>
+            </button>
+          </div>
+
+          <div
+            dir="ltr"
+            className={`rounded-lg border px-3 py-2.5 text-center font-mono-tabular text-xs sm:text-sm font-bold tracking-wider select-all transition-colors ${
               copiedRib
-                ? 'bg-emerald-700 text-white'
-                : 'bg-[var(--karya-primary)] hover:bg-[var(--karya-primary-hover)] text-white'
+                ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                : 'border-[var(--karya-border)] bg-white text-[var(--karya-primary)]'
             }`}
           >
-            {copiedRib ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-            <span>{copiedRib ? 'تم النسخ' : 'نسخ RIB'}</span>
-          </button>
-        </div>
+            {selectedBank.rib}
+          </div>
 
-        <div
-          dir="ltr"
-          className={`rounded-lg border px-3 py-2.5 text-center font-mono-tabular text-sm font-bold tracking-wider select-all transition-colors ${
-            copiedRib
-              ? 'border-emerald-300 bg-emerald-50 text-[var(--karya-primary)]'
-              : 'border-[var(--karya-border)] bg-white text-[var(--karya-primary)]'
-          }`}
-        >
-          {selectedBank.rib}
+          {copiedRib && (
+            <p className="text-[11px] font-bold text-emerald-700 text-center">
+              تم نسخ رقم الحساب البنكي RIB بنجاح
+            </p>
+          )}
         </div>
       </div>
 
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <Upload className="w-4 h-4 text-[var(--karya-primary)]" />
-          <h4 className="font-bold text-[var(--karya-primary)] text-sm">إرفاق وصل التحويل</h4>
+      {/* Receipt Upload */}
+      <div className="space-y-2.5">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Upload className="w-4 h-4 text-[var(--karya-primary)] shrink-0" />
+            <h4 className="font-extrabold text-[var(--karya-primary)] text-sm">
+              إرفاق وصل التحويل
+            </h4>
+          </div>
+          {receiptFile && (
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="inline-flex items-center gap-1 text-xs font-bold text-[var(--karya-action)] hover:underline"
+            >
+              <RefreshCw className="w-3 h-3" />
+              <span>استبدال الملف</span>
+            </button>
+          )}
         </div>
 
         <input
@@ -338,10 +300,12 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className={`w-full min-h-[104px] rounded-xl border-2 border-dashed transition-colors p-4 flex flex-col items-center justify-center gap-1.5 text-center ${
+          className={`w-full min-h-[108px] rounded-xl border-2 border-dashed transition-colors p-4 flex flex-col items-center justify-center gap-1.5 text-center ${
             fileError
               ? 'border-red-400 bg-red-50/40'
-              : 'border-slate-300 bg-[var(--karya-bg)] hover:bg-[var(--karya-action-soft)] hover:border-[var(--karya-action)]'
+              : receiptFile
+                ? 'border-emerald-400 bg-emerald-50/40 hover:bg-emerald-50/70'
+                : 'border-slate-300 bg-[var(--karya-bg)] hover:bg-[var(--karya-action-soft)] hover:border-[var(--karya-action)]'
           }`}
         >
           {receiptFile ? (
@@ -350,16 +314,16 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
                 <img
                   src={receiptPreviewUrl}
                   alt="معاينة وصل التحويل"
-                  className="h-20 w-auto rounded-lg object-cover border border-[var(--karya-border)]"
+                  className="h-20 w-auto rounded-lg object-cover border border-[var(--karya-border)] bg-white"
                 />
               ) : (
                 <FileText className="w-7 h-7 text-[var(--karya-primary)]" />
               )}
-              <span className="text-xs font-bold text-[var(--karya-primary)] break-all">
+              <span className="text-xs font-extrabold text-[var(--karya-primary)] break-all">
                 {receiptFile.name}
               </span>
-              <span className="text-[11px] text-[var(--karya-text-muted)] font-mono-tabular">
-                {(receiptFile.size / (1024 * 1024)).toFixed(2)} MB · انقر للتغيير
+              <span className="text-[11px] text-emerald-700 font-bold font-mono-tabular">
+                {(receiptFile.size / (1024 * 1024)).toFixed(2)} MB · جاهز للإرفاق (انقر للاستبدال)
               </span>
             </div>
           ) : (
@@ -368,7 +332,9 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
               <span className="text-xs sm:text-sm font-bold text-[var(--karya-primary)]">
                 اختر صورة أو ملف PDF للوصل
               </span>
-              <span className="text-[11px] text-[var(--karya-text-muted)]">JPG, PNG, PDF — حتى 5MB</span>
+              <span className="text-[11px] text-[var(--karya-text-muted)]">
+                JPG أو PNG أو PDF — الحد الأقصى 5MB
+              </span>
             </>
           )}
         </button>
@@ -376,7 +342,7 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
         {fileError && (
           <div
             role="alert"
-            className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs font-medium text-red-700 flex items-center gap-2"
+            className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 flex items-center gap-2"
           >
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{fileError}</span>
@@ -384,53 +350,9 @@ export const BankTransferCheckout: React.FC<BankTransferCheckoutProps> = ({
         )}
       </div>
 
-      {errorMsg && (
-        <div
-          role="alert"
-          className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700 flex items-center gap-2"
-        >
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          <span>{errorMsg}</span>
-        </div>
-      )}
-
-      <div className="space-y-2 pt-1">
-        <button
-          type="button"
-          disabled={submitting}
-          onClick={handleConfirmPayment}
-          className="w-full min-h-[48px] rounded-lg bg-[var(--karya-action)] hover:bg-[var(--karya-action-hover)] disabled:opacity-65 disabled:cursor-not-allowed text-white py-3 px-5 font-extrabold text-sm transition-colors flex items-center justify-center gap-2 shadow-sm"
-        >
-          {submitting ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>جاري الإرسال...</span>
-            </>
-          ) : (
-            <>
-              <span>تأكيد وإرسال الوصل</span>
-              <span dir="ltr" className="font-mono-tabular text-sky-100">
-                ({formatDH(booking.commission_amount)})
-              </span>
-            </>
-          )}
-        </button>
-
-        {onBack && (
-          <button
-            type="button"
-            disabled={submitting}
-            onClick={onBack}
-            className="w-full min-h-[40px] py-1.5 text-xs font-semibold text-[var(--karya-text-muted)] hover:text-[var(--karya-primary)] transition-colors"
-          >
-            العودة لتعديل البيانات
-          </button>
-        )}
-
-        <div className="flex items-center justify-center gap-1.5 text-[11px] text-[var(--karya-text-muted)] text-center">
-          <ShieldCheck className="w-3.5 h-3.5 text-[var(--karya-action)] shrink-0" />
-          <span>استرجاع مبلغ تأكيد الحجز وفق الإجراءات المعتمدة إذا لم تتمكن الوكالة من تسليم السيارة</span>
-        </div>
+      <div className="flex items-center justify-center gap-1.5 text-[11px] text-[var(--karya-text-muted)] text-center pt-1">
+        <ShieldCheck className="w-3.5 h-3.5 text-[var(--karya-action)] shrink-0" />
+        <span>استرجاع مبلغ تأكيد الحجز متاح إذا تعذّر تسليم السيارة</span>
       </div>
     </div>
   );

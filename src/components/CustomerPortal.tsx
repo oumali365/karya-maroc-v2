@@ -8,9 +8,6 @@ import {
   ShieldCheck,
   ChevronDown,
   Check,
-  HelpCircle,
-  Star,
-  Quote,
   Building2,
   ArrowLeft,
 } from 'lucide-react';
@@ -24,6 +21,7 @@ import {
 import { BookingModal } from './BookingModal';
 import { CarOfferCard } from './CarOfferCard';
 import { CitySelector } from './CitySelector';
+import { FaqSection } from './FaqSection';
 import type { CarOffer, CreatedBooking } from '../types/karya';
 
 interface CustomerPortalProps {
@@ -47,57 +45,6 @@ function formatDays(d: number): string {
   if (d <= 10) return `${d} أيام`;
   return `${d} يومًا`;
 }
-
-interface AgencyReviewItem {
-  id: string;
-  agencyName: string;
-  city: string;
-  rating: number;
-  ratingCount: number;
-  reviewerName: string;
-  carLabel: string;
-  comment: string;
-  isLiveVerified?: boolean;
-}
-
-const DEFAULT_AGENCY_REVIEWS: AgencyReviewItem[] = [
-  {
-    id: 'rev-vite-casa',
-    agencyName: 'Vite Car',
-    city: 'Casablanca',
-    rating: 4.9,
-    ratingCount: 0,
-    reviewerName: 'نموذج تجربة زبون — يوسف م.',
-    carLabel: 'Dacia Duster',
-    comment:
-      'تم تأكيد الحجز بسهولة بدفع 10% فقط، واستلام السيارة بدون تقديم شيك ضمان أو ترك مبلغ مالي كضمانة.',
-    isLiveVerified: false,
-  },
-  {
-    id: 'rev-carspeed-casa',
-    agencyName: 'Car Speed',
-    city: 'Casablanca',
-    rating: 4.9,
-    ratingCount: 0,
-    reviewerName: 'نموذج تجربة زبون — سلمى ر.',
-    carLabel: 'Renault Clio 5',
-    comment:
-      'تعامل احترافي، معاينة السيارة قبل دفع المبلغ المتبقي (90%)، وتوضيح جميع شروط الكراء منذ البداية مع توقيع العقد الرسمي.',
-    isLiveVerified: false,
-  },
-  {
-    id: 'rev-atlas-casa',
-    agencyName: 'أطلس كار',
-    city: 'Marrakech',
-    rating: 4.8,
-    ratingCount: 0,
-    reviewerName: 'نموذج تجربة زبون — أمين ب.',
-    carLabel: 'Volkswagen Polo',
-    comment:
-      'استلام في الموعد المحدد وسيارة نظيفة. لم يُطلب مني ترك مبلغ مالي كضمانة أو حجز مبلغ من بطاقتي البنكية.',
-    isLiveVerified: false,
-  },
-];
 
 const CUSTOMER_FAQS = [
   {
@@ -144,13 +91,11 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
 
   const [cars, setCars] = useState<CarOffer[]>([]);
   const [catalogBrands, setCatalogBrands] = useState<string[]>(KNOWN_ECONOMIC_BRANDS);
-  const [agencyReviews, setAgencyReviews] = useState<AgencyReviewItem[]>(DEFAULT_AGENCY_REVIEWS);
   const [loadingCars, setLoadingCars] = useState(true);
   const [dbConnected, setDbConnected] = useState(false);
 
   const [brandFilter, setBrandFilter] = useState<string>('all');
   const [selectedCar, setSelectedCar] = useState<CarOffer | null>(null);
-  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
 
   const loadCars = async (
     cityToLoad: string,
@@ -304,39 +249,6 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
         }
       } catch {
         // Keep KNOWN_ECONOMIC_BRANDS fallback
-      }
-
-      try {
-        const { data: agenciesData, error: agenciesErr } = await supabase
-          .from('agencies')
-          .select('id, name, city, rating_avg, rating_count')
-          .eq('verification_status', 'verified')
-          .order('rating_avg', { ascending: false })
-          .order('rating_count', { ascending: false })
-          .limit(3);
-
-        if (active && !agenciesErr && Array.isArray(agenciesData) && agenciesData.length > 0) {
-          const liveItems: AgencyReviewItem[] = agenciesData.map((row: Record<string, unknown>, i) => {
-            const fallback = DEFAULT_AGENCY_REVIEWS[i % DEFAULT_AGENCY_REVIEWS.length];
-            const ratingVal = Number(row.rating_avg ?? 5);
-            const countVal = Number(row.rating_count ?? 0);
-            return {
-              id: String(row.id),
-              agencyName: String(row.name || fallback.agencyName),
-              city: String(row.city || fallback.city),
-              rating: Number.isFinite(ratingVal) && ratingVal > 0 ? ratingVal : 5,
-              ratingCount: Number.isFinite(countVal) ? countVal : 0,
-              reviewerName: 'تقييم عملاء المنصة',
-              carLabel: 'كراء بدون ضمانة مالية',
-              comment:
-                'وكالة موثقة في شبكة Karya ملتزمة بالتسليم في الموعد، وبشروط واضحة بدون ضمانة مالية.',
-              isLiveVerified: true,
-            };
-          });
-          setAgencyReviews(liveItems);
-        }
-      } catch {
-        // Keep DEFAULT_AGENCY_REVIEWS fallback
       }
     })();
     return () => {
@@ -685,216 +597,36 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
       </section>
 
       {/* ===================== CUSTOMER CARE FAQ SECTION ===================== */}
-      <section
-        aria-label="أسئلة شائعة تهمّ عملاء Karya"
+      <FaqSection
+        title="الأسئلة الشائعة – الزبائن"
+        subtitle="كل ما تحتاج معرفته للكراء بدون ضمانة مالية، وبشروط واضحة"
+        ariaLabel="أسئلة شائعة تهمّ عملاء Karya"
+        items={CUSTOMER_FAQS}
         className="max-w-6xl mx-auto px-4 sm:px-6 pb-8 pt-2"
-      >
-        <div className="bg-[var(--karya-surface)] rounded-xl border border-[var(--karya-border)] overflow-hidden">
-          <div className="bg-[var(--karya-primary)] px-5 py-5 sm:px-7 sm:py-6 flex items-center gap-3.5 text-white">
-            <div className="w-10 h-10 rounded-lg bg-white/10 border border-white/15 text-[var(--karya-accent)] flex items-center justify-center shrink-0">
-              <HelpCircle className="w-5 h-5" aria-hidden="true" />
-            </div>
-            <div className="space-y-0.5 min-w-0">
-              <h2 className="text-base sm:text-lg font-extrabold tracking-tight">
-                الأسئلة الشائعة – الزبائن
-              </h2>
-              <p className="text-xs text-slate-200">
-                كل ما تحتاج معرفته للكراء بدون ضمانة مالية، وبشروط واضحة
-              </p>
-            </div>
-          </div>
+      />
 
-          <div className="divide-y divide-[var(--karya-border)]">
-            {CUSTOMER_FAQS.map((item, idx) => {
-              const isOpen = openFaqIndex === idx;
-              const numLabel = String(idx + 1).padStart(2, '0');
-
-              return (
-                <div
-                  key={item.q}
-                  className={`transition-colors ${
-                    isOpen ? 'bg-[var(--karya-action-soft)]/50' : 'bg-[var(--karya-surface)]'
-                  }`}
-                >
-                  <button
-                    type="button"
-                    aria-expanded={isOpen}
-                    onClick={() => setOpenFaqIndex((prev) => (prev === idx ? null : idx))}
-                    className="w-full flex items-center justify-between gap-3 text-right px-4 py-4 sm:px-6 hover:bg-[var(--karya-surface-muted)] transition-colors"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span
-                        className={`w-7 h-7 rounded-md font-mono-tabular text-xs font-bold flex items-center justify-center shrink-0 transition-colors ${
-                          isOpen
-                            ? 'bg-[var(--karya-action)] text-white'
-                            : 'bg-[var(--karya-bg)] text-[var(--karya-primary)] border border-[var(--karya-border)]'
-                        }`}
-                        aria-hidden="true"
-                      >
-                        {numLabel}
-                      </span>
-                      <span className="text-xs sm:text-sm font-extrabold text-[var(--karya-text)] leading-snug">
-                        {item.q}
-                      </span>
-                    </div>
-
-                    <ChevronDown
-                      className={`w-4 h-4 shrink-0 transition-transform duration-200 ${
-                        isOpen ? 'rotate-180 text-[var(--karya-action)]' : 'text-[var(--karya-text-muted)]'
-                      }`}
-                      aria-hidden="true"
-                    />
-                  </button>
-
-                  {isOpen && (
-                    <div className="px-4 pb-4 sm:pr-16 sm:pl-6">
-                      <p className="text-xs sm:text-[13px] text-[var(--karya-text-muted)] leading-relaxed">
-                        {item.a}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* ===================== AGENCY REVIEWS SECTION (تقييمات الوكالات) ===================== */}
+      {/* ===================== PARTNER AGENCY CTA ===================== */}
       <section
-        aria-label="تقييمات الوكالات"
+        aria-label="انضمام الوكالات الشريكة"
         className="max-w-6xl mx-auto px-4 sm:px-6 pb-12"
       >
-        <div className="bg-[var(--karya-surface)] rounded-xl border border-[var(--karya-border)] overflow-hidden">
-          <div className="bg-[var(--karya-primary)] px-5 py-5 sm:px-7 sm:py-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-white">
-            <div className="flex items-center gap-3.5 min-w-0">
-              <div className="w-10 h-10 rounded-lg bg-white/10 border border-white/15 text-[var(--karya-accent)] flex items-center justify-center shrink-0">
-                <Star className="w-5 h-5 fill-[#D49A42] text-[#D49A42]" aria-hidden="true" />
-              </div>
-              <div className="space-y-0.5 min-w-0">
-                <h2 className="text-base sm:text-lg font-extrabold tracking-tight">
-                  تقييمات الوكالات وثقة الزبائن
-                </h2>
-                <p className="text-xs text-slate-200">
-                  تجارب تعكس التزام الوكالات الشريكة بالتسليم في الموعد وبدون ضمانة مالية
-                </p>
-              </div>
-            </div>
-
-            {agencyReviews.some((r) => r.isLiveVerified) ? (
-              <div className="inline-flex items-center gap-2 self-start sm:self-auto rounded-lg bg-white/10 border border-white/15 px-3.5 py-2 shrink-0">
-                <div className="flex items-center gap-0.5" aria-hidden="true">
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <Star key={n} className="w-3.5 h-3.5 fill-[#D49A42] text-[#D49A42]" />
-                  ))}
-                </div>
-                <span className="text-xs font-extrabold text-white font-mono-tabular">
-                  4.9 / 5
-                </span>
-                <span className="text-[11px] font-semibold text-slate-200">
-                  وكالات معتمدة
-                </span>
-              </div>
-            ) : (
-              <div className="inline-flex items-center gap-2 self-start sm:self-auto rounded-lg bg-white/10 border border-white/15 px-3.5 py-2 shrink-0">
-                <ShieldCheck className="w-4 h-4 text-[var(--karya-accent)]" aria-hidden="true" />
-                <span className="text-[11px] font-semibold text-slate-100">
-                  نماذج لتجربة الكراء عبر Karya
-                </span>
-              </div>
-            )}
+        <div className="rounded-xl border border-[var(--karya-border)] bg-[var(--karya-primary-soft)] p-4 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-start sm:items-center gap-3 text-xs sm:text-sm text-[var(--karya-text)]">
+            <span className="w-8 h-8 rounded-lg bg-[var(--karya-primary)] text-[var(--karya-accent)] flex items-center justify-center shrink-0">
+              <Building2 className="w-4 h-4" aria-hidden="true" />
+            </span>
+            <span>
+              <strong className="text-[var(--karya-primary)]">هل تملك وكالة لكراء السيارات؟</strong> انضم إلى شبكة Karya، واعرض سياراتك لزبائن في مدن المغرب، مع نظام واضح لتأكيد الحجز وحفظ حقوق الطرفين.
+            </span>
           </div>
-
-          <div className="p-4 sm:p-6 space-y-5">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {agencyReviews.map((review, idx) => {
-                const numLabel = String(idx + 1).padStart(2, '0');
-                return (
-                  <article
-                    key={review.id}
-                    className="rounded-xl border border-[var(--karya-border)] bg-[var(--karya-surface-muted)] p-4 flex flex-col justify-between gap-3.5"
-                  >
-                    <div className="space-y-3">
-                      <div className="flex items-start justify-between gap-2.5">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <span
-                            className="w-7 h-7 rounded-md bg-[var(--karya-primary)] text-white font-mono-tabular text-xs font-bold flex items-center justify-center shrink-0"
-                            aria-hidden="true"
-                          >
-                            {numLabel}
-                          </span>
-                          <div className="min-w-0">
-                            <h3 className="text-xs sm:text-sm font-extrabold text-[var(--karya-primary)] truncate">
-                              {review.agencyName}
-                            </h3>
-                            <div className="flex items-center gap-1.5 text-[11px] text-[var(--karya-text-muted)] mt-0.5">
-                              <MapPin className="w-3 h-3 text-[var(--karya-text-muted)] shrink-0" aria-hidden="true" />
-                              <span>{getCityLabelAr(review.city)}</span>
-                              <span aria-hidden="true">·</span>
-                              <span
-                                className={
-                                  review.isLiveVerified
-                                    ? 'text-[var(--karya-action)] font-bold'
-                                    : 'text-[var(--karya-text-muted)] font-semibold'
-                                }
-                              >
-                                {review.isLiveVerified ? 'وكالة معتمدة' : 'عرض توضيحي'}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {review.isLiveVerified && (
-                          <div className="inline-flex items-center gap-1 text-xs font-extrabold text-[var(--karya-primary)] shrink-0">
-                            <Star className="w-3.5 h-3.5 fill-[#D49A42] text-[#D49A42]" aria-hidden="true" />
-                            <span className="font-mono-tabular">{review.rating.toFixed(1)}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="text-xs text-[var(--karya-text)] leading-relaxed pt-2 border-t border-[var(--karya-border)]/70">
-                        <Quote
-                          className="w-4 h-4 text-[var(--karya-accent)]/60 mb-1"
-                          aria-hidden="true"
-                        />
-                        <p>{review.comment}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-2 pt-2.5 border-t border-[var(--karya-border)] text-[11px]">
-                      <span className="font-bold text-[var(--karya-primary)] truncate">
-                        {review.reviewerName}
-                      </span>
-                      <span className="text-[var(--karya-text-muted)] font-medium truncate">
-                        {review.carLabel}
-                        {review.isLiveVerified && review.ratingCount > 0 ? ` · ${review.ratingCount} تقييم` : ''}
-                      </span>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-
-            {/* Partner Agency Strip */}
-            <div className="rounded-xl border border-[var(--karya-border)] bg-[var(--karya-primary-soft)] p-4 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-start sm:items-center gap-3 text-xs sm:text-sm text-[var(--karya-text)]">
-                <span className="w-8 h-8 rounded-lg bg-[var(--karya-primary)] text-[var(--karya-accent)] flex items-center justify-center shrink-0">
-                  <Building2 className="w-4 h-4" aria-hidden="true" />
-                </span>
-                <span>
-                  <strong className="text-[var(--karya-primary)]">هل تملك وكالة لكراء السيارات؟</strong> انضم إلى شبكة Karya، واعرض سياراتك لزبائن في مدن المغرب، مع نظام واضح لتأكيد الحجز وحفظ حقوق الطرفين.
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={onGoToAgency}
-                className="self-start sm:self-auto shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-[var(--karya-primary)] hover:bg-[var(--karya-primary-hover)] text-white px-4 py-2.5 min-h-[42px] text-xs font-extrabold transition-colors"
-              >
-                <span>سجّل وكالتك الآن</span>
-                <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" />
-              </button>
-            </div>
-          </div>
+          <button
+            type="button"
+            onClick={onGoToAgency}
+            className="self-start sm:self-auto shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-[var(--karya-primary)] hover:bg-[var(--karya-primary-hover)] text-white px-4 py-2.5 min-h-[42px] text-xs font-extrabold transition-colors"
+          >
+            <span>سجّل وكالتك الآن</span>
+            <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" />
+          </button>
         </div>
       </section>
 
@@ -911,7 +643,6 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
                 item.id === selectedCar.id ? { ...item, is_booked: true } : item,
               ),
             );
-            setSelectedCar(null);
             loadCars(selectedCity, searchPickupDate, searchDays);
           }}
         />

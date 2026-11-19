@@ -72,6 +72,20 @@
   scrollbar-width: none;
 }
 
+.date-input-centered {
+  text-align: center;
+}
+.date-input-centered::-webkit-datetime-edit {
+  display: flex;
+  justify-content: center;
+  text-align: center;
+  width: 100%;
+}
+.date-input-centered::-webkit-date-and-time-value {
+  text-align: center;
+  margin-inline: auto;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

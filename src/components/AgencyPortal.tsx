@@ -29,9 +29,7 @@ import {
   Calendar,
   MapPin,
   TrendingUp,
-  ChevronDown,
   ChevronRight,
-  HelpCircle,
   Search,
 } from 'lucide-react';
 import { supabase, MOROCCAN_CITIES, formatDH, getCityLabelAr } from '../lib/supabase';
@@ -40,6 +38,7 @@ import {
   mapCatalogRow,
   resolveCatalogImage,
 } from '../data/starterData';
+import { FaqSection } from './FaqSection';
 import type {
   AgencyBookingRecord,
   AgencyProfile,
@@ -706,7 +705,6 @@ const AgencyPhoneAuthView: React.FC<{
   const [error, setError] = useState<string | null>(null);
   const [gpsNote, setGpsNote] = useState<string | null>(null);
   const [showForgotPin, setShowForgotPin] = useState(false);
-  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
 
   const captureGps = () => {
     if (!navigator.geolocation) {
@@ -807,8 +805,8 @@ const AgencyPhoneAuthView: React.FC<{
   };
 
   return (
-    <div className="max-w-lg mx-auto px-4 py-8 sm:py-10 space-y-6" dir="rtl">
-      <div className="bg-[var(--karya-surface)] p-6 sm:p-8 rounded-xl border border-[var(--karya-border)] shadow-xs space-y-6">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-10 space-y-10" dir="rtl">
+      <div className="max-w-lg mx-auto bg-[var(--karya-surface)] p-6 sm:p-8 rounded-xl border border-[var(--karya-border)] shadow-xs space-y-6">
         <div className="text-center space-y-1">
           <h2 className="text-2xl font-extrabold text-[var(--karya-primary)]">
             {mode === 'login' ? 'دخول وكالات كراء السيارات' : 'انضم إلى شبكة وكالات Karya'}
@@ -1030,80 +1028,12 @@ const AgencyPhoneAuthView: React.FC<{
       </div>
 
       {/* Agency Partner FAQ Section */}
-      <section
-        aria-label="الأسئلة الشائعة للوكالات"
-        className="bg-[var(--karya-surface)] rounded-xl border border-[var(--karya-border)] shadow-xs overflow-hidden"
-      >
-        {/* Solid Deep Karya Blue Header Band */}
-        <div className="bg-[var(--karya-primary)] px-5 py-4 sm:px-6 sm:py-5 flex items-center gap-3.5 text-white">
-          <div className="w-10 h-10 rounded-lg bg-white/10 border border-white/15 text-[var(--karya-accent)] flex items-center justify-center shrink-0">
-            <HelpCircle className="w-5 h-5" aria-hidden="true" />
-          </div>
-          <div className="space-y-0.5 min-w-0">
-            <h3 className="text-sm sm:text-base font-extrabold tracking-tight">
-              الأسئلة الشائعة – الوكالات الشريكة
-            </h3>
-            <p className="text-xs text-slate-200">
-              كل ما يضمن حقوق وكالتك ويزيد أرباحك عبر Karya
-            </p>
-          </div>
-        </div>
-
-        {/* Hairline-Separated FAQ Rows */}
-        <div className="divide-y divide-[var(--karya-border)]">
-          {AGENCY_FAQS.map((item, idx) => {
-            const isOpen = openFaqIndex === idx;
-            const numLabel = String(idx + 1).padStart(2, '0');
-
-            return (
-              <div
-                key={item.q}
-                className={`transition-colors ${
-                  isOpen ? 'bg-[var(--karya-action-soft)]/50' : 'hover:bg-[var(--karya-surface-muted)]'
-                }`}
-              >
-                <button
-                  type="button"
-                  aria-expanded={isOpen}
-                  onClick={() => setOpenFaqIndex((prev) => (prev === idx ? null : idx))}
-                  className="w-full min-h-[54px] flex items-center justify-between gap-3 text-right px-5 py-3.5"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span
-                      className={`w-7 h-7 rounded-lg font-mono-tabular text-xs font-bold flex items-center justify-center shrink-0 transition-colors ${
-                        isOpen
-                          ? 'bg-[var(--karya-action)] text-white'
-                          : 'bg-[var(--karya-surface-muted)] text-[var(--karya-primary)] border border-[var(--karya-border)]'
-                      }`}
-                      aria-hidden="true"
-                    >
-                      {numLabel}
-                    </span>
-                    <span className="text-xs sm:text-sm font-extrabold text-[var(--karya-primary)] leading-snug">
-                      {item.q}
-                    </span>
-                  </div>
-
-                  <ChevronDown
-                    className={`w-4 h-4 shrink-0 transition-transform duration-200 ${
-                      isOpen ? 'rotate-180 text-[var(--karya-action)]' : 'text-[var(--karya-text-muted)]'
-                    }`}
-                    aria-hidden="true"
-                  />
-                </button>
-
-                {isOpen && (
-                  <div className="px-5 pb-4 sm:pr-14 sm:pl-6">
-                    <p className="text-xs text-[var(--karya-text-muted)] leading-relaxed">
-                      {item.a}
-                    </p>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </section>
+      <FaqSection
+        title="الأسئلة الشائعة – الوكالات الشريكة"
+        subtitle="كل ما يضمن حقوق وكالتك ويزيد أرباحك عبر Karya"
+        ariaLabel="الأسئلة الشائعة للوكالات"
+        items={AGENCY_FAQS}
+      />
     </div>
   );
 };
