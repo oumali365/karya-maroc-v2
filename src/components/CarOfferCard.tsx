@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   CalendarClock,
 } from 'lucide-react';
+import { CarImage } from './CarImage';
 import type { CarOffer } from '../types/karya';
 
 interface CarOfferCardProps {
@@ -62,7 +63,7 @@ export const CarOfferCard: React.FC<CarOfferCardProps> = ({
         onClick={() => {
           if (!isBooked) onSelect(car);
         }}
-        className={`aspect-[16/10] bg-slate-100 overflow-hidden block w-full text-right relative ${
+        className={`h-40 sm:h-auto sm:aspect-[16/10] bg-slate-100 overflow-hidden block w-full text-right relative ${
           isBooked ? 'cursor-not-allowed' : 'cursor-pointer'
         }`}
         aria-label={
@@ -71,11 +72,11 @@ export const CarOfferCard: React.FC<CarOfferCardProps> = ({
             : `حجز ${car.brand} ${car.model}`
         }
       >
-        <img
+        <CarImage
           src={car.primary_image_url}
+          brand={car.brand}
+          model={car.model}
           alt={`${car.brand} ${car.model}`}
-          referrerPolicy="no-referrer"
-          loading="lazy"
           className={`w-full h-full object-cover transition-transform duration-500 ease-out ${
             isBooked
               ? 'grayscale-[50%] blur-[1.5px] opacity-75 scale-[1.02]'
@@ -90,14 +91,16 @@ export const CarOfferCard: React.FC<CarOfferCardProps> = ({
           />
         )}
 
-        {/* Rating Badge (Justified Warm Gold accent) */}
-        <div className="absolute top-3 left-3 inline-flex items-center gap-1 rounded-lg bg-white/95 backdrop-blur-xs px-2.5 py-1 text-xs font-extrabold text-[var(--karya-primary)] shadow-sm border border-black/5">
-          <Star
-            className="w-3.5 h-3.5 fill-[#D49A42] text-[#D49A42]"
-            aria-hidden="true"
-          />
-          <span className="font-mono-tabular">{car.agency_rating.toFixed(1)}</span>
-        </div>
+        {/* Rating Badge (only shown when real ratings exist) */}
+        {car.agency_rating_count > 0 && car.agency_rating > 0 && (
+          <div className="absolute top-3 left-3 inline-flex items-center gap-1 rounded-lg bg-white/95 backdrop-blur-xs px-2.5 py-1 text-xs font-extrabold text-[var(--karya-primary)] shadow-sm border border-black/5">
+            <Star
+              className="w-3.5 h-3.5 fill-[#D49A42] text-[#D49A42]"
+              aria-hidden="true"
+            />
+            <span className="font-mono-tabular">{car.agency_rating.toFixed(1)}</span>
+          </div>
+        )}
 
         {/* Model Year Label */}
         {car.model_year && !isBooked && (
@@ -123,11 +126,11 @@ export const CarOfferCard: React.FC<CarOfferCardProps> = ({
       </button>
 
       {/* Card Body */}
-      <div className="p-4 sm:p-5 flex-1 flex flex-col gap-3.5">
+      <div className="p-3.5 sm:p-5 flex-1 flex flex-col gap-3 sm:gap-3.5">
         {/* Car Title, Agency & No-Deposit Indicator */}
         <div className="space-y-1">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="font-extrabold text-lg text-[var(--karya-primary)] leading-snug truncate">
+            <h3 className="font-extrabold text-base sm:text-lg text-[var(--karya-primary)] leading-snug truncate">
               {car.brand} {car.model}
             </h3>
           </div>
@@ -161,13 +164,13 @@ export const CarOfferCard: React.FC<CarOfferCardProps> = ({
         </div>
 
         {/* Prominent Daily Price & Booking CTA */}
-        <div className="mt-auto pt-3.5 border-t border-[var(--karya-border)] flex items-center justify-between gap-3">
+        <div className="mt-auto pt-3 sm:pt-3.5 border-t border-[var(--karya-border)] flex items-center justify-between gap-3">
           <div className="min-w-0">
             <div className="text-[11px] font-semibold text-[var(--karya-text-muted)] mb-0.5">
               السعر اليومي
             </div>
             <div className="flex items-baseline gap-1">
-              <span className="text-2xl font-extrabold text-[var(--karya-primary)] font-mono-tabular leading-none">
+              <span className="text-xl sm:text-2xl font-extrabold text-[var(--karya-primary)] font-mono-tabular leading-none">
                 {car.daily_price}
               </span>
               <span className="text-xs font-bold text-[var(--karya-text-muted)]">DH / يوم</span>

@@ -49,6 +49,7 @@ export interface CarOffer {
   catalog_id?: string | null;
   agency_name: string;
   agency_phone?: string;
+  agency_verified?: boolean;
   agency_rating: number;
   agency_rating_count: number;
   brand: string;

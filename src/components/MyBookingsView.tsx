@@ -20,6 +20,7 @@ import {
   Gauge,
 } from 'lucide-react';
 import { supabase, formatDH, getCityLabelAr } from '../lib/supabase';
+import { CarImage } from './CarImage';
 import type { BookingStatus, CreatedBooking } from '../types/karya';
 
 const PICKUP_CHECKLIST_STORAGE_KEY = 'karya_pickup_checklist_v1';
@@ -683,18 +684,12 @@ export const MyBookingsView: React.FC<MyBookingsViewProps> = ({
                 className="bg-[var(--karya-surface)] rounded-xl border border-[var(--karya-border)] overflow-hidden flex flex-col sm:flex-row"
               >
                 <div className="w-full sm:w-52 md:w-60 h-44 sm:h-auto bg-slate-100 shrink-0 relative overflow-hidden">
-                  {booking.car_image ? (
-                    <img
-                      src={booking.car_image}
-                      alt={booking.car_label}
-                      referrerPolicy="no-referrer"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-slate-400">
-                      <CarFront className="w-10 h-10" />
-                    </div>
-                  )}
+                  <CarImage
+                    src={booking.car_image}
+                    brand={booking.car_label}
+                    alt={booking.car_label}
+                    className="w-full h-full object-cover"
+                  />
                 </div>
 
                 <div className="flex-1 p-4 sm:p-5 flex flex-col justify-between gap-4 min-w-0">

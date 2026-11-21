@@ -178,7 +178,7 @@ export function App() {
 
   return (
     <div
-      className="min-h-screen flex flex-col bg-[var(--karya-bg)] text-[var(--karya-text)] pb-[64px] md:pb-0"
+      className="min-h-screen flex flex-col bg-[var(--karya-bg)] text-[var(--karya-text)] pb-[calc(76px+env(safe-area-inset-bottom,0px))] md:pb-0"
       dir="rtl"
     >
       {/* Clean 3-Zone Top Bar */}
@@ -280,7 +280,7 @@ export function App() {
       </main>
 
       {/* Quiet Footer */}
-      <footer className="bg-[var(--karya-surface)] border-t border-[var(--karya-border)] py-6 mt-auto">
+      <footer className="bg-[var(--karya-surface)] border-t border-[var(--karya-border)] py-6 pb-8 md:pb-6 mt-auto">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[var(--karya-text-muted)]">
           <div onClick={handleCopyrightClick} className="select-none cursor-default">
             © Karya — كراء السيارات في المغرب بدون ضمانة مالية

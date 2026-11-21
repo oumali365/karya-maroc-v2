@@ -32,6 +32,7 @@ import {
 } from '../lib/supabase';
 import { STARTER_BANKS } from '../data/starterData';
 import { BankTransferCheckout } from './BankTransferCheckout';
+import { CarImage } from './CarImage';
 import type { CarOffer, CreatedBooking, PlatformBank } from '../types/karya';
 
 interface BookingModalProps {
@@ -831,10 +832,11 @@ export const BookingModal: React.FC<BookingModalProps> = ({
               {/* Compact Car Summary with Collapsible Secondary Details */}
               <div className="rounded-xl border border-[var(--karya-border)] bg-[var(--karya-bg)] p-3.5 space-y-3">
                 <div className="flex items-start gap-3">
-                  <img
+                  <CarImage
                     src={car.primary_image_url}
+                    brand={car.brand}
+                    model={car.model}
                     alt={`${car.brand} ${car.model}`}
-                    referrerPolicy="no-referrer"
                     className="w-24 h-[68px] sm:w-28 sm:h-20 rounded-lg object-cover border border-[var(--karya-border)] bg-white shrink-0"
                   />
                   <div className="min-w-0 flex-1 space-y-1">
@@ -842,7 +844,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                       <h4 className="font-extrabold text-sm sm:text-base text-[var(--karya-primary)] truncate">
                         {car.brand} {car.model}
                       </h4>
-                      {car.agency_rating > 0 && (
+                      {car.agency_rating_count > 0 && car.agency_rating > 0 && (
                         <span className="inline-flex items-center gap-1 text-xs font-extrabold text-[var(--karya-primary)] shrink-0">
                           <Star className="w-3.5 h-3.5 fill-[#D49A42] text-[#D49A42]" />
                           <span className="font-mono-tabular">{car.agency_rating.toFixed(1)}</span>

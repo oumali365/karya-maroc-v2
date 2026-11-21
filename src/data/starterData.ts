@@ -33,13 +33,15 @@ export const STARTER_IMAGE_TEMPLATES = [
   { label: 'VW Golf 8', url: carVwGolf },
 ];
 
-/**
- * يربط كل موديل في قاعدة البيانات بصورة مرجعية عالية الجودة عند غياب رابط صورة مرفوع
- */
-export function resolveCatalogImage(brand: string, model: string, explicitUrl?: string | null): string {
-  const clean = explicitUrl?.trim();
-  if (clean) return clean;
+const BUNDLED_CAR_ASSETS = new Set<string>([
+  carDaciaDuster,
+  carRenaultClio,
+  carPeugeot208,
+  carHyundaiTucson,
+  carVwGolf,
+]);
 
+export function getModelFallbackImage(brand: string, model: string): string {
   const key = `${brand} ${model}`.toLowerCase();
   if (key.includes('duster')) return carDaciaDuster;
   if (key.includes('sandero') || key.includes('logan') || key.includes('dacia')) return carDaciaDuster;
@@ -48,6 +50,36 @@ export function resolveCatalogImage(brand: string, model: string, explicitUrl?: 
   if (key.includes('tucson') || key.includes('hyundai')) return carHyundaiTucson;
   if (key.includes('golf') || key.includes('polo') || key.includes('volkswagen') || key.includes('vw') || key.includes('ford') || key.includes('fiesta') || key.includes('focus')) return carVwGolf;
   return DEFAULT_CAR_IMAGE_URL;
+}
+
+/**
+ * يربط كل موديل في قاعدة البيانات بصورة مرجعية عالية الجودة عند غياب رابط صالح
+ */
+export function resolveCatalogImage(brand: string, model: string, explicitUrl?: string | null): string {
+  const clean = explicitUrl?.trim();
+  const fallback = getModelFallbackImage(brand, model);
+
+  if (!clean) return fallback;
+
+  if (BUNDLED_CAR_ASSETS.has(clean)) {
+    return clean;
+  }
+
+  // Ignore stale dev/build Vite paths persisted in DB from previous builds
+  if (clean.startsWith('/src/assets/') || clean.startsWith('/assets/')) {
+    return fallback;
+  }
+
+  if (
+    clean.startsWith('https://') ||
+    clean.startsWith('http://') ||
+    clean.startsWith('data:image/') ||
+    clean.startsWith('blob:')
+  ) {
+    return clean;
+  }
+
+  return fallback;
 }
 
 export const STARTER_CATALOG: CatalogCar[] = [

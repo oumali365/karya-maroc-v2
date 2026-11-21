@@ -39,6 +39,7 @@ import {
   resolveCatalogImage,
 } from '../data/starterData';
 import { FaqSection } from './FaqSection';
+import { CarImage } from './CarImage';
 import type {
   AgencyBookingRecord,
   AgencyProfile,
@@ -1379,10 +1380,11 @@ const AgencyFleetManager: React.FC<{
                 }`}
               >
                 <div className="aspect-[16/10] bg-[var(--karya-surface-muted)] relative">
-                  <img
+                  <CarImage
                     src={car.primary_image_url}
+                    brand={car.brand}
+                    model={car.model}
                     alt={`${car.brand} ${car.model}`}
-                    referrerPolicy="no-referrer"
                     className="w-full h-full object-cover"
                   />
                   {activeBooking && (
@@ -1706,8 +1708,10 @@ const AgencyFleetManager: React.FC<{
                             }`}
                           >
                             <div className="aspect-[16/10] bg-[var(--karya-surface-muted)] w-full overflow-hidden relative">
-                              <img
+                              <CarImage
                                 src={item.image_url}
+                                brand={item.brand}
+                                model={item.model}
                                 alt={`${item.brand} ${item.model}`}
                                 className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                               />
@@ -1737,8 +1741,10 @@ const AgencyFleetManager: React.FC<{
                     {/* Selected Model Preview Strip */}
                     <div className="rounded-xl border border-[var(--karya-border)] bg-[var(--karya-bg)] p-3 flex items-center justify-between gap-3">
                       <div className="flex items-center gap-3 min-w-0">
-                        <img
+                        <CarImage
                           src={selectedModel.image_url}
+                          brand={selectedModel.brand}
+                          model={selectedModel.model}
                           alt={`${selectedModel.brand} ${selectedModel.model}`}
                           className="w-20 h-14 rounded-lg object-cover border border-[var(--karya-border)] bg-white shrink-0"
                         />
